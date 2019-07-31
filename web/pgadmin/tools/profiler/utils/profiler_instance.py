@@ -16,7 +16,7 @@ profiler_sessions_lock = Lock()
 class ProfilerInstance:
     def __init__(self, trans_id=None):
         if trans_id is None:
-            self._trans_id = str(ranom.randint(1, 9999999))
+            self._trans_id = str(random.randint(1, 9999999))
         else:
             self._trans_id = trans_id
 

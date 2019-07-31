@@ -27,7 +27,7 @@ from pgadmin.utils.ajax import make_json_response, \
     internal_server_error
 from pgadmin.utils.driver import get_driver
 
-# other imports 
+# other imports
 from config import PG_DEFAULT_DRIVER
 from pgadmin.tools.profiler.utils.profiler_instance import ProfilerInstance
 
@@ -77,7 +77,7 @@ class ProfilerModule(PgAdminModule):
         )
 
     def get_exposed_url_endpoints(self):
-        return []
+        return ['profiler.index', 'profiler.init_for_function']
 
     def on_logout(self, user):
         """

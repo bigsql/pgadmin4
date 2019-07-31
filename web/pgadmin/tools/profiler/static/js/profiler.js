@@ -52,8 +52,6 @@ define([
         //TODO: more menus
       ]);
 
-      console.warn('adding menu');
-
       // Create and load the new frame required for profiler panel
       this.frame = new pgBrowser.Frame({
         name: 'frm_Profiler',
@@ -135,6 +133,8 @@ define([
       // Generate the URL to create a profiler instance
       var treeInfo = node.getTreeNodeHierarchy.apply(node, [i]),
         _url = this.generate_url('init', treeInfo, node);
+
+      console.warn(_url);
 
       $.ajax({
         url:_url,

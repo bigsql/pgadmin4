@@ -10,12 +10,106 @@
 define([
   'sources/gettext', 'sources/url_for', 'jquery', 'underscore', 'backbone',
   'pgadmin.alertifyjs', 'sources/pgadmin', 'pgadmin.browser',
-  'pgadmin.backgrid', 'pgadmin.tools.debugger.ui', //'wcdocker',
+  'pgadmin.backgrid', //'wcdocker',
 ], function(
-  gettext, url_for, $, _, Backbone, Alertify, pgAdmin, pgBrowser, Backgrid, debuggerUI
+  gettext, url_for, $, _, Backbone, Alertify, pgAdmin, pgBrowser, Backgrid
 ) {
 
   //var wcDocker = window.wcDocker;
+
+  /*
+   * Function used to return the respective Backgrid control based on the data type
+   * of function input argument.
+   */
+  var cellFunction = function(model) {
+    var variable_type = model.get('type');
+
+    // if variable type is an array then we need to render the custom control to take the input from user.
+    if (variable_type.indexOf('[]') != -1) {
+      var data_type = variable_type.replace('[]' ,'');
+
+      switch (data_type) {
+      case 'boolean':
+        return Backgrid.Extension.InputBooleanArrayCell;
+      case 'integer':
+      case 'smallint':
+      case 'bigint':
+      case 'serial':
+      case 'smallserial':
+      case 'bigserial':
+      case 'oid':
+      case 'cid':
+      case 'xid':
+      case 'tid':
+        return Backgrid.Extension.InputIntegerArrayCell;
+      case 'real':
+      case 'numeric':
+      case 'double precision':
+      case 'decimal':
+        return Backgrid.Extension.InputNumberArrayCell;
+      default:
+        return Backgrid.Extension.InputStringArrayCell;
+      }
+    } else {
+      switch (variable_type) {
+      case 'boolean':
+        return Backgrid.BooleanCell.extend({
+          formatter: Backgrid.BooleanCellFormatter,
+        });
+      case 'integer':
+      case 'smallint':
+      case 'bigint':
+      case 'serial':
+      case 'smallserial':
+      case 'bigserial':
+      case 'oid':
+      case 'cid':
+      case 'xid':
+      case 'tid':
+        // As we are getting this value as text from sqlite database so we need to type cast it.
+        if (model.get('value') != undefined) {
+          model.set({
+            'value': parseInt(model.get('value')),
+          }, {
+            silent: true,
+          });
+        }
+
+        return Backgrid.IntegerCell;
+      case 'real':
+      case 'numeric':
+      case 'double precision':
+      case 'decimal':
+        // As we are getting this value as text from sqlite database so we need to type cast it.
+        if (model.get('value') != undefined) {
+          model.set({
+            'value': parseFloat(model.get('value')),
+          }, {
+            silent: true,
+          });
+        }
+        return Backgrid.NumberCell;
+      case 'string':
+        return Backgrid.StringCell;
+      case 'date':
+        return Backgrid.DateCell;
+      default:
+        return Backgrid.Cell;
+      }
+    }
+  };
+
+  /*
+   * Function used to return the respective Backgrid string or boolean control based on the data type
+   * of function input argument.
+   */
+  var cellExprControlFunction = function(model) {
+    var variable_type = model.get('type');
+    if (variable_type.indexOf('[]') != -1) {
+      return Backgrid.StringCell;
+    }
+    return Backgrid.BooleanCell;
+  };
 
   /**
    *  ProfilerInputArgsModel used to represent input parameters for the function to profile
@@ -41,6 +135,7 @@ define([
       } else {
         this.errorModel.unset('value');
       }
+
       return null;
     },
   });
@@ -49,6 +144,25 @@ define([
   var ProfilerInputArgCollections = Backbone.Collection.extend({
     model: ProfilerInputArgsModel,
   });
+
+  // function will enable/disable the use_default column based on the value received.
+  var disableDefaultCell = function(d) {
+    if (d instanceof Backbone.Model) {
+      return d.get('use_default');
+    }
+    return false;
+  };
+
+  // Enable/Disable the control based on the array data type of the function input arguments
+  var disableExpressionControl = function(d) {
+    if (d instanceof Backbone.Model) {
+      var argType = d.get('type');
+      if (argType.indexOf('[]') != -1) {
+        return false;
+      }
+      return true;
+    }
+  };
 
 
   var res = function(profile_info, restart_profile, is_edb_proc, trans_id) {
@@ -84,7 +198,9 @@ define([
               */
             }
 
-            var _Url = url_for('debugger.get_arguments', {
+            /* To get existing params from sqlite db
+             * Currently not implemented
+            var _Url = url_for('profiler.get_arguments', {
               'sid': profile_info.server_id,
               'did': profile_info.database_id,
               'scid': profile_info.schema_id,
@@ -106,6 +222,7 @@ define([
                   gettext('unable to fetch the arguments from the server')
                 );
               });
+            */
 
             var argname, argtype, argmode, default_args_count, default_args, arg_cnt;
 
@@ -139,15 +256,15 @@ define([
                 name: 'expr',
                 label: gettext('Expression?'),
                 type: 'boolean',
-                cellFunction: debuggerUI.cellExprControlFunction,
-                editable: debuggerUI.disableExpressionControl,
+                cellFunction: cellExprControlFunction,
+                editable: disableExpressionControl,
               },
               {
                 name: 'value',
                 label: gettext('Value'),
                 type: 'text',
                 editable: true,
-                cellFunction: debuggerUI.cellFunction,
+                cellFunction: cellFunction,
                 headerCell: value_header,
               },
               {
@@ -155,7 +272,7 @@ define([
                 label: gettext('Use Default?'),
                 type: 'boolean',
                 cell: 'boolean',
-                editable: debuggerUI.disableDefaultCell,
+                editable: disableDefaultCell,
               },
               {
                 name: 'default_value',
@@ -400,11 +517,12 @@ define([
              If we already have data available in sqlite database then we should
              enable the profile button otherwise disable the profile button.
             */
+            /* TODO: sqlite
             if (this.func_args_data.length == 0) {
               this.__internal.buttons[1].element.disabled = true;
-            } else {
-              this.__internal.buttons[1].element.disabled = false;
-            }
+            } else {*/
+            this.__internal.buttons[1].element.disabled = false;
+            //}
 
             /*
              Listen to the grid change event so that if any value changed by user then we can enable/disable the
