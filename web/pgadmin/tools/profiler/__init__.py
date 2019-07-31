@@ -219,4 +219,31 @@ def init_function(node_type, sid, did, scid, fid, trid=None):
     r_set['rows'][0]['require_input'] = data['require_input']
 
     # Create a profiler instance
-    
+    de_inst = ProfilerInstance()
+    de_inst.function_data = {
+        'oid': fid,
+        'name': r_set['rows'][0]['name'],
+        'is_func': r_set['rows'][0]['isfunc'],
+        'is_ppas_database': ppas_server,
+        'is_callable': False,
+        'schema': r_set['rows'][0]['schemaname'],
+        'language': r_set['rows'][0]['lanname'],
+        'return_type': r_set['rows'][0]['rettype'],
+        'args_type': r_set['rows'][0]['proargtypenames'],
+        'args_name': r_set['rows'][0]['proargnames'],
+        'arg_mode': r_set['rows'][0]['proargmodes'],
+        'use_default': r_set['rows'][0]['pronargdefaults'],
+        'default_value': r_set['rows'][0]['proargdefaults'],
+        'pkgname': r_set['rows'][0]['pkgname'],
+        'pkg': r_set['rows'][0]['pkg'],
+        'require_input': data['require_input'],
+        'args_value': ''
+    }
+
+    return make_json_response(
+        data=dict(
+            profile_info=r_set['rows'],
+            trans_id=de_inst.trans_id
+        ),
+        status=200
+    )

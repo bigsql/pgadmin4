@@ -1,11 +1,21 @@
+/////////////////////////////////////////////////////////////
+//
+//
+//
+//
+//
+//
+/////////////////////////////////////////////////////////////
+
 define([
   'sources/gettext', 'sources/url_for', 'jquery', 'underscore',
   'underscore.string', 'alertify', 'sources/pgadmin', 'pgadmin.browser',
   'backbone', 'pgadmin.backgrid', 'codemirror', 'pgadmin.backform',
+  'pgadmin.tools.profiler.ui', //'pgadmin.tools.profiler.utils',
   'wcdocker', 'pgadmin.browser.frame',
 ]), function(
   gettext, url_for, $, _, S, Alertify, pgAdmin, pgBrowser, Backbone, Backgrid,
-  CodeMirror, Backform,
+  CodeMirror, Backform, get_function_arguments, profilerUtils
 ) {
   var pgTools = pgAdmin.Tools = pgAdmin.Tools || {},
     wcDocker = window.wcDocker;
@@ -16,7 +26,8 @@ define([
 
     pgTools.Profiler = {
       init: function() {
-        // We do not want ot initialize the module multiple times.
+
+        // We do not want to initialize the module multiple times.
         if (this.initialized)
           return;
 
@@ -95,6 +106,9 @@ define([
       Get the function information for the direct profiling to display the functions arguments and  other informations
       in the user input dialog
     */
+    /*
+     * Does not support procedures, trigger functions, edb/ppass functions/procedures
+    */
     get_function_information: function(args, item) {
       var t = pgBrowser.tree,
         i = item || t.selected(),
@@ -106,14 +120,22 @@ define([
         if (!d)
           return;
 
-        //var treeInfo = node.getTreeNodeHierarchy.apply(node, [i]),
-        //  _url = this.generate_url('init', treeInfo, node);
+        // Generate the URL to create a profiler instance
+        var treeInfo = node.getTreeNodeHierarchy.apply(node, [i]),
+          _url = this.generate_url('init', treeInfo, node);
 
         $.ajax({
           url:_url,
           cache: false,
         })
           .done(function(res) {
+
+            let profile_info = res.data.profile_info,
+              trans_id = res.data.trans_id;
+            // Open Alertify the dialog to take the input arguments from user if function having input arguments
+            if (profile_info[0]['require_input']) {
+              (profile_info[0], 0, false /* is_edb_proc */, trans_id);
+            } else {
 
           })
 
