@@ -11,7 +11,7 @@ define([
   'sources/gettext', 'sources/url_for', 'jquery', 'underscore',
   'underscore.string', 'alertify', 'sources/pgadmin', 'pgadmin.browser',
   'backbone', 'pgadmin.backgrid', 'codemirror', 'pgadmin.backform',
-  'pgadmin.tools.profiler.ui', //'pgadmin.tools.profiler.utils',
+  'pgadmin.tools.profiler.ui', 'pgadmin.tools.profiler.utils',
   'wcdocker', 'pgadmin.browser.frame',
 ]), function(
   gettext, url_for, $, _, S, Alertify, pgAdmin, pgBrowser, Backbone, Backgrid,

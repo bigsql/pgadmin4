@@ -17,10 +17,39 @@ define([
 
   var wcDocker = window.wcDocker;
 
+  /**
+   *  ProfilerInputArgsModel used to represent input parameters for the function to profile
+   *  for function objects.
+   **/
+  var DebuggerInputArgsModel = Backbone.Model.extend({
+    defaults: {
+      name: undefined,
+      type: undefined,
+      is_null: undefined,
+      expr: undefined,
+      value: undefined,
+      use_default: undefined,
+      default_value: undefined,
+    },
+    validate: function() {
+      if (_.isUndefined(this.get('value')) ||
+        _.isNull(this.get('value')) ||
+        String(this.get('value')).replace(/^\s+|\s+$/g, '') == '') {
+        var msg = gettext('Please enter a value for the parameter.');
+        this.errorModel.set('value', msg);
+        return msg;
+      } else {
+        this.errorModel.unset('value');
+      }
+      return null;
+    },
+  });
+
   // Collection which contains the model for function informations.
   var ProfilerInputArgCollections = Backbone.Collection.extend({
     model: ProfilerInputArgsModel,
   });
+
 
   var res = function(profile_info, restart_profile, is_edb_proc, trans_id) {
     if (!Alertify.profilerInputArgsDialog) {
@@ -293,17 +322,133 @@ define([
             //}
 
             // Initialize a new Grid instance
+            if (this.grid) {
+              this.grid.remove();
+              this.grid = null;
+            }
+            var grid = this.grid = new Backgrid.Grid({
+              columns: gridCols,
+              collection: this.profilerInputArgsColl,
+              className: 'backgrid table table-bordered table-noouter-border table-bottom-border',
+            });
 
-          }
-        }
-      })
+            grid.render();
+            $(this.elements.content).html(grid.el);
 
+            // For keyboard navigation in the grid
+            // we'll set focus on checkbox from the first row if any
+            var grid_checkbox = $(grid.el).find('input:checkbox').first();
+            if (grid_checkbox.length) {
+              setTimeout(function() {
+                grid_checkbox.trigger('click');
+              }, 250);
+            }
+
+          },
+          settings: {
+            profile_info: undefined,
+            restart_profile: undefined,
+            trans_id: undefined,
+          },
+          setup: function() {
+            return {
+              buttons: [{
+                text: gettext('Cancel'),
+                key: 27,
+                className: 'btn btn-secondary fa fa-times pg-alertify-button',
+              },{
+                text: gettext('Profile'),
+                key: 13,
+                className: 'btn btn-primary fa fa-bug pg-alertify-button',
+              }],
+              // Set options for dialog
+              options: {
+                //disable both padding and overflow control.
+                padding: !1,
+                overflow: !1,
+                model: 0,
+                resizable: true,
+                maximizable: true,
+                pinnable: false,
+                closableByDimmer: false,
+                modal: false,
+              },
+            };
+          },
+
+          build: function() {
+            Alertify.pgDialogBuild.apply(this);
+          },
+          prepare: function() {
+            // Add our class to alertify
+            $(this.elements.body.childNodes[0]).addClass(
+              'alertify_tools_dialog_properties obj_properties'
+            );
+
+            /*
+             If we already have data available in sqlite database then we should
+             enable the profile button otherwise disable the profile button.
+            */
+            if (this.func_args_data.length == 0) {
+              this.__internal.buttons[1].element.disabled = true;
+            } else {
+              this.__internal.buttons[1].element.disabled = false;
+            }
+
+            /*
+             Listen to the grid change event so that if any value changed by user then we can enable/disable the
+             profile button.
+            */
+            this.grid.listenTo(this.profileInputArgsColl, 'backgrid:edited',
+              (function(obj) {
+
+                return function() {
+
+                  var enable_btn = false;
+
+                  for (var i = 0; i < this.collection.length; i++) {
+
+                    if (this.collection.models[i].get('is_null')) {
+                      obj.__internal.buttons[1].element.disabled = false;
+                      enable_btn = true;
+                      continue;
+                    }
+                    // TODO: Need to check the "Expression" column value to
+                    // enable/disable the "Profile" button
+                    if (this.collection.models[i].get('value') == null ||
+                        this.collection.models[i].get('value') == undefined) {
+                      enable_btn = true;
+
+                      if (this.collection.models[i].get('use_default')) {
+                        obj.__internal.buttons[1].element.disabled = false;
+                      } else {
+                        obj.__internal.buttons[1].element.disabled = true;
+                        break;
+                      }
+                    }
+                  }
+                  if (!enable_btn)
+                    obj.__internal.buttons[1].element.disabled = false;
+                };
+              })(this)
+            );
+
+            this.grid.listenTo(this.profilerInputArgsColl, 'backgrid:error',
+              (function(obj) {
+                return function() {
+                  obj.__internal.buttons[1].element.disabled = true;
+                };
+              })(this)
+            );
+          },
+        };
+      });
     }
-  }
 
-  Alertify.profilerInputArgsDialog(
-      gettext('Profiler'), profile_info, restart_profile, is_edb_proc, trans_id
+    Alertify.profilerInputArgsDialog(
+        gettext('Profiler'), profile_info, restart_profile, is_edb_proc, trans_id
     ).resizeTo(pgBrowser.stdW.md,pgBrowser.stdH.md);
   };
 
+  return res;
 });
