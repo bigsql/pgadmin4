@@ -238,8 +238,8 @@ def init_function(node_type, sid, did, scid, fid, trid=None):
     r_set['rows'][0]['require_input'] = data['require_input']
 
     # Create a profiler instance
-    de_inst = ProfilerInstance()
-    de_inst.function_data = {
+    pfl_inst = ProfilerInstance()
+    pfl_inst.function_data = {
         'oid': fid,
         'name': r_set['rows'][0]['name'],
         'is_func': r_set['rows'][0]['isfunc'],
@@ -262,7 +262,73 @@ def init_function(node_type, sid, did, scid, fid, trid=None):
     return make_json_response(
         data=dict(
             profile_info=r_set['rows'],
-            trans_id=de_inst.trans_id
+            trans_id=pfl_inst.trans_id
         ),
         status=200
     )
+
+@blueprint.route(
+    '/close/<int:trans_id>', methods=["DELETE"], endpoint='close'
+)
+def close(trans_id):
+    """
+    close(trans_id)
+
+    This method is used to close the asynchronous connection
+    and remove the information of unique transaction id from
+    the session variable.
+
+    Parameters:
+        trans_id
+        - unique transaction id.
+    """
+
+    close_profiler_session(trans_id)
+    return make_json_response(data={'status': True})
+
+def close_profiler_session(_trans_id, close_all=False):
+    """
+    This function is used to cancel the profiler transaction and
+    release the connection.
+
+    :param trans_id: Transaction id
+    :return:
+    """
+
+    if close_all:
+        trans_ids = ProfilerInstance.get_trans_ids()
+    else:
+        trans_ids = [_trans_id]
+
+    for trans_id in trans_ids:
+        pfl_inst = ProfilerInstance(trans_id)
+        pfl_obj = pfl_inst.profiler_data
+
+        try:
+            if pfl_obj is not None:
+                manager = get_driver(PG_DEFAULT_DRIVER).\
+                    connection_manager(pfl_obj['server_id'])
+
+                if manager is not None:
+                    conn = manager.connection(
+                        did=pfl_obj['database_id'],
+                        conn_id=pfl_obj['conn_id'])
+                    if conn.connected():
+                        conn.cancel_transaction(
+                            pfl_obj['conn_id'],
+                            pfl_obj['database_id'])
+                    manager.release(conn_id=pfl_obj['conn_id'])
+
+                    if 'exe_conn_id' in pfl_obj:
+                        conn = manager.connection(
+                            did=pfl_obj['database_id'],
+                            conn_id=pfl_obj['exe_conn_id'])
+                        if conn.connected():
+                            conn.cancel_transaction(
+                                pfl_obj['exe_conn_id'],
+                                pfl_obj['database_id'])
+                        manager.release(conn_id=pfl_obj['exe_conn_id'])
+        except Exception as _:
+            raise
+        finally:
+            pfl_inst.clear()

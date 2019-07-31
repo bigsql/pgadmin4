@@ -1,7 +1,7 @@
 /////////////////////////////////////////////////////////////
 //
 //
-//
+// TODO: support for restart_profile
 //
 //
 //
@@ -503,7 +503,145 @@ define([
               },
             };
           },
+          // Callback functions when click on the buttons of the Alertify dialogs
+          callback: function(e) {
+            if (e.button.text === gettext('Profile')) {
+              // Initialize the target once the profile button is clicked and
+              // create asynchronous connection and unique transaction ID
+              var self = this;
 
+              // If the profiling is started again then treeInfo is already
+              // stored in this.data so we can use the same.
+              if (self.setting('restart_profile') == 0) {
+                var t = pgBrowser.tree,
+                  i = t.selected(),
+                  d = i && i.length == 1 ? t.itemData(i) : undefined,
+                  node = d && pgBrowser.Nodes[d._type];
+
+                if (!d)
+                  return;
+
+                var treeInfo = node.getTreeNodeHierarchy.apply(node, [i]);
+              }
+
+              var args_value_list = [];
+              // var sqlite_func_args_list = this.sqlite_func_args_list = [];
+              var int_count = 0;
+
+              this.grid.collection.each(function(m) {
+
+                // Check if value is set to NULL then we should ignore the value field
+                if (m.get('is_null')) {
+                  args_value_list.push({
+                    'name': m.get('name'),
+                    'type': m.get('type'),
+                    'value': 'NULL',
+                  });
+                } else {
+                  // Check if default value to be used or not
+                  if (m.get('use_default')) {
+                    args_value_list.push({
+                      'name': m.get('name'),
+                      'type': m.get('type'),
+                      'value': m.get('default_value'),
+                    });
+                  } else {
+                    args_value_list.push({
+                      'name': m.get('name'),
+                      'type': m.get('type'),
+                      'value': m.get('value'),
+                    });
+                  }
+                }
+
+                // TODO: Add support to store settings in sqlite
+
+                int_count = int_count + 1;
+              });
+
+              var baseUrl;
+
+              // TODO: At this point, we are assuming that profiling is not starting again
+              if (d._type == 'function') {
+                baseUrl = url_for('profiler.initialize_target_for_function', {
+                  'profile_type': 'direct',
+                  'trans_id': self.setting('trans_id'),
+                  'sid': treeInfo.server._id,
+                  'did': treeInfo.database._id,
+                  'scid': treeInfo.schema._id,
+                  'func_id': treeInfo.function._id,
+                });
+              }
+
+              $.ajax({
+                url: baseUrl
+                method: 'POST',
+                data: {
+                  'data': JSON.stringify(args_value_list),
+                }
+              })
+                .done(function(res) {
+
+                  var url = url_for(
+                    'profiler.direct', {
+                      'trans_id': res.data.profilerTransId,
+                    }
+                  );
+
+                  if (self.preference.profiler_new_browser_tab) {
+                    window.open(url, '_blank');
+                  } /* else  {
+                  // TODO: Add support for opening/not opening in new tab
+                  }*/
+
+                  /*
+                   * TODO: support for sqlite db
+                  var _Url;
+
+                  if (d._type == 'function') {
+                    _Url = url_for('profiler.set_arguments', {
+                      'sid': treeInfo.server._id,
+                      'did': treeInfo.database._id,
+                      'scid': treeInfo.schema._id,
+                      'func_id': treeInfo.function._id,
+                    });
+                  }
+                  $.ajax({
+                    url: _Url,
+                    method: 'POST',
+                    data: {
+                      'data': JSON.stringify(sqlite_func_args_list),
+                    }
+                  })
+                    .done(function() {})
+                    .fail(function() {
+                      Alertify.alert(
+                        gettext('Profiler error'),
+                        gettext('Uable to set the arguments on the server')
+                      );
+                    });
+                  */
+                })
+                .fail(function(e) {
+                  Alertify.alert(
+                    gettext('Profiler Target Initialization Error'),
+                    e.responseJSON.errormsg
+                  );
+                });
+                
+                return true;
+            }
+
+            if (e.button.text === gettext('Cancel')) {
+              /* Clear the trans id */
+              $.ajax({
+                method: 'DELETE',
+                url: url_for('profiler.close', {'trans_id': this.setting('trans_id')}),
+              });
+
+              return false;
+            }
+          },
           build: function() {
             Alertify.pgDialogBuild.apply(this);
           },
