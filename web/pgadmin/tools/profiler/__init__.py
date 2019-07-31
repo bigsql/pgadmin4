@@ -13,6 +13,7 @@ MODULE_NAME = 'profiler'
 
 # Python imports
 import simplejson as json
+import random
 
 # Flask imports
 from flask import url_for, Response, render_template, request, session, \
@@ -26,6 +27,7 @@ from pgadmin.utils.ajax import bad_request
 from pgadmin.utils.ajax import make_json_response, \
     internal_server_error
 from pgadmin.utils.driver import get_driver
+from pgadmin.settings import get_setting
 
 # other imports
 from config import PG_DEFAULT_DRIVER
@@ -77,7 +79,10 @@ class ProfilerModule(PgAdminModule):
         )
 
     def get_exposed_url_endpoints(self):
-        return ['profiler.index', 'profiler.init_for_function']
+        return ['profiler.index', 'profiler.init_for_function',
+                'profiler.initialize_target_for_function',
+                'profiler.close'
+                ]
 
     def on_logout(self, user):
         """
@@ -266,6 +271,176 @@ def init_function(node_type, sid, did, scid, fid, trid=None):
         ),
         status=200
     )
+
+@blueprint.route('/direct/<int:trans_id>', methods=['GET'], endpoint='direct')
+@login_required
+def direct_new(trans_id):
+    pfl_inst = ProfilerInstance(trans_id)
+
+    # Return from the function if transaction id not found
+    if pfl_inst.profiler_data is None:
+        return make_json_response(data={'status': True})
+
+    # if indirect profiling pass value 0 to client and for direct profiling
+    # pass it to 1
+    profile_type = 0 if pfl_inst.profiler_data['profile_type'] == 'indirect' else 1
+
+    """
+    Animations and transitions are not automatically GPU accelerated and by
+    default use browser's slow rendering engine.
+    We need to set 'translate3d' value of '-webkit-transform' property in
+    order to use GPU.
+    After applying this property under linux, Webkit calculates wrong position
+    of the elements so panel contents are not visible.
+    To make it work, we need to explicitly set '-webkit-transform' property
+    to 'none' for .ajs-notifier, .ajs-message, .ajs-modal classes.
+
+    This issue is only with linux runtime application and observed in Query
+    tool and debugger. When we open 'Open File' dialog then whole Query-tool
+    panel content is not visible though it contains HTML element in back end.
+
+    The port number should have already been set by the runtime if we're
+    running in desktop mode.
+    """
+    is_linux_platform = False
+
+    from sys import platform as _platform
+    if "linux" in _platform:
+        is_linux_platform = True
+
+    # We need client OS information to render correct Keyboard shortcuts
+    user_agent = UserAgent(request.headers.get('User-Agent'))
+
+    function_arguments = '('
+    if pfl_inst.profiler_data is not None:
+        if 'args_name' in pfl_inst.profiler_data and \
+            pfl_inst.profiler_data['args_name'] is not None and \
+                pfl_inst.profiler_data['args_name'] != '':
+            args_name_list = pfl_inst.profiler_data['args_name'].split(",")
+            args_type_list = pfl_inst.profiler_data['args_type'].split(",")
+            index = 0
+            for args_name in args_name_list:
+                function_arguments = '{}{} {}, '.format(function_arguments,
+                                                        args_name,
+                                                        args_type_list[index])
+                index += 1
+            # Remove extra comma and space from the arguments list
+            if len(args_name_list) > 0:
+                function_arguments = function_arguments[:-2]
+
+    function_arguments += ')'
+
+    layout = get_setting('Profiler/Layout')
+
+    function_name_with_arguments = \
+        pfl_inst.profiler_data['function_name'] + function_arguments
+
+    f = open('asdf.txt', 'w+')
+    f.write(function_arguments)
+    f.close()
+
+    return render_template(
+        "profiler/direct.html",
+        _=gettext,
+        function_name=pfl_inst.profiler_data['function_name'],
+        uniqueId=trans_id,
+        profile_type=profile_type,
+        is_desktop_mode=current_app.PGADMIN_RUNTIME,
+        is_linux=is_linux_platform,
+        client_platform=user_agent.platform,
+        function_name_with_arguments=function_name_with_arguments,
+        layout=layout
+    )
+
+@blueprint.route(
+    '/initialize_target/<profile_type>/<int:trans_id>/<int:sid>/<int:did>/'
+    '<int:scid>/<int:func_id>',
+    methods=['GET', 'POST'],
+    endpoint='initialize_target_for_function'
+)
+@blueprint.route(
+    '/initialize_target/<profile_type>/<int:trans_id>/<int:sid>/<int:did>/'
+    '<int:scid>/<int:func_id>/<int:tri_id>',
+    methods=['GET', 'POST'],
+    endpoint='initialize_target_for_trigger'
+)
+@login_required
+def initialize_target(profile_type, trans_id, sid, did,
+                      scid, func_id, tri_id=None):
+    """
+    initialize_target(profile_type, sid, did, scid, func_id, tri_id)
+
+    This method is responsible for creating an asynchronous connection.
+
+    Parameters:
+        profile_type
+        - Type of profiling (Direct or Indirect)
+        sid
+        - Server Id
+        did
+        - Database Id
+        scid
+        - Schema Id
+        func_id
+        - Function Id
+        tri_id
+        - Trigger Function Id
+    """
+
+    # Create asynchronous connection using random connection id.
+    conn_id = str(random.randint(1, 9999999))
+    try:
+        manager = get_driver(PG_DEFAULT_DRIVER).connection_manager(sid)
+        conn = manager.connection(did=did, conn_id=conn_id)
+    except Exception as e:
+        return internal_server_error(errormsg=str(e))
+
+    # Connect the Server
+    status, msg = conn.connect()
+    if not status:
+        return internal_server_error(errormsg=str(msg))
+
+    user = manager.user_info
+    if profile_type == 'indirect':
+        # TODO: global profiling error checking
+        raise Exception('Indirect(global) profiling not currently support')
+
+    # TODO: PPAS/EPAS 11 & above support
+
+    # Set the template path required to read the sql files
+    template_path = 'profiler/sql'
+
+    # TODO: trigger func support
+    # TODO: Version check
+
+    pfl_inst = ProfilerInstance(trans_id)
+    if request.method == 'POST':
+        data = json.loads(request.values['data'], encoding='utf-8')
+        if data:
+            pfl_inst.function_data['args_value'] = data
+
+    # Update the profiler data session variable
+    # Here frame_id is required when user profiler the multilevel function.
+    # When user select the frame from client we need to update the frame
+    # here and set the breakpoint information on that function oid
+    pfl_inst.profiler_data = {
+        'conn_id': conn_id,
+        'server_id': sid,
+        'database_id': did,
+        'schema_id': scid,
+        'function_id': func_id,
+        'function_name': pfl_inst.function_data['name'],
+        'profile_type': profile_type,
+        'profiler_version': 1.0, # Placeholder
+        'frame_id': 0,
+        'restart_profile': 0
+    }
+
+    pfl_inst.update_session()
+
+    return make_json_response(data={'status': status,
+                                    'profilerTransId': trans_id})
+
 
 @blueprint.route(
     '/close/<int:trans_id>', methods=["DELETE"], endpoint='close'

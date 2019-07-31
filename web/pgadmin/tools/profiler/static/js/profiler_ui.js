@@ -528,6 +528,7 @@ define([
               // var sqlite_func_args_list = this.sqlite_func_args_list = [];
               var int_count = 0;
 
+              // Store arguments values into args_value_list
               this.grid.collection.each(function(m) {
 
                 // Check if value is set to NULL then we should ignore the value field
@@ -563,6 +564,7 @@ define([
 
               // TODO: At this point, we are assuming that profiling is not starting again
               if (d._type == 'function') {
+                console.warn('asdf'); // TODO: development message
                 baseUrl = url_for('profiler.initialize_target_for_function', {
                   'profile_type': 'direct',
                   'trans_id': self.setting('trans_id'),
@@ -574,13 +576,15 @@ define([
               }
 
               $.ajax({
-                url: baseUrl
+                url: baseUrl,
                 method: 'POST',
                 data: {
                   'data': JSON.stringify(args_value_list),
-                }
+                },
               })
                 .done(function(res) {
+
+                  console.warn('Calling profile direct'); // TODO: development message
 
                   var url = url_for(
                     'profiler.direct', {
@@ -588,7 +592,7 @@ define([
                     }
                   );
 
-                  if (self.preference.profiler_new_browser_tab) {
+                  if (self.preferences.profiler_new_browser_tab) {
                     window.open(url, '_blank');
                   } /* else  {
                   // TODO: Add support for opening/not opening in new tab
@@ -628,8 +632,8 @@ define([
                     e.responseJSON.errormsg
                   );
                 });
-                
-                return true;
+
+              return true;
             }
 
             if (e.button.text === gettext('Cancel')) {

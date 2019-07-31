@@ -134,8 +134,6 @@ define([
       var treeInfo = node.getTreeNodeHierarchy.apply(node, [i]),
         _url = this.generate_url('init', treeInfo, node);
 
-      console.warn(_url);
-
       $.ajax({
         url:_url,
         cache: false,
