@@ -135,6 +135,7 @@ module.exports = {
     codemirror: sourceDir + '/bundle/codemirror.js',
     sqleditor: './pgadmin/tools/sqleditor/static/js/sqleditor.js',
     debugger_direct: './pgadmin/tools/debugger/static/js/direct.js',
+    profiler_direct: './pgadmin/tools/profiler/static/js/direct.js',
     file_utils: './pgadmin/misc/file_manager/static/js/utility.js',
     pgadmin: pgadminStyles,
     style: './pgadmin/static/css/style.css',
@@ -268,6 +269,8 @@ module.exports = {
         ',pgadmin.tools.import_export' +
         ',pgadmin.tools.debugger.controller' +
         ',pgadmin.tools.debugger.direct' +
+        ',pgadmin.tools.profiler.controller' +
+        ',pgadmin.tools.profiler.direct' +
         ',pgadmin.node.pga_job',
       },
     }, {

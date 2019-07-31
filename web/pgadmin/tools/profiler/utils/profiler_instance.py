@@ -8,7 +8,7 @@
 ####################################################################################################
 
 from flask import session
-from threading import lock
+from threading import Lock
 import random
 
 profiler_sessions_lock = Lock()

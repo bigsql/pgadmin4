@@ -11,7 +11,26 @@
 
 MODULE_NAME = 'profiler'
 
-# import statements go here
+# Python imports
+import simplejson as json
+
+# Flask imports
+from flask import url_for, Response, render_template, request, session, \
+    current_app
+from flask_babelex import gettext
+from flask_security import login_required
+
+# pgAdmin utils imports
+from pgadmin.utils import PgAdminModule
+from pgadmin.utils.ajax import bad_request
+from pgadmin.utils.ajax import make_json_response, \
+    internal_server_error
+from pgadmin.utils.driver import get_driver
+
+# other imports 
+from config import PG_DEFAULT_DRIVER
+from pgadmin.tools.profiler.utils.profiler_instance import ProfilerInstance
+
 
 # Constants
 ASYNC_OK = 1
@@ -178,17 +197,17 @@ def init_function(node_type, sid, did, scid, fid, trid=None):
 
     status, r_set = conn.execute_dict(sql)
     if not status:
-        #current_app.logger.debug(
-            #"Error retrieving function information from database")
+        current_app.logger.debug(
+            "Error retrieving function information from database")
         return internal_server_error(errormsg=r_set)
 
     ret_status = status
 
     # TODO: error checking (e.g. checking if extension is installed)
 
-    # Return the response that function cannot be debug...
+    # Return the response that function cannot be profiled...
     if not ret_status:
-        #current_app.logger.debug(msg)
+        current_app.logger.debug(msg)
         return internal_server_error(msg)
 
     data = {'name': r_set['rows'][0]['proargnames'],

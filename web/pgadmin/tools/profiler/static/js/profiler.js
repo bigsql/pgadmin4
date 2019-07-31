@@ -10,64 +10,74 @@
 define([
   'sources/gettext', 'sources/url_for', 'jquery', 'underscore',
   'underscore.string', 'alertify', 'sources/pgadmin', 'pgadmin.browser',
-  'backbone', 'pgadmin.backgrid', 'codemirror', 'pgadmin.backform',
-  'pgadmin.tools.profiler.ui', 'pgadmin.tools.profiler.utils',
-  'wcdocker', 'pgadmin.browser.frame',
-]), function(
-  gettext, url_for, $, _, S, Alertify, pgAdmin, pgBrowser, Backbone, Backgrid,
-  CodeMirror, Backform, get_function_arguments, profilerUtils
+  /*'backbone', 'pgadmin.backgrid', 'codemirror', 'pgadmin.backform',*/
+  'pgadmin.tools.profiler.ui', //'pgadmin.tools.profiler.utils',
+  /*'wcdocker',*/ 'pgadmin.browser.frame',
+], function(
+  gettext, url_for, $, _, S, Alertify, pgAdmin, pgBrowser, /*Backbone, Backgrid,
+  CodeMirror, Backform,*/ get_function_arguments, //profilerUtils
 ) {
-  var pgTools = pgAdmin.Tools = pgAdmin.Tools || {},
-    wcDocker = window.wcDocker;
+  var pgTools = pgAdmin.Tools = pgAdmin.Tools || {}; //,
+  //wcDocker = window.wcDocker;
 
-    /* Return back, this has been called more than once */
-    if (pgAdmin.Tools.Profiler)
-      return pgAdmin.Tools.Profiler;
+  /* Return back, this has been called more than once */
+  if (pgAdmin.Tools.Profiler)
+    return pgAdmin.Tools.Profiler;
 
-    pgTools.Profiler = {
-      init: function() {
+  pgTools.Profiler = {
+    init: function() {
 
-        // We do not want to initialize the module multiple times.
-        if (this.initialized)
-          return;
+      // We do not want to initialize the module multiple times.
+      if (this.initialized)
+        return;
 
-        this.initalized = true;
+      this.initalized = true;
 
-        pgBrowser.add_menus([{
-          name: 'direct_profiler',
-          node: 'function',
-          module: this,
-          applies: ['object, context'],
-          callback: 'get_function_information',
-          category: gettext('Profiling'),
-          priority: 10,
-          label:gettext('Profile'),
-          data: {
-            object: 'function',
-          },
-          icon: 'fa fa-arrow-circle-right',
-          enable: 'can-debug',
-          },
-
-          //TODO: more menus
-        }]);
-
-        // Create and load the new frame required for debugger panel
-        this.frame = new pgBrowser.Frame({
-          name: 'frm_Profiler',
-          title: gettext('Profiler'),
-          width: 500,
-          isCloseable: true,
-          isPrivate: true,
-          icon: 'fa fa-bug',
-          url: 'about:blank',
-        });
-
-        this.frame.load(pgBrowser.docker);
-
-        // TODO: set caching preferences at an interval
-
+      pgBrowser.add_menus([{
+        name: 'direct_profiler',
+        node: 'function',
+        module: this,
+        applies: ['object, context'],
+        callback: 'get_function_information',
+        category: gettext('Debugging'),
+        priority: 11,
+        label:gettext('Profile'),
+        data: {
+          object: 'function',
+        },
+        icon: 'fa fa-arrow-circle-right',
+        enable: true,
       },
+
+        //TODO: more menus
+      ]);
+
+      // Create and load the new frame required for profiler panel
+      this.frame = new pgBrowser.Frame({
+        name: 'frm_Profiler',
+        title: gettext('Profiler'),
+        width: 500,
+        isCloseable: true,
+        isPrivate: true,
+        icon: 'fa fa-bug',
+        url: 'about:blank',
+      });
+
+      this.frame.load(pgBrowser.docker);
+
+      let self = this;
+      let cacheIntervalId = setInterval(function() {
+        if(pgBrowser.preference_version() > 0) {
+          self.preferences = pgBrowser.get_preferences_for_module('profiler');
+          clearInterval(cacheIntervalId);
+        }
+      },0);
+
+      pgBrowser.onPreferencesChange('profiler', function() {
+        self.preferences = pgBrowser.get_preferences_for_module('profiler');
+      });
+
+    },
 
     // generates the endpoint url that will correspond to the correct method for the server to perform
     generate_url: function(_url, treeInfo, node) {
@@ -113,31 +123,32 @@ define([
       var t = pgBrowser.tree,
         i = item || t.selected(),
         d = i && i.length == 1 ? t.itemData(i) : undefined,
-        node = d && pgBrowser.Nodes[d._type],
-        self = this,
+        node = d && pgBrowser.Nodes[d._type]; //,
+        //self = this,
         // is_edb_proc = d._type == 'edbproc';
 
-        if (!d)
-          return;
+      if (!d)
+        return;
 
-        // Generate the URL to create a profiler instance
-        var treeInfo = node.getTreeNodeHierarchy.apply(node, [i]),
-          _url = this.generate_url('init', treeInfo, node);
+      // Generate the URL to create a profiler instance
+      var treeInfo = node.getTreeNodeHierarchy.apply(node, [i]),
+        _url = this.generate_url('init', treeInfo, node);
 
-        $.ajax({
-          url:_url,
-          cache: false,
-        })
-          .done(function(res) {
+      $.ajax({
+        url:_url,
+        cache: false,
+      })
+        .done(function(res) {
 
-            let profile_info = res.data.profile_info,
-              trans_id = res.data.trans_id;
-            // Open Alertify the dialog to take the input arguments from user if function having input arguments
-            if (profile_info[0]['require_input']) {
-              (profile_info[0], 0, false /* is_edb_proc */, trans_id);
-            } else {
-
-          })
+          let profile_info = res.data.profile_info,
+            trans_id = res.data.trans_id;
+          // Open Alertify the dialog to take the input arguments from user if function having input arguments
+          if (profile_info[0]['require_input']) {
+            get_function_arguments(profile_info[0], 0, false /* is_edb_proc */, trans_id);
+          } else {
+            console.warn('A'); // temporary to get rid of jslint error
+          }
+        });
 
     },
   };

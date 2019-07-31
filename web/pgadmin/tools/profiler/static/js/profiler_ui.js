@@ -10,18 +10,18 @@
 define([
   'sources/gettext', 'sources/url_for', 'jquery', 'underscore', 'backbone',
   'pgadmin.alertifyjs', 'sources/pgadmin', 'pgadmin.browser',
-  'pgadmin.backgrid', 'wcdocker',
+  'pgadmin.backgrid', 'pgadmin.tools.debugger.ui', //'wcdocker',
 ], function(
-  gettext, url_for, $, _, Backbone, Alertify, pgAdmin, pgBrowser, Backgrid
+  gettext, url_for, $, _, Backbone, Alertify, pgAdmin, pgBrowser, Backgrid, debuggerUI
 ) {
 
-  var wcDocker = window.wcDocker;
+  //var wcDocker = window.wcDocker;
 
   /**
    *  ProfilerInputArgsModel used to represent input parameters for the function to profile
    *  for function objects.
    **/
-  var DebuggerInputArgsModel = Backbone.Model.extend({
+  var ProfilerInputArgsModel = Backbone.Model.extend({
     defaults: {
       name: undefined,
       type: undefined,
@@ -71,6 +71,7 @@ define([
             // As we are not getting pgBrowser.tree when we profile again
             // so tree info will be updated from the server data
             if (restart_profile == 0) {
+              /*
               var t = pgBrowser.tree,
                 i = t.selected(),
                 d = i && i.length == 1 ? t.itemData(i) : undefined,
@@ -80,7 +81,15 @@ define([
                 return;
 
               var treeInfo = node.getTreeNodeHierarchy.apply(node, [i]);
+              */
             }
+
+            var _Url = url_for('debugger.get_arguments', {
+              'sid': profile_info.server_id,
+              'did': profile_info.database_id,
+              'scid': profile_info.schema_id,
+              'func_id': profile_info.function_id,
+            });
 
             $.ajax({
               url: _Url,
@@ -88,6 +97,7 @@ define([
               async: false,
             })
               .done(function(res) {
+                console.warn(res); // temp to pass jslint
                 // store the function params into sqlite database
               })
               .fail(function() {
@@ -129,15 +139,15 @@ define([
                 name: 'expr',
                 label: gettext('Expression?'),
                 type: 'boolean',
-                cellFunction: cellExprControlFunction,
-                editable: disableExpressionControl,
+                cellFunction: debuggerUI.cellExprControlFunction,
+                editable: debuggerUI.disableExpressionControl,
               },
               {
                 name: 'value',
                 label: gettext('Value'),
                 type: 'text',
                 editable: true,
-                cellFunction: cellFunction,
+                cellFunction: debuggerUI.cellFunction,
                 headerCell: value_header,
               },
               {
@@ -145,7 +155,7 @@ define([
                 label: gettext('Use Default?'),
                 type: 'boolean',
                 cell: 'boolean',
-                editable: disableDefaultCell,
+                editable: debuggerUI.disableDefaultCell,
               },
               {
                 name: 'default_value',
@@ -157,7 +167,7 @@ define([
               ];
 
             var my_obj = [];
-            var func_obj = [];
+            // var func_obj = []; // For getting/setting params from sqlite db
 
             argtype = profile_info['proargtypenames'].split(',');
 
@@ -173,7 +183,8 @@ define([
               arg_cnt = default_args_count;
             }
 
-            var vals, values, index, use_def_value, j;
+            // var vals, values, index; // For late use with params in sqlite db
+            var use_def_value, j;
 
             // if the procedure has arguments
             if (profile_info['proargnames'] != null) {
@@ -204,7 +215,7 @@ define([
               if (argtype.length != 0) {
 
                 // for every arg
-                for (i = 0; i < argtype.length; i++) {
+                for (var i = 0; i < argtype.length; i++) {
 
                   // ??
                   if (profile_info['proargmodes'] != null) {
@@ -314,8 +325,8 @@ define([
             // Check if the arguments already available in the sqlite database
             // then we should use the existing arguments
             //if (func_args_data.length == 0) {
-              this.profilerInputArgsColl =
-                new ProfilerInputArgCollections(my_obj);
+            this.profilerInputArgsColl =
+              new ProfilerInputArgCollections(my_obj);
             //} else {
             //  this.debuggerInputArgsColl =
             //    new DebuggerInputArgCollections(func_obj);
@@ -446,7 +457,7 @@ define([
     }
 
     Alertify.profilerInputArgsDialog(
-        gettext('Profiler'), profile_info, restart_profile, is_edb_proc, trans_id
+      gettext('Profiler'), profile_info, restart_profile, is_edb_proc, trans_id
     ).resizeTo(pgBrowser.stdW.md,pgBrowser.stdH.md);
   };
 
