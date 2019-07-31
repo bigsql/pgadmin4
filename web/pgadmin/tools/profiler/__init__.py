@@ -70,7 +70,7 @@ class ProfilerModule(PgAdminModule):
 
 ####################################################################################################
 
-blueprint = DebuggerModule(MODULE_NAME, __name__)
+blueprint = ProfilerModule(MODULE_NAME, __name__)
 
 @blueprint.route("/", endpoint='index')
 @login_required
@@ -89,12 +89,12 @@ def script():
         mimetype="application/javascript"
     )
 
-@blueprint.route("/js/debugger_ui.js")
+@blueprint.route("/js/profiler_ui.js")
 @login_required
-def script_debugger_js():
-    """render the debugger UI javascript file"""
+def script_profiler_js():
+    """render the profiler UI javascript file"""
     return Response(
-        response=render_template("debugger/js/debugger_ui.js", _=gettext),
+        response=render_template("profiler/js/profiler_ui.js", _=gettext),
         status=200,
         mimetype="application/javascript"
     )
@@ -102,13 +102,13 @@ def script_debugger_js():
 
 @blueprint.route("/js/direct.js")
 @login_required
-def script_debugger_direct_js():
+def script_profiler_direct_js():
     """
     Render the javascript file required send and receive the response
-    from server for debugging
+    from server for profiling
     """
     return Response(
-        response=render_template("debugger/js/direct.js", _=gettext),
+        response=render_template("profiler/js/direct.js", _=gettext),
         status=200,
         mimetype="application/javascript"
     )
@@ -128,7 +128,7 @@ def init_function(node_type, sid, did, scid, fid, trid=None):
     profiling.
     This method is also responsible for storing the all functions data to
     session variable.
-    This is only required for direct profiling. As Indirect debugging does
+    This is only required for direct profiling. As Indirect profiling does
     not require these data because user will
     provide all the arguments and other functions information through another
     session to invoke the target.
@@ -166,3 +166,57 @@ def init_function(node_type, sid, did, scid, fid, trid=None):
 
     # Set the template path required to read the sql files
     template_path = 'profiler/sql'
+
+    sql = ''
+    sql = render_template(
+        "/".join([template_path, 'get_function_profile_info.sql']),
+        is_ppas_database=False, # edb/other packages not supported fo rnow
+        hasFeatureFunctionDefaults=True,
+        fid=fid,
+        is_proc_supported=False # procedures not supported for now
+    )
+
+    status, r_set = conn.execute_dict(sql)
+    if not status:
+        #current_app.logger.debug(
+            #"Error retrieving function information from database")
+        return internal_server_error(errormsg=r_set)
+
+    ret_status = status
+
+    # TODO: error checking (e.g. checking if extension is installed)
+
+    # Return the response that function cannot be debug...
+    if not ret_status:
+        #current_app.logger.debug(msg)
+        return internal_server_error(msg)
+
+    data = {'name': r_set['rows'][0]['proargnames'],
+            'type': r_set['rows'][0]['proargtypenames'],
+            'use_default': r_set['rows'][0]['pronargdefaults'],
+            'default_value': r_set['rows'][0]['proargdefaults'],
+            'require_input': True}
+
+    # Below will check do we really required for the user input arguments and
+    # show input dialog
+    if not r_set['rows'][0]['proargtypenames']:
+        data['require_input'] = False
+    else:
+        if r_set['rows'][0]['pkg'] != 0 and \
+                r_set['rows'][0]['pkgconsoid'] != 0:
+            data['require_input'] = True
+
+        if r_set['rows'][0]['proargmodes']:
+            pro_arg_modes = r_set['rows'][0]['proargmodes'].split(",")
+            for pr_arg_mode in pro_arg_modes:
+                if pr_arg_mode == 'o' or pr_arg_mode == 't':
+                    data['require_input'] = False
+                    continue
+                else:
+                    data['require_input'] = True
+                    break
+
+    r_set['rows'][0]['require_input'] = data['require_input']
+
+    # Create a profiler instance
+    
