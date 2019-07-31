@@ -37,9 +37,9 @@ define([
         name: 'direct_profiler',
         node: 'function',
         module: this,
-        applies: ['object, context'],
+        applies: ['object', 'context'],
         callback: 'get_function_information',
-        category: gettext('Debugging'),
+        category: gettext('Profiling'),
         priority: 11,
         label:gettext('Profile'),
         data: {
@@ -51,6 +51,8 @@ define([
 
         //TODO: more menus
       ]);
+
+      console.warn('adding menu');
 
       // Create and load the new frame required for profiler panel
       this.frame = new pgBrowser.Frame({
