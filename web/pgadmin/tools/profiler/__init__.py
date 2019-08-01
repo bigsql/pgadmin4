@@ -21,6 +21,7 @@ from flask import url_for, Response, render_template, request, session, \
     current_app
 from flask_babelex import gettext
 from flask_security import login_required
+from werkzeug.useragents import UserAgent
 
 # pgAdmin utils imports
 from pgadmin.utils import PgAdminModule, \
@@ -80,6 +81,8 @@ class ProfilerModule(PgAdminModule):
             help_str=gettext('If set to True, the Profiler '
                              'will be opened in a new browser tab.')
         )
+
+    # TODO: Keyboard shortcuts
 
     def get_exposed_url_endpoints(self):
         return ['profiler.index', 'profiler.init_for_function',
@@ -292,7 +295,6 @@ def init_function(node_type, sid, did, scid, fid, trid=None):
 @blueprint.route('/direct/<int:trans_id>', methods=['GET'], endpoint='direct')
 #@login_required
 def direct_new(trans_id):
-    print("AAAAAAAAAAAAAAAAAAAAAAAAAAAA");
     pfl_inst = ProfilerInstance(trans_id)
 
     # Return from the function if transaction id not found
@@ -327,6 +329,7 @@ def direct_new(trans_id):
         is_linux_platform = True
 
     # We need client OS information to render correct Keyboard shortcuts
+    # TODO: keyboard shortcuts
     user_agent = UserAgent(request.headers.get('User-Agent'))
 
     function_arguments = '('
@@ -352,10 +355,6 @@ def direct_new(trans_id):
 
     function_name_with_arguments = \
         pfl_inst.profiler_data['function_name'] + function_arguments
-
-    f = open('asdf.txt', 'w+')
-    f.write(function_arguments)
-    f.close()
 
     return render_template(
         "profiler/direct.html",
