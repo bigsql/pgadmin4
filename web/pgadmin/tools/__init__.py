@@ -46,6 +46,27 @@ class ToolsModule(PgAdminModule):
                 filename='js/slickgrid/slick.pgadmin.formatters'
             ),
             'when': 'debugger'
+        }, {
+            'name': 'pgadmin-sqlfoldcode',
+            'path': url_for(
+                'static',
+                filename='js/codemirror/addon/fold/pgadmin-sqlfoldcode'
+            ),
+            'when': 'profiler'
+        }, {
+            'name': 'slick.pgadmin.editors',
+            'path': url_for(
+                'static',
+                filename='js/slickgrid/slick.pgadmin.editors'
+            ),
+            'when': 'profiler'
+        }, {
+            'name': 'slick.pgadmin.formatters',
+            'path': url_for(
+                'static',
+                filename='js/slickgrid/slick.pgadmin.formatters'
+            ),
+            'when': 'profiler'
         }]
 
 

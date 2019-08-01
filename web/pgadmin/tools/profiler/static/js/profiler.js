@@ -11,14 +11,14 @@ define([
   'sources/gettext', 'sources/url_for', 'jquery', 'underscore',
   'underscore.string', 'alertify', 'sources/pgadmin', 'pgadmin.browser',
   /*'backbone', 'pgadmin.backgrid', 'codemirror', 'pgadmin.backform',*/
-  'pgadmin.tools.profiler.ui', //'pgadmin.tools.profiler.utils',
-  /*'wcdocker',*/ 'pgadmin.browser.frame',
+  'pgadmin.tools.profiler.ui', 'pgadmin.tools.profiler.utils',
+  'wcdocker', 'pgadmin.browser.frame',
 ], function(
   gettext, url_for, $, _, S, Alertify, pgAdmin, pgBrowser, /*Backbone, Backgrid,
-  CodeMirror, Backform,*/ get_function_arguments, //profilerUtils
+  CodeMirror, Backform,*/ get_function_arguments, profilerUtils
 ) {
-  var pgTools = pgAdmin.Tools = pgAdmin.Tools || {}; //,
-  //wcDocker = window.wcDocker;
+  var pgTools = pgAdmin.Tools = pgAdmin.Tools || {},
+    wcDocker = window.wcDocker;
 
   /* Return back, this has been called more than once */
   if (pgAdmin.Tools.Profiler)
@@ -54,12 +54,12 @@ define([
 
       // Create and load the new frame required for profiler panel
       this.frame = new pgBrowser.Frame({
-        name: 'frm_Profiler',
+        name: 'frm_profiler',
         title: gettext('Profiler'),
         width: 500,
         isCloseable: true,
         isPrivate: true,
-        icon: 'fa fa-bug',
+        //icon: 'fa fa-bug', TODO: Create an icon
         url: 'about:blank',
       });
 
@@ -146,7 +146,81 @@ define([
           if (profile_info[0]['require_input']) {
             get_function_arguments(profile_info[0], 0, false /* is_edb_proc */, trans_id);
           } else {
-            console.warn('A'); // temporary to get rid of jslint error
+            // Initialize the target and create asynchronous connection and unique transaction ID
+            // If there is no arguments to the functions then we should not ask for for function arguments and
+            // Directly open the panel
+            var t = pgBrowser.tree,
+              i = t.selected(),
+              d = i && i.length == 1 ? t.itemData(i) : undefined,
+              node = d && pgBrowser.Nodes[d._type];
+
+            if (!d)
+              return;
+
+            var treeInfo = node.getTreeNodeHierarchy.apply(node, [i]),
+              baseUrl;
+
+            if (d._type == 'function' || d._type == 'edbfunc') {
+              baseUrl = url_for(
+                'profiler.initialize_target_for_function', {
+                  'profile': 'direct',
+                  'trans_id': trans_id,
+                  'sid': treeInfo.server._id,
+                  'did': treeInfo.database._id,
+                  'scid': treeInfo.schema._id,
+                  'func_id': profilerUtils.getFunctionId(treeInfo),
+                }
+              );
+
+              $.ajax({
+                url: baseUrl,
+                method: 'GET',
+              })
+                .done(function() {
+
+                  var url = url_for('profiler.direct', {
+                    'trans_id': trans_id,
+                  });
+
+                  if (self.preferences.profiler_new_browser_tab) {
+                    window.open(url, '_blank');
+                  } else {
+                    pgBrowser.Events.once(
+                      'pgadmin-browser:frame:urlloaded:frm_profiler',
+                      function(frame) {
+                        frame.openURL(url);
+                      }
+                    );
+
+                    // Create the debugger panel as per the data received from user input dialog.
+                    var dashboardPanel = pgBrowser.docker.findPanels(
+                        'properties'
+                      ),
+                      panel = pgBrowser.docker.addPanel(
+                        'frm_profiler', wcDocker.DOCK.STACKED, dashboardPanel[0]
+                      );
+
+                    panel.focus();
+
+                    // Register Panel Closed event
+                    panel.on(wcDocker.EVENT.CLOSED, function() {
+                      var closeUrl = url_for('profiler.close', {
+                        'trans_id': trans_id,
+                      });
+                      $.ajax({
+                        url: closeUrl,
+                        method: 'DELETE',
+                      });
+                    });
+                  }
+                })
+                .fail(function(e) {
+                  Alertify.alert(
+                    gettext('Debugger Target Initialization Error'),
+                    e.responseJSON.errormsg
+                  );
+                });
+            }
           }
         });
 

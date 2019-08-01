@@ -14,6 +14,7 @@ MODULE_NAME = 'profiler'
 # Python imports
 import simplejson as json
 import random
+import re # unnecessary?
 
 # Flask imports
 from flask import url_for, Response, render_template, request, session, \
@@ -22,7 +23,9 @@ from flask_babelex import gettext
 from flask_security import login_required
 
 # pgAdmin utils imports
-from pgadmin.utils import PgAdminModule
+from pgadmin.utils import PgAdminModule, \
+    SHORTCUT_FIELDS as shortcut_fields,  \
+    ACCESSKEY_FIELDS as accesskey_fields
 from pgadmin.utils.ajax import bad_request
 from pgadmin.utils.ajax import make_json_response, \
     internal_server_error
@@ -80,9 +83,19 @@ class ProfilerModule(PgAdminModule):
 
     def get_exposed_url_endpoints(self):
         return ['profiler.index', 'profiler.init_for_function',
-                'profiler.initialize_target_for_function',
-                'profiler.close'
+                'profiler.init_for_trigger',
+                'profiler.direct', 'profiler.initialize_target_for_function',
+                'profiler.initialize_target_for_trigger', 'profiler.close',
+                #'profiler.restart',
+                #'profiler.start_listener', 'profiler.execute_query',
+                #'profiler.messages',
+                #'profiler.start_execution', 'profiler.set_breakpoint',
+                #'profiler.clear_all_breakpoint', 'profiler.deposit_value',
+                #'profiler.select_frame', 'profiler.get_arguments',
+                #'profiler.set_arguments',
+                #'profiler.poll_end_execution_result', 'profiler.poll_result'
                 ]
+
 
     def on_logout(self, user):
         """
@@ -142,6 +155,10 @@ def script_profiler_direct_js():
 @blueprint.route(
     '/init/<node_type>/<int:sid>/<int:did>/<int:scid>/<int:fid>',
     methods=['GET'], endpoint='init_for_function'
+)
+@blueprint.route(
+    '/init/<node_type>/<int:sid>/<int:did>/<int:scid>/<int:fid>/<int:trid>',
+    methods=['GET'], endpoint='init_for_trigger'
 )
 @login_required
 def init_function(node_type, sid, did, scid, fid, trid=None):
@@ -273,8 +290,9 @@ def init_function(node_type, sid, did, scid, fid, trid=None):
     )
 
 @blueprint.route('/direct/<int:trans_id>', methods=['GET'], endpoint='direct')
-@login_required
+#@login_required
 def direct_new(trans_id):
+    print("AAAAAAAAAAAAAAAAAAAAAAAAAAAA");
     pfl_inst = ProfilerInstance(trans_id)
 
     # Return from the function if transaction id not found
@@ -440,7 +458,6 @@ def initialize_target(profile_type, trans_id, sid, did,
 
     return make_json_response(data={'status': status,
                                     'profilerTransId': trans_id})
-
 
 @blueprint.route(
     '/close/<int:trans_id>', methods=["DELETE"], endpoint='close'

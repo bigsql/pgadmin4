@@ -10,12 +10,12 @@
 define([
   'sources/gettext', 'sources/url_for', 'jquery', 'underscore', 'backbone',
   'pgadmin.alertifyjs', 'sources/pgadmin', 'pgadmin.browser',
-  'pgadmin.backgrid', //'wcdocker',
+  'pgadmin.backgrid', 'wcdocker',
 ], function(
   gettext, url_for, $, _, Backbone, Alertify, pgAdmin, pgBrowser, Backgrid
 ) {
 
-  //var wcDocker = window.wcDocker;
+  var wcDocker = window.wcDocker;
 
   /*
    * Function used to return the respective Backgrid control based on the data type
@@ -185,17 +185,15 @@ define([
             // As we are not getting pgBrowser.tree when we profile again
             // so tree info will be updated from the server data
             if (restart_profile == 0) {
-              /*
               var t = pgBrowser.tree,
                 i = t.selected(),
-                d = i && i.length == 1 ? t.itemData(i) : undefined,
-                node = d && pgBrowser.Nodes[d._type];
+                d = i && i.length == 1 ? t.itemData(i) : undefined;
+              //node = d && pgBrowser.Nodes[d._type];
 
               if (!d)
                 return;
 
-              var treeInfo = node.getTreeNodeHierarchy.apply(node, [i]);
-              */
+              //var treeInfo = node.getTreeNodeHierarchy.apply(node, [i]);
             }
 
             /* To get existing params from sqlite db
@@ -286,6 +284,27 @@ define([
             var my_obj = [];
             // var func_obj = []; // For getting/setting params from sqlite db
 
+            /* TODO: sqlite db support
+            // Below will calculate the input argument id required to store in sqlite database
+            var input_arg_id = this.input_arg_id = [],
+              k;
+            //
+            if (profile_info['proargmodes'] != null) {
+              var argmode_1 = profile_info['proargmodes'].split(',');
+              for (k = 0; k < argmode_1.length; k++) {
+                if (argmode_1[k] == 'i' || argmode_1[k] == 'b' ||
+                  (is_edb_proc && argmode_1[k] == 'o')) {
+                  input_arg_id.push(k);
+                }
+              }
+            } else {
+              var argtype_1 = profile_info['proargtypenames'].split(',');
+              for (k = 0; k < argtype_1.length; k++) {
+                input_arg_id.push(k);
+              }
+            }
+            */
+
             argtype = profile_info['proargtypenames'].split(',');
 
             // ??
@@ -332,7 +351,7 @@ define([
               if (argtype.length != 0) {
 
                 // for every arg
-                for (var i = 0; i < argtype.length; i++) {
+                for (i = 0; i < argtype.length; i++) {
 
                   // ??
                   if (profile_info['proargmodes'] != null) {
@@ -368,7 +387,7 @@ define([
             } else {
               /*
                Generate the name parameter if function do not have arguments name
-               like dbgparam1, dbgparam2 etc.
+               like pflparam1, pflparam2 etc.
               */
               var myargname = [];
 
@@ -445,8 +464,8 @@ define([
             this.profilerInputArgsColl =
               new ProfilerInputArgCollections(my_obj);
             //} else {
-            //  this.debuggerInputArgsColl =
-            //    new DebuggerInputArgCollections(func_obj);
+            //  this.profilerInputArgsColl =
+            //    new ProfilerInputArgCollections(func_obj);
             //}
 
             // Initialize a new Grid instance
@@ -556,6 +575,46 @@ define([
                 }
 
                 // TODO: Add support to store settings in sqlite
+                /*
+                if (self.setting('restart_profile') == 0) {
+                  var f_id;
+                  if (d._type == 'function') {
+                    f_id = treeInfo.function._id;
+                  } else if (d._type == 'procedure') {
+                    f_id = treeInfo.procedure._id;
+                  } else if (d._type == 'edbfunc') {
+                    f_id = treeInfo.edbfunc._id;
+                  } else if (d._type == 'edbproc') {
+                    f_id = treeInfo.edbproc._id;
+                  }
+
+                  // Below will format the data to be stored in sqlite database
+                  sqlite_func_args_list.push({
+                    'server_id': treeInfo.server._id,
+                    'database_id': treeInfo.database._id,
+                    'schema_id': treeInfo.schema._id,
+                    'function_id': f_id,
+                    'arg_id': self.input_arg_id[int_count],
+                    'is_null': m.get('is_null') ? 1 : 0,
+                    'is_expression': m.get('expr') ? 1 : 0,
+                    'use_default': m.get('use_default') ? 1 : 0,
+                    'value': m.get('value'),
+                  });
+                } else {
+                  // Below will format the data to be stored in sqlite database
+                  sqlite_func_args_list.push({
+                    'server_id': self.setting('profile_info').server_id,
+                    'database_id': self.setting('profile_info').database_id,
+                    'schema_id': self.setting('profile_info').schema_id,
+                    'function_id': self.setting('profile_info').function_id,
+                    'arg_id': self.input_arg_id[int_count],
+                    'is_null': m.get('is_null') ? 1 : 0,
+                    'is_expression': m.get('expr') ? 1 : 0,
+                    'use_default': m.get('use_default') ? 1 : 0,
+                    'value': m.get('value'),
+                  });
+                }
+                */
 
                 int_count = int_count + 1;
               });
@@ -563,75 +622,99 @@ define([
               var baseUrl;
 
               // TODO: At this point, we are assuming that profiling is not starting again
-              if (d._type == 'function') {
-                console.warn('asdf'); // TODO: development message
-                baseUrl = url_for('profiler.initialize_target_for_function', {
-                  'profile_type': 'direct',
-                  'trans_id': self.setting('trans_id'),
-                  'sid': treeInfo.server._id,
-                  'did': treeInfo.database._id,
-                  'scid': treeInfo.schema._id,
-                  'func_id': treeInfo.function._id,
-                });
-              }
+              if (self.setting('restart_profile') == 0) {
+                if (d._type == 'function') {
+                  baseUrl = url_for('profiler.initialize_target_for_function', {
+                    'profile_type': 'direct',
+                    'trans_id': self.setting('trans_id'),
+                    'sid': treeInfo.server._id,
+                    'did': treeInfo.database._id,
+                    'scid': treeInfo.schema._id,
+                    'func_id': treeInfo.function._id,
+                  });
+                }
 
-              $.ajax({
-                url: baseUrl,
-                method: 'POST',
-                data: {
-                  'data': JSON.stringify(args_value_list),
-                },
-              })
-                .done(function(res) {
-
-                  console.warn('Calling profile direct'); // TODO: development message
-
-                  var url = url_for(
-                    'profiler.direct', {
-                      'trans_id': res.data.profilerTransId,
-                    }
-                  );
-
-                  if (self.preferences.profiler_new_browser_tab) {
-                    window.open(url, '_blank');
-                  } /* else  {
-                  // TODO: Add support for opening/not opening in new tab
-                  }*/
-
-                  /*
-                   * TODO: support for sqlite db
-                  var _Url;
-
-                  if (d._type == 'function') {
-                    _Url = url_for('profiler.set_arguments', {
-                      'sid': treeInfo.server._id,
-                      'did': treeInfo.database._id,
-                      'scid': treeInfo.schema._id,
-                      'func_id': treeInfo.function._id,
-                    });
-                  }
-                  $.ajax({
-                    url: _Url,
-                    method: 'POST',
-                    data: {
-                      'data': JSON.stringify(sqlite_func_args_list),
-                    }
-                  })
-                    .done(function() {})
-                    .fail(function() {
-                      Alertify.alert(
-                        gettext('Profiler error'),
-                        gettext('Uable to set the arguments on the server')
-                      );
-                    });
-                  */
+                $.ajax({
+                  url: baseUrl,
+                  method: 'POST',
+                  data: {
+                    'data': JSON.stringify(args_value_list),
+                  },
                 })
-                .fail(function(e) {
-                  Alertify.alert(
-                    gettext('Profiler Target Initialization Error'),
-                    e.responseJSON.errormsg
-                  );
-                });
+                  .done(function(res) {
+                    var url = url_for(
+                      'profiler.direct', {
+                        'trans_id': res.data.profilerTransId,
+                      }
+                    );
+
+                    if (self.preferences.profiler_new_browser_tab) {
+                      window.open(url, '_blank');
+                    }  else  {
+                      pgBrowser.Events.once(
+                        'pgadmin-browser:frame:urlloaded:frm_profiler',
+                        function(frame) {
+                          frame.openURL(url);
+                        });
+
+                      // Create the profiler panel as per the data received from user input dialog.
+                      var dashboardPanel = pgBrowser.docker.findPanels('properties'),
+                        panel = pgBrowser.docker.addPanel(
+                          'frm_profiler', wcDocker.DOCK.STACKED, dashboardPanel[0]
+                        );
+
+                      panel.focus();
+
+                      // Panel Closed event
+                      panel.on(wcDocker.EVENT.CLOSED, function() {
+                        var closeUrl = url_for('profiler.close', {
+                          'trans_id': res.data.profilerTransId,
+                        });
+                        $.ajax({
+                          url: closeUrl,
+                          method: 'DELETE',
+                        });
+                      });
+                    }
+
+                    /*
+                     * TODO: support for sqlite db
+                    var _Url;
+
+                    if (d._type == 'function') {
+                      _Url = url_for('profiler.set_arguments', {
+                        'sid': treeInfo.server._id,
+                        'did': treeInfo.database._id,
+                        'scid': treeInfo.schema._id,
+                        'func_id': treeInfo.function._id,
+                      });
+                    }
+                    $.ajax({
+                      url: _Url,
+                      method: 'POST',
+                      data: {
+                        'data': JSON.stringify(sqlite_func_args_list),
+                      }
+                    })
+                      .done(function() {})
+                      .fail(function() {
+                        Alertify.alert(
+                          gettext('Profiler error'),
+                          gettext('Uable to set the arguments on the server')
+                        );
+                      });
+                    */
+                  })
+                  .fail(function(e) {
+                    Alertify.alert(
+                      gettext('Profiler Target Initialization Error'),
+                      e.responseJSON.errormsg
+                    );
+                  });
+              } else {
+                // TODO
+                console.warn('not implemented yet');
+              }
 
               return true;
             }
