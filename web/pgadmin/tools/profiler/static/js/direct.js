@@ -36,153 +36,21 @@ define([
     controller, Backbone.Events, {
       enable: function(btn, enable) {
         // trigger the event and change the button view to enable/disable the buttons for profiling
-        this.trigger('pgDebugger:button:state:' + btn, enable);
+        this.trigger('pgProfiler:button:state:' + btn, enable);
       },
 
       enable_toolbar_buttons: function() {
         var self = this;
-        self.enable('stop', true);
-        self.enable('step_over', true);
-        self.enable('step_into', true);
-        self.enable('toggle_breakpoint', true);
-        self.enable('clear_all_breakpoints', true);
-        self.enable('continue', true);
+        self.enable('start', true);
+        self.enable('stop' , true);
+        self.enable('save' , true);
       },
 
       disable_toolbar_buttons: function() {
         var self = this;
-        self.enable('stop', false);
-        self.enable('step_over', false);
-        self.enable('step_into', false);
-        self.enable('toggle_breakpoint', false);
-        self.enable('clear_all_breakpoints', false);
-        self.enable('continue', false);
-      },
-
-      /*
-        Function to set the breakpoint and send the line no. which is set to server
-        trans_id :- Unique Transaction ID, line_no - line no. to set the breakpoint,
-        set_type = 0 - clear , 1 - set
-      */
-      set_breakpoint: function(trans_id, line_no, set_type) {
-        // Make ajax call to set/clear the break point by user
-        var baseUrl = url_for('profiler.set_breakpoint', {
-          'trans_id': trans_id,
-          'line_no': line_no,
-          'set_type': set_type,
-        });
-        $.ajax({
-          url: baseUrl,
-          method: 'GET',
-        })
-          .done(function(res) {
-            if (res.data.status) {
-            // Breakpoint has been set by the user
-            }
-          })
-          .fail(function() {
-            Alertify.alert(
-              gettext('Debugger Error'),
-              gettext('Error while setting profiling breakpoint.')
-            );
-          });
-      },
-
-      // Function to get the latest breakpoint information and update the
-      // gutters of codemirror
-      UpdateBreakpoint: function(trans_id) {
-        var self = this;
-
-        var br_list = self.GetBreakpointInformation(trans_id);
-
-        // If there is no break point to clear then we should return from here.
-        if ((br_list.length == 1) && (br_list[0].linenumber == -1))
-          return;
-
-        var breakpoint_list = new Array();
-
-        for (var i = 0; i < br_list.length; i++) {
-          if (br_list[i].linenumber != -1) {
-            breakpoint_list.push(br_list[i].linenumber);
-          }
-        }
-
-        for (i = 0; i < breakpoint_list.length; i++) {
-          var info = pgTools.DirectProfile.editor.lineInfo((breakpoint_list[i] - 1));
-
-          if (info.gutterMarkers != undefined) {
-            pgTools.DirectProfile.editor.setGutterMarker((breakpoint_list[i] - 1), 'breakpoints', null);
-          } else {
-            pgTools.DirectProfile.editor.setGutterMarker((breakpoint_list[i] - 1), 'breakpoints', function() {
-              var marker = document.createElement('div');
-              marker.style.color = '#822';
-              marker.innerHTML = '●';
-              return marker;
-            }());
-          }
-        }
-      },
-
-      // Function to get the breakpoint information from the server
-      GetBreakpointInformation: function(trans_id) {
-        var result = '';
-
-        // Make ajax call to listen the database message
-        var baseUrl = url_for('profiler.execute_query', {
-          'trans_id': trans_id,
-          'query_type': 'get_breakpoints',
-        });
-        $.ajax({
-          url: baseUrl,
-          method: 'GET',
-          async: false,
-        })
-          .done(function(res) {
-            if (res.data.status === 'Success') {
-              result = res.data.result;
-            } else if (res.data.status === 'NotConnected') {
-              Alertify.alert(
-                gettext('Debugger Error'),
-                gettext('Error while fetching breakpoint information.')
-              );
-            }
-          })
-          .fail(function() {
-            Alertify.alert(
-              gettext('Debugger Error'),
-              gettext('Error while fetching breakpoint information.')
-            );
-          });
-
-        return result;
-      },
-
-      setActiveLine: function(lineNo) {
-        var self = this;
-        let editor = pgTools.DirectProfile.editor;
-
-        /* If lineNo sent, remove active line */
-        if(lineNo && self.active_line_no) {
-          editor.removeLineClass(
-            self.active_line_no, 'wrap', 'CodeMirror-activeline-background'
-          );
-        }
-
-        /* If lineNo not sent, set it to active line */
-        if(!lineNo && self.active_line_no) {
-          lineNo = self.active_line_no;
-        }
-
-        /* Set new active line only if positive */
-        if(lineNo > 0) {
-          self.active_line_no = lineNo;
-          editor.addLineClass(
-            self.active_line_no, 'wrap', 'CodeMirror-activeline-background'
-          );
-
-          /* centerOnLine is codemirror extension in bundle/codemirror.js */
-          editor.centerOnLine(self.active_line_no);
-        }
+        self.enable('start', false);
+        self.enable('stop' , false);
+        self.enable('save' , false);
       },
 
       // Function to start the executer and execute the user requested option for profiling
@@ -204,14 +72,14 @@ define([
               self.execute_query(trans_id);
             } else if (res.data.status === 'NotConnected') {
               Alertify.alert(
-                gettext('Debugger Error'),
+                gettext('Profiler Error'),
                 gettext('Error while starting profiling session.')
               );
             }
           })
           .fail(function() {
             Alertify.alert(
-              gettext('Debugger Error'),
+              gettext('Profiler Error'),
               gettext('Error while starting profiling session.')
             );
           });
@@ -261,81 +129,6 @@ define([
           });
       },
 
-      // Get the local variable information of the functions and update the grid
-      GetLocalVariables: function(trans_id) {
-        var self = this;
-
-        // Make ajax call to listen the database message
-        var baseUrl = url_for(
-          'profiler.execute_query', {
-            'trans_id': trans_id,
-            'query_type': 'get_variables',
-          });
-        $.ajax({
-          url: baseUrl,
-          method: 'GET',
-        })
-          .done(function(res) {
-            if (res.data.status === 'Success') {
-            // Call function to create and update local variables
-              self.AddLocalVariables(res.data.result);
-              self.AddParameters(res.data.result);
-              // If profile function is restarted then again start listener to
-              // read the updated messages.
-              if (pgTools.DirectProfile.profile_restarted) {
-                if (pgTools.DirectProfile.profile_type) {
-                  self.poll_end_execution_result(trans_id);
-                }
-                pgTools.DirectProfile.profile_restarted = false;
-              }
-            } else if (res.data.status === 'NotConnected') {
-              Alertify.alert(
-                gettext('Debugger Error'),
-                gettext('Error while fetching variable information.')
-              );
-            }
-          })
-          .fail(function() {
-            Alertify.alert(
-              gettext('Debugger Error'),
-              gettext('Error while fetching variable information.')
-            );
-          });
-      },
-
-      // Get the stack information of the functions and update the grid
-      GetStackInformation: function(trans_id) {
-        var self = this;
-
-        // Make ajax call to listen the database message
-        var baseUrl = url_for(
-          'profiler.execute_query', {
-            'trans_id': trans_id,
-            'query_type': 'get_stack_info',
-          });
-        $.ajax({
-          url: baseUrl,
-          method: 'GET',
-        })
-          .done(function(res) {
-            if (res.data.status === 'Success') {
-            // Call function to create and update stack information
-              self.AddStackInformation(res.data.result);
-              self.GetLocalVariables(pgTools.DirectProfile.trans_id);
-            } else if (res.data.status === 'NotConnected') {
-              Alertify.alert(
-                gettext('Debugger Error'),
-                gettext('Error while fetching stack information.')
-              );
-            }
-          })
-          .fail(function() {
-            Alertify.alert(
-              gettext('Debugger Error'),
-              gettext('Error while fetching stack information.')
-            );
-          });
-      },
 
       /*
         poll the actual result after user has executed the "continue", "step-into",
@@ -727,106 +520,6 @@ define([
           });
       },
 
-      // Continue the execution until the next breakpoint
-      Continue: function(trans_id) {
-        var self = this;
-        self.disable_toolbar_buttons();
-
-        //Check first if previous execution was completed or not
-        if (pgTools.DirectProfile.direct_execution_completed &&
-          pgTools.DirectProfile.direct_execution_completed == pgTools.DirectProfile.polling_timeout_idle) {
-          self.Restart(trans_id);
-        } else {
-          // Make ajax call to listen the database message
-          var baseUrl = url_for('profiler.execute_query', {
-            'trans_id': trans_id,
-            'query_type': 'continue',
-          });
-          $.ajax({
-            url: baseUrl,
-            method: 'GET',
-          })
-            .done(function(res) {
-              if (res.data.status) {
-                self.poll_result(trans_id);
-              } else {
-                Alertify.alert(
-                  gettext('Debugger Error'),
-                  gettext('Error while executing continue in profiling session.')
-                );
-              }
-            })
-            .fail(function() {
-              Alertify.alert(
-                gettext('Debugger Error'),
-                gettext('Error while executing continue in profiling session.')
-              );
-            });
-        }
-      },
-
-      Step_over: function(trans_id) {
-        var self = this;
-        self.disable_toolbar_buttons();
-
-        // Make ajax call to listen the database message
-        var baseUrl = url_for('profiler.execute_query', {
-          'trans_id': trans_id,
-          'query_type': 'step_over',
-        });
-        $.ajax({
-          url: baseUrl,
-          method: 'GET',
-        })
-          .done(function(res) {
-            if (res.data.status) {
-              self.poll_result(trans_id);
-            } else {
-              Alertify.alert(
-                gettext('Debugger Error'),
-                gettext('Error while executing step over in profiling session.')
-              );
-            }
-          })
-          .fail(function() {
-            Alertify.alert(
-              gettext('Debugger Error'),
-              gettext('Error while executing step over in profiling session.')
-            );
-          });
-      },
-
-      Step_into: function(trans_id) {
-        var self = this;
-        self.disable_toolbar_buttons();
-
-        // Make ajax call to listen the database message
-        var baseUrl = url_for('profiler.execute_query', {
-          'trans_id': trans_id,
-          'query_type': 'step_into',
-        });
-        $.ajax({
-          url: baseUrl,
-          method: 'GET',
-        })
-          .done(function(res) {
-            if (res.data.status) {
-              self.poll_result(trans_id);
-            } else {
-              Alertify.alert(
-                gettext('Debugger Error'),
-                gettext('Error while executing step into in profiling session.')
-              );
-            }
-          })
-          .fail(function() {
-            Alertify.alert(
-              gettext('Debugger Error'),
-              gettext('Error while executing step into in profiling session.')
-            );
-          });
-      },
-
       Stop: function(trans_id) {
         var self = this;
         self.disable_toolbar_buttons();
@@ -871,209 +564,6 @@ define([
               gettext('Error while executing stop in profiling session.')
             );
           });
-      },
-
-      toggle_breakpoint: function(trans_id) {
-        var self = this;
-        self.disable_toolbar_buttons();
-
-
-        var info = pgTools.DirectProfile.editor.lineInfo(self.active_line_no);
-        var baseUrl = '';
-
-        // If gutterMarker is undefined that means there is no marker defined previously
-        // So we need to set the breakpoint command here...
-        if (info.gutterMarkers == undefined) {
-          baseUrl = url_for('profiler.set_breakpoint', {
-            'trans_id': trans_id,
-            'line_no': self.active_line_no + 1,
-            'set_type': '1',
-          });
-        } else {
-          baseUrl = url_for('profiler.set_breakpoint', {
-            'trans_id': trans_id,
-            'line_no': self.active_line_no + 1,
-            'set_type': '0',
-          });
-        }
-
-        $.ajax({
-          url: baseUrl,
-          method: 'GET',
-        })
-          .done(function(res) {
-            if (res.data.status) {
-            // Call function to create and update local variables ....
-              var info = pgTools.DirectProfile.editor.lineInfo(self.active_line_no);
-
-              if (info.gutterMarkers != undefined) {
-                pgTools.DirectProfile.editor.setGutterMarker(self.active_line_no, 'breakpoints', null);
-              } else {
-                pgTools.DirectProfile.editor.setGutterMarker(self.active_line_no, 'breakpoints', function() {
-                  var marker = document.createElement('div');
-                  marker.style.color = '#822';
-                  marker.innerHTML = '●';
-                  return marker;
-                }());
-              }
-
-              self.enable_toolbar_buttons();
-            } else if (res.data.status === 'NotConnected') {
-              Alertify.alert(
-                gettext('Debugger Error'),
-                gettext('Error while toggling breakpoint.')
-              );
-            }
-          })
-          .fail(function() {
-            Alertify.alert(
-              gettext('Debugger Error'),
-              gettext('Error while toggling breakpoint.')
-            );
-          });
-      },
-
-      clear_all_breakpoint: function(trans_id) {
-        var self = this,
-          br_list = self.GetBreakpointInformation(trans_id);
-
-        // If there is no break point to clear then we should return from here.
-        if ((br_list.length == 1) && (br_list[0].linenumber == -1))
-          return;
-
-        self.disable_toolbar_buttons();
-
-        var breakpoint_list = new Array();
-
-        for (var i = 0; i < br_list.length; i++) {
-          if (br_list[i].linenumber != -1) {
-            breakpoint_list.push(br_list[i].linenumber);
-          }
-        }
-
-        // Make ajax call to listen the database message
-        var baseUrl = url_for('profiler.clear_all_breakpoint', {
-          'trans_id': trans_id,
-        });
-
-        $.ajax({
-          url: baseUrl,
-          method: 'POST',
-          data: {
-            'breakpoint_list': breakpoint_list.join(),
-          },
-        })
-          .done(function(res) {
-            if (res.data.status) {
-              for (var i = 0; i < breakpoint_list.length; i++) {
-                var info = pgTools.DirectProfile.editor.lineInfo((breakpoint_list[i] - 1));
-
-                if (info) {
-                  if (info.gutterMarkers != undefined) {
-                    pgTools.DirectProfile.editor.setGutterMarker((breakpoint_list[i] - 1), 'breakpoints', null);
-                  }
-                }
-              }
-            }
-            self.enable_toolbar_buttons();
-          })
-          .fail(function() {
-            Alertify.alert(
-              gettext('Debugger Error'),
-              gettext('Error while clearing all breakpoint.')
-            );
-          });
-      },
-
-      AddStackInformation: function(result) {
-        var self = this;
-
-        // Remove the existing created grid and update the stack values
-        if (self.stack_grid) {
-          self.stack_grid.remove();
-          self.stack_grid = null;
-        }
-
-        var DebuggerStackModel = Backbone.Model.extend({
-          defaults: {
-            frame_id: 0,
-            name: undefined,
-            value: undefined,
-            line_no: undefined,
-          },
-        });
-
-        // Collection which contains the model for function informations.
-        var StackCollection = Backbone.Collection.extend({
-          model: DebuggerStackModel,
-        });
-
-        var stackGridCols = [{
-          name: 'name',
-          label: gettext('Name'),
-          type: 'text',
-          editable: false,
-          cell: 'string',
-        },
-        {
-          name: 'value',
-          label: gettext('Value'),
-          type: 'text',
-          editable: false,
-          cell: 'string',
-        },
-        {
-          name: 'line_no',
-          label: gettext('Line No.'),
-          type: 'text',
-          editable: false,
-          cell: 'string',
-        },
-        ];
-
-        var my_obj = [];
-        for (var i = 0; i < result.length; i++) {
-          my_obj.push({
-            'frame_id': i,
-            'name': result[i].targetname,
-            'value': result[i].args,
-            'line_no': result[i].linenumber,
-          });
-        }
-
-        var stackColl = this.stackColl = new StackCollection(my_obj);
-        this.stackColl.on('backgrid:row:selected', self.select_frame, self);
-
-        // Initialize a new Grid instance
-        var stack_grid = this.stack_grid = new Backgrid.Grid({
-          emptyText: 'No data found',
-          columns: stackGridCols,
-          row: Backgrid.Row.extend({
-            events: {
-              click: 'rowClick',
-            },
-            rowClick: function() {
-              //Find which row is selected and depending on that send the frame id
-              self.frame_id = this.model.get('frame_id');
-              this.model.trigger('backgrid:row:selected', this);
-              self.stack_grid.$el.find('td').css(
-                'background-color', this.disabledColor
-              );
-              this.$el.find('td').css('background-color', this.highlightColor);
-            },
-          }),
-          collection: stackColl,
-          className: 'backgrid table table-bordered table-noouter-border table-bottom-border',
-        });
-
-        stack_grid.render();
-
-        // Render the stack grid into stack panel
-        pgTools.DirectProfile.stack_pane_panel
-          .$container
-          .find('.stack_pane')
-          .append(stack_grid.el);
-
       },
 
       AddResults: function(columns, result) {
@@ -1124,92 +614,6 @@ define([
           .$container
           .find('.profile_results')
           .append(result_grid.el);
-      },
-
-      AddLocalVariables: function(result) {
-        var self = this;
-
-        // Remove the existing created grid and update the variables values
-        if (self.variable_grid) {
-          self.variable_grid.remove();
-          self.variable_grid = null;
-        }
-
-        var DebuggerVariablesModel = Backbone.Model.extend({
-          defaults: {
-            name: undefined,
-            type: undefined,
-            value: undefined,
-          },
-        });
-
-        // Collection which contains the model for function information.
-        var VariablesCollection = Backbone.Collection.extend({
-          model: DebuggerVariablesModel,
-        });
-
-        VariablesCollection.prototype.on(
-          'change', self.deposit_parameter_value, self
-        );
-
-        var gridCols = [{
-          name: 'name',
-          label: gettext('Name'),
-          type: 'text',
-          editable: false,
-          cell: 'string',
-        },
-        {
-          name: 'type',
-          label: gettext('Type'),
-          type: 'text',
-          editable: false,
-          cell: 'string',
-        },
-        {
-          name: 'value',
-          label: gettext('Value'),
-          type: 'text',
-          cell: 'string',
-        },
-        ];
-
-        var my_obj = [];
-        if (result.length != 0) {
-          for (var i = 0; i < result.length; i++) {
-            if (result[i].varclass == 'L') {
-              my_obj.push({
-                'name': result[i].name,
-                'type': result[i].dtype,
-                'value': result[i].value,
-              });
-            }
-          }
-        }
-
-        // Initialize a new Grid instance
-        var variable_grid = this.variable_grid = new Backgrid.Grid({
-          emptyText: 'No data found',
-          columns: gridCols,
-          collection: new VariablesCollection(my_obj),
-          className: 'backgrid table table-bordered table-noouter-border table-bottom-border',
-        });
-
-        variable_grid.collection.on(
-          'backgrid:edited', (ch1, ch2, command) => {
-            profilerUtils.setFocusToDebuggerEditor(
-              pgTools.DirectProfile.editor, command
-            );
-          }
-        );
-
-        variable_grid.render();
-
-        // Render the variables grid into local variables panel
-        pgTools.DirectProfile.local_variables_panel
-          .$container
-          .find('.local_variables')
-          .append(variable_grid.el);
       },
 
       AddParameters: function(result) {
@@ -1378,20 +782,14 @@ define([
   var DebuggerToolbarView = Backbone.View.extend({
     el: '.profiler_main_container',
     initialize: function() {
-      controller.on('pgDebugger:button:state:stop', this.enable_stop, this);
-      controller.on('pgDebugger:button:state:step_over', this.enable_step_over, this);
-      controller.on('pgDebugger:button:state:step_into', this.enable_step_into, this);
-      controller.on('pgDebugger:button:state:continue', this.enable_continue, this);
-      controller.on('pgDebugger:button:state:toggle_breakpoint', this.enable_toggle_breakpoint, this);
-      controller.on('pgDebugger:button:state:clear_all_breakpoints', this.enable_clear_all_breakpoints, this);
+      controller.on('pgDebugger:button:state:start', this.enable_start, this);
+      controller.on('pgDebugger:button:state:stop' , this.enable_stop, this);
+      controller.on('pgDebugger:button:state:save' , this.enable_save, this);
     },
     events: {
-      'click .btn-stop': 'on_stop',
-      'click .btn-clear-breakpoint': 'on_clear_all_breakpoint',
-      'click .btn-toggle-breakpoint': 'on_toggle_breakpoint',
-      'click .btn-continue': 'on_continue',
-      'click .btn-step-over': 'on_step_over',
-      'click .btn-step-into': 'on_step_into',
+      'click .btn-start': 'on_start',
+      'click .btn-stop' : 'on stop',
+      'click .btn-save' : 'on_save',
       'keydown': 'keyAction',
     },
     enable_stop: function(enable) {
@@ -1405,8 +803,8 @@ define([
         $btn.attr('disabled', 'disabled');
       }
     },
-    enable_step_over: function(enable) {
-      var $btn = this.$el.find('.btn-step-over');
+    enable_stop: function(enable) {
+      var $btn = this.$el.find('.btn-start');
 
       if (enable) {
         $btn.prop('disabled', false);
@@ -1416,8 +814,8 @@ define([
         $btn.attr('disabled', 'disabled');
       }
     },
-    enable_step_into: function(enable) {
-      var $btn = this.$el.find('.btn-step-into');
+    enable_save: function(enable) {
+      var $btn = this.$el.find('.btn-save');
 
       if (enable) {
         $btn.prop('disabled', false);
@@ -1427,57 +825,16 @@ define([
         $btn.attr('disabled', 'disabled');
       }
     },
-    enable_continue: function(enable) {
-      var $btn = this.$el.find('.btn-continue');
-
-      if (enable) {
-        $btn.prop('disabled', false);
-        $btn.removeAttr('disabled');
-      } else {
-        $btn.prop('disabled', true);
-        $btn.attr('disabled', 'disabled');
-      }
-    },
-    enable_toggle_breakpoint: function(enable) {
-      var $btn = this.$el.find('.btn-toggle-breakpoint');
-
-      if (enable) {
-        $btn.prop('disabled', false);
-        $btn.removeAttr('disabled');
-      } else {
-        $btn.prop('disabled', true);
-        $btn.attr('disabled', 'disabled');
-      }
-    },
-    enable_clear_all_breakpoints: function(enable) {
-      var $btn = this.$el.find('.btn-clear-breakpoint');
-
-      if (enable) {
-        $btn.prop('disabled', false);
-        $btn.removeAttr('disabled');
-      } else {
-        $btn.prop('disabled', true);
-        $btn.attr('disabled', 'disabled');
-      }
+    on_start: function() {
+      controller.start(pgTools.DirectProfile.trans_id);
     },
     on_stop: function() {
-      controller.Stop(pgTools.DirectProfile.trans_id);
+      controller.stop(pgTools.DirectProfile.trans_id);
     },
-    on_clear_all_breakpoint: function() {
-      controller.clear_all_breakpoint(pgTools.DirectProfile.trans_id);
+    on_save: function() {
+      controller.save(pgTools.DirectProfile.trans_id);
     },
-    on_toggle_breakpoint: function() {
-      controller.toggle_breakpoint(pgTools.DirectProfile.trans_id);
-    },
-    on_continue: function() {
-      controller.Continue(pgTools.DirectProfile.trans_id);
-    },
-    on_step_over: function() {
-      controller.Step_over(pgTools.DirectProfile.trans_id);
-    },
-    on_step_into: function() {
-      controller.Step_into(pgTools.DirectProfile.trans_id);
-    },
+    // ?
     keyAction: function (event) {
       let panel_type='';
 
@@ -1645,55 +1002,14 @@ define([
 
     },
 
-    // Callback function when user click on gutters of codemirror to set/clear the breakpoint
-    onBreakPoint: function(cm, m, gutter) {
-      var self = this;
-
-      // If breakpoint gutter is clicked and execution is not completed then only set the breakpoint
-      if (gutter == 'breakpoints' && !pgTools.DirectProfile.polling_timeout_idle) {
-        // We may want to check, if break-point is allowed at this moment or not
-        var info = cm.lineInfo(m);
-
-        // If gutterMarker is undefined that means there is no marker defined previously
-        // So we need to set the breakpoint command here...
-        if (info.gutterMarkers == undefined) {
-          controller.set_breakpoint(self.trans_id, m + 1, 1); //set the breakpoint
-        } else {
-          if (info.gutterMarkers.breakpoints == undefined) {
-            controller.set_breakpoint(self.trans_id, m + 1, 1); //set the breakpoint
-          } else {
-            controller.set_breakpoint(self.trans_id, m + 1, 0); //clear the breakpoint
-          }
-        }
-
-        // If line folding is defined then gutterMarker will be defined so
-        // we need to find out 'breakpoints' information
-        var markers = info.gutterMarkers;
-        if (markers != undefined && info.gutterMarkers.breakpoints == undefined)
-          markers = info.gutterMarkers.breakpoints;
-
-        cm.setGutterMarker(
-          m, 'breakpoints', markers ? null : function() {
-            var marker = document.createElement('div');
-
-            marker.style.color = '#822';
-            marker.innerHTML = '●';
-
-            return marker;
-          }());
-      }
-    },
-
     buildDefaultLayout: function(docker) {
       let code_editor_panel = docker.addPanel('code', wcDocker.DOCK.TOP);
 
       let parameters_panel = docker.addPanel('parameters', wcDocker.DOCK.BOTTOM, code_editor_panel);
-      docker.addPanel('local_variables',wcDocker.DOCK.STACKED, parameters_panel, {
+      docker.addPanel('messages',wcDocker.DOCK.STACKED, parameters_panel, {
         tabOrientation: wcDocker.TAB.TOP,
       });
-      docker.addPanel('messages', wcDocker.DOCK.STACKED, parameters_panel);
       docker.addPanel('results', wcDocker.DOCK.STACKED, parameters_panel);
-      docker.addPanel('stack_pane', wcDocker.DOCK.STACKED, parameters_panel);
     },
 
     // Create the profiler layout with splitter and display the appropriate data received from server.
@@ -1712,17 +1028,6 @@ define([
             isCloseable: false,
             isPrivate: true,
             content: '<div id ="parameters" class="parameters" tabindex="0"></div>',
-          });
-
-          // Create the Local variables panel to display the local variables of the function.
-          var local_variables = new pgAdmin.Browser.Panel({
-            name: 'local_variables',
-            title: gettext('Local variables'),
-            width: '100%',
-            height: '100%',
-            isCloseable: false,
-            isPrivate: true,
-            content: '<div id ="local_variables" class="local_variables" tabindex="0"></div>',
           });
 
           // Create the messages panel to display the message returned from the database server
@@ -1747,23 +1052,10 @@ define([
             content: '<div id="profile_results" class="profile_results" tabindex="0"></div>',
           });
 
-          // Create the stack pane panel to display the profiling stack information.
-          var stack_pane = new pgAdmin.Browser.Panel({
-            name: 'stack_pane',
-            title: gettext('Stack'),
-            width: '100%',
-            height: '100%',
-            isCloseable: false,
-            isPrivate: true,
-            content: '<div id="stack_pane" class="stack_pane" tabindex="0"></div>',
-          });
-
           // Load all the created panels
           parameters.load(self.docker);
-          local_variables.load(self.docker);
           messages.load(self.docker);
           results.load(self.docker);
-          stack_pane.load(self.docker);
         });
 
       // restore the layout if present else fallback to buildDefaultLayout
@@ -1775,10 +1067,8 @@ define([
 
       self.code_editor_panel = self.docker.findPanels('code')[0];
       self.parameters_panel = self.docker.findPanels('parameters')[0];
-      self.local_variables_panel = self.docker.findPanels('local_variables')[0];
       self.messages_panel = self.docker.findPanels('messages')[0];
       self.results_panel = self.docker.findPanels('results')[0];
-      self.stack_pane_panel = self.docker.findPanels('stack_pane')[0];
 
       var editor_pane = $('<div id="stack_editor_pane" ' +
         'class="pg-panel-content info"></div>');
@@ -1906,30 +1196,8 @@ define([
       self.preferences = browser.get_preferences_for_module('profiler');
       self.toolbarView.preferences = self.preferences;
 
-      /* Update the shortcuts of the buttons */
-      self.toolbarView.$el.find('#btn-step-into')
-        .attr('title', keyboardShortcuts.shortcut_accesskey_title('Step into',self.preferences.btn_step_into))
-        .attr('accesskey', keyboardShortcuts.shortcut_key(self.preferences.btn_step_into));
+      /* TODO: Update the shortcuts of the buttons */
 
-      self.toolbarView.$el.find('#btn-step-over')
-        .attr('title', keyboardShortcuts.shortcut_accesskey_title('Step over',self.preferences.btn_step_over))
-        .attr('accesskey', keyboardShortcuts.shortcut_key(self.preferences.btn_step_over));
-
-      self.toolbarView.$el.find('#btn-continue')
-        .attr('title', keyboardShortcuts.shortcut_accesskey_title('Continue/Start',self.preferences.btn_start))
-        .attr('accesskey', keyboardShortcuts.shortcut_key(self.preferences.btn_start));
-
-      self.toolbarView.$el.find('#btn-toggle-breakpoint')
-        .attr('title', keyboardShortcuts.shortcut_accesskey_title('Toggle breakpoint',self.preferences.btn_toggle_breakpoint))
-        .attr('accesskey', keyboardShortcuts.shortcut_key(self.preferences.btn_toggle_breakpoint));
-
-      self.toolbarView.$el.find('#btn-clear-breakpoint')
-        .attr('title', keyboardShortcuts.shortcut_accesskey_title('Clear all breakpoints',self.preferences.btn_clear_breakpoints))
-        .attr('accesskey', keyboardShortcuts.shortcut_key(self.preferences.btn_clear_breakpoints));
-
-      self.toolbarView.$el.find('#btn-stop')
-        .attr('title', keyboardShortcuts.shortcut_accesskey_title('Stop',self.preferences.btn_stop))
-        .attr('accesskey', keyboardShortcuts.shortcut_key(self.preferences.btn_stop));
     },
     // Register the panel with new profiler docker instance.
     registerPanel: function(name, title, width, height, onInit) {

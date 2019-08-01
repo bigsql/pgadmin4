@@ -59,7 +59,7 @@ define([
         width: 500,
         isCloseable: true,
         isPrivate: true,
-        //icon: 'fa fa-bug', TODO: Create an icon
+        icon: 'fa fa-bullseye', // TODO: Create an icon
         url: 'about:blank',
       });
 

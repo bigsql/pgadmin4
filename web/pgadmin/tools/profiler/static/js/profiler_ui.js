@@ -506,7 +506,7 @@ define([
               },{
                 text: gettext('Profile'),
                 key: 13,
-                className: 'btn btn-primary fa fa-bug pg-alertify-button',
+                className: 'btn btn-primary fa fa-bullseye pg-alertify-button', // TODO: replace icon
               }],
               // Set options for dialog
               options: {
