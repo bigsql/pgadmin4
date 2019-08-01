@@ -116,14 +116,14 @@ define([
               }
             } else if (res.data.status === 'NotConnected') {
               Alertify.alert(
-                gettext('Debugger Error'),
+                gettext('Profiler Error'),
                 gettext('Error while executing requested profiling information.')
               );
             }
           })
           .fail(function() {
             Alertify.alert(
-              gettext('Debugger Error'),
+              gettext('Profiler Error'),
               gettext('Error while executing requested profiling information.')
             );
           });
@@ -170,13 +170,9 @@ define([
                 xhr.setRequestHeader(
                   pgAdmin.csrf_token_header, pgAdmin.csrf_token
                 );
-                // set cursor to progress before every poll.
-                $('.profiler-container').addClass('show_progress');
               },
             })
               .done(function(res) {
-              // remove progress cursor
-                $('.profiler-container').removeClass('show_progress');
 
                 if (res.data.status === 'Success') {
                 // If no result then poll again to wait for results.
@@ -238,14 +234,14 @@ define([
                   }
                 } else if (res.data.status === 'NotConnected') {
                   Alertify.alert(
-                    gettext('Debugger Error'),
+                    gettext('Profiler Error'),
                     gettext('Error while polling result.')
                   );
                 }
               })
               .fail(function() {
                 Alertify.alert(
-                  gettext('Debugger Error'),
+                  gettext('Profiler Error'),
                   gettext('Error while polling result.')
                 );
               });
@@ -331,19 +327,13 @@ define([
                       self.update_messages(res.data.status_message);
                     }
 
-                    // remove progress cursor
-                    $('.profiler-container').removeClass('show_progress');
-
                     // Execution completed so disable the buttons other than
                     // "Continue/Start" button because user can still
                     // start the same execution again.
                     setTimeout(function() {
+                      self.enable('start', false);
                       self.enable('stop', false);
-                      self.enable('step_over', false);
-                      self.enable('step_into', false);
-                      self.enable('toggle_breakpoint', false);
-                      self.enable('clear_all_breakpoints', false);
-                      self.enable('continue', true);
+                      self.enable('save', false);
                     }, 500);
 
                     // Stop further polling
@@ -365,19 +355,13 @@ define([
                         self.update_messages(res.data.status_message);
                       }
 
-                      // remove progress cursor
-                      $('.profiler-container').removeClass('show_progress');
-
                       // Execution completed so disable the buttons other than
                       // "Continue/Start" button because user can still
                       // start the same execution again.
                       setTimeout(function() {
+                        self.enable('start', false);
                         self.enable('stop', false);
-                        self.enable('step_over', false);
-                        self.enable('step_into', false);
-                        self.enable('toggle_breakpoint', false);
-                        self.enable('clear_all_breakpoints', false);
-                        self.enable('continue', true);
+                        self.enable('save', false);
                       }, 500);
 
                       // Stop further pooling
@@ -394,7 +378,7 @@ define([
                   }
                 } else if (res.data.status === 'NotConnected') {
                   Alertify.alert(
-                    gettext('Debugger poll end execution error'),
+                    gettext('Profiler poll end execution error'),
                     res.data.result
                   );
                 } else if (res.data.status === 'ERROR') {
@@ -413,9 +397,6 @@ define([
                   }
 
                   pgTools.DirectProfile.messages_panel.focus();
-
-                  // remove progress cursor
-                  $('.profiler-container').removeClass('show_progress');
 
                   // Execution completed so disable the buttons other than
                   // "Continue/Start" button because user can still start the
@@ -438,7 +419,7 @@ define([
               })
               .fail(function() {
                 Alertify.alert(
-                  gettext('Debugger Error'),
+                  gettext('Profiler Error'),
                   gettext('Error while polling result.')
                 );
               });
@@ -485,7 +466,7 @@ define([
             if (res.data.result.require_input) {
               profile_function_again(res.data.result, restart_dbg);
             } else {
-            // Debugging of void function is started again so we need to start
+            // Profiling of void function is started again so we need to start
             // the listener again
               var baseUrl = url_for('profiler.start_listener', {
                 'trans_id': trans_id,
@@ -502,7 +483,7 @@ define([
                 })
                 .fail(function() {
                   Alertify.alert(
-                    gettext('Debugger Error'),
+                    gettext('Profiler Error'),
                     gettext('Error while polling result.')
                   );
                 });
@@ -512,7 +493,7 @@ define([
             try {
               var err = JSON.parse(xhr.responseText);
               if (err.success == 0) {
-                Alertify.alert(gettext('Debugger Error'), err.errormsg);
+                Alertify.alert(gettext('Profiler Error'), err.errormsg);
               }
             } catch (e) {
               console.warn(e.stack || e);
@@ -553,14 +534,14 @@ define([
               Alertify.success(res.info, 3);
             } else if (res.data.status === 'NotConnected') {
               Alertify.alert(
-                gettext('Debugger Error'),
+                gettext('Profiler Error'),
                 gettext('Error while executing stop in profiling session.')
               );
             }
           })
           .fail(function() {
             Alertify.alert(
-              gettext('Debugger Error'),
+              gettext('Profiler Error'),
               gettext('Error while executing stop in profiling session.')
             );
           });
@@ -575,7 +556,7 @@ define([
           self.result_grid = null;
         }
 
-        var DebuggerResultsModel = Backbone.Model.extend({
+        var ProfilerResultsModel = Backbone.Model.extend({
           defaults: {
             name: undefined,
           },
@@ -583,7 +564,7 @@ define([
 
         // Collection which contains the model for function informations.
         var ResultsCollection = Backbone.Collection.extend({
-          model: DebuggerResultsModel,
+          model: ProfilerResultsModel,
         });
 
         var resultGridCols = [];
@@ -625,7 +606,7 @@ define([
           self.param_grid = null;
         }
 
-        var DebuggerParametersModel = Backbone.Model.extend({
+        var ProfilerParametersModel = Backbone.Model.extend({
           defaults: {
             name: undefined,
             type: undefined,
@@ -635,7 +616,7 @@ define([
 
         // Collection which contains the model for function informations.
         var ParametersCollection = self.ParametersCollection = Backbone.Collection.extend({
-          model: DebuggerParametersModel,
+          model: ProfilerParametersModel,
         });
 
         ParametersCollection.prototype.on(
@@ -687,7 +668,7 @@ define([
 
         param_grid.collection.on(
           'backgrid:edited', (ch1, ch2, command) => {
-            profilerUtils.setFocusToDebuggerEditor(
+            profilerUtils.setFocusToProfilerEditor(
               pgTools.DirectProfile.editor, command
             );
           }
@@ -738,7 +719,7 @@ define([
           })
           .fail(function() {
             Alertify.alert(
-              gettext('Debugger Error'),
+              gettext('Profiler Error'),
               gettext('Error while depositing variable value.')
             );
           });
@@ -767,7 +748,7 @@ define([
           })
           .fail(function() {
             Alertify.alert(
-              gettext('Debugger Error'),
+              gettext('Profiler Error'),
               gettext('Error while selecting frame.')
             );
           });
@@ -776,15 +757,15 @@ define([
   );
 
   /*
-    Debugger tool var view to create the button toolbar and listen to the button click event and inform the
+    Profiler tool var view to create the button toolbar and listen to the button click event and inform the
     controller about the click and controller will take the action for the specified button click.
   */
-  var DebuggerToolbarView = Backbone.View.extend({
+  var ProfilerToolbarView = Backbone.View.extend({
     el: '.profiler_main_container',
     initialize: function() {
-      controller.on('pgDebugger:button:state:start', this.enable_start, this);
-      controller.on('pgDebugger:button:state:stop' , this.enable_stop, this);
-      controller.on('pgDebugger:button:state:save' , this.enable_save, this);
+      controller.on('pgProfiler:button:state:start', this.enable_start, this);
+      controller.on('pgProfiler:button:state:stop' , this.enable_stop, this);
+      controller.on('pgProfiler:button:state:save' , this.enable_save, this);
     },
     events: {
       'click .btn-start': 'on_start',
@@ -792,8 +773,8 @@ define([
       'click .btn-save' : 'on_save',
       'keydown': 'keyAction',
     },
-    enable_stop: function(enable) {
-      var $btn = this.$el.find('.btn-stop');
+    enable_start: function(enable) {
+      var $btn = this.$el.find('.btn-start');
 
       if (enable) {
         $btn.prop('disabled', false);
@@ -804,7 +785,7 @@ define([
       }
     },
     enable_stop: function(enable) {
-      var $btn = this.$el.find('.btn-start');
+      var $btn = this.$el.find('.btn-stop');
 
       if (enable) {
         $btn.prop('disabled', false);
@@ -838,7 +819,7 @@ define([
     keyAction: function (event) {
       let panel_type='';
 
-      panel_type = keyboardShortcuts.processEventDebugger(
+      panel_type = keyboardShortcuts.processEventProfiler(
         this.$el, event, this.preferences, pgTools.DirectProfile.docker
       );
 
@@ -923,11 +904,11 @@ define([
             try {
               var err = JSON.parse(xhr.responseText);
               if (err.success == 0) {
-                Alertify.alert(gettext('Debugger Error'), err.errormsg);
+                Alertify.alert(gettext('Profiler Error'), err.errormsg);
               }
             } catch (e) {
               Alertify.alert(
-                gettext('Debugger Error'),
+                gettext('Profiler Error'),
                 gettext('Error while starting profiling listener.')
               );
             }
@@ -951,11 +932,11 @@ define([
             try {
               var err = JSON.parse(xhr.responseText);
               if (err.success == 0) {
-                Alertify.alert(gettext('Debugger Error'), err.errormsg);
+                Alertify.alert(gettext('Profiler Error'), err.errormsg);
               }
             } catch (e) {
               Alertify.alert(
-                gettext('Debugger Error'),
+                gettext('Profiler Error'),
                 gettext('Error while starting profiling listener.')
               );
             }
@@ -995,7 +976,7 @@ define([
         })
         .fail(function() {
           Alertify.alert(
-            gettext('Debugger Error'),
+            gettext('Profiler Error'),
             gettext('Error while fetching messages information.')
           );
         });
@@ -1062,7 +1043,7 @@ define([
       pgBrowser.restore_layout(self.docker, self.layout, this.buildDefaultLayout.bind(this));
 
       self.docker.on(wcDocker.EVENT.LAYOUT_CHANGED, function() {
-        pgBrowser.save_current_layout('Debugger/Layout', self.docker);
+        pgBrowser.save_current_layout('Profiler/Layout', self.docker);
       });
 
       self.code_editor_panel = self.docker.findPanels('code')[0];
@@ -1166,7 +1147,7 @@ define([
       self.docker.on(wcDocker.EVENT.LOADED, onLoad);
 
       // Create the toolbar view for profiling the function
-      this.toolbarView = new DebuggerToolbarView();
+      this.toolbarView = new ProfilerToolBarView();
 
       /* wcDocker focuses on window always, and all our shortcuts are
        * bind to editor-panel. So when we use wcDocker focus, editor-panel
