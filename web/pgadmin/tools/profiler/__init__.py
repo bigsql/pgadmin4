@@ -93,8 +93,8 @@ class ProfilerModule(PgAdminModule):
                 'profiler.initialize_target_for_trigger', 'profiler.close',
                 'profiler.get_parameters',
                 #'profiler.restart',
-                #'profiler.start_listener', 'profiler.execute_query',
-                #'profiler.messages',
+                'profiler.start_listener',# 'profiler.execute_query',
+                'profiler.messages',
                 'profiler.start_execution',# 'profiler.set_breakpoint',
                 #'profiler.clear_all_breakpoint', 'profiler.deposit_value',
                 #'profiler.select_frame', 'profiler.get_arguments',
@@ -462,6 +462,114 @@ def initialize_target(profile_type, trans_id, sid, did,
                                     'profilerTransId': trans_id})
 
 @blueprint.route(
+    '/start_listener/<int:trans_id>', methods=['GET', 'POST'],
+    endpoint='start_listener'
+)
+@login_required
+def start_profiler_listener(trans_id):
+    """
+    start_profiler_listener(trans_id)
+
+    This method is responsible to listen and get the required information
+    requested by user during profiling. It will also reset local data.
+
+    Parameters:
+        trans_id
+        - Transaction ID
+    """
+    pfl_inst = ProfilerInstance(trans_id)
+    if pfl_inst.profiler_data is None:
+        return make_json_response(
+            data={
+                'status': 'NotConnected',
+                'result': gettext(
+                    'Not connected to server or connection with the server '
+                    'has been closed.'
+                )
+            }
+        )
+
+    driver = get_driver(PG_DEFAULT_DRIVER)
+    manager = driver.connection_manager(pfl_inst.profiler_data['server_id'])
+    conn = manager.connection(
+        did=pfl_inst.profiler_data['database_id'],
+        conn_id=pfl_inst.profiler_data['conn_id'])
+
+    ver = manager.version
+    server_type = manager.server_type
+
+    if conn.connected():
+        if pfl_inst.profiler_data['profile_type'] == 'direct':
+            sql = """SET search_path to """ + pfl_inst.function_data['schema'] + """";"""
+            conn.execute_async(sql)
+            sql = """SELECT pl_profiler_reset_local();"""
+            status, result = conn.execute_async(sql)
+            conn.execute_async("""RESET search_path""")
+            if not status:
+                return internal_server_error(errormsg=result)
+
+    else:
+        status = False
+        result = gettext(
+            'Not connected to server or connection with the server has '
+            'been closed.'
+        )
+
+    return make_json_response(data={'status': status, 'result': result})
+
+
+@blueprint.route(
+    '/messages/<int:trans_id>/', methods=["GET"], endpoint='messages'
+)
+@login_required
+def messages(trans_id):
+    """
+    messages(trans_id)
+
+    This method polls the messages returned by the database server.
+
+    Parameters:
+        trans_id
+        - unique transaction id.
+    """
+
+    pfl_inst = ProfilerInstance(trans_id)
+    if pfl_inst.profiler_data is None:
+        return make_json_response(
+            data={
+                'status': 'NotConnected',
+                'result': gettext(
+                    'Not connected to server or connection with the server '
+                    'has been closed.'
+                )
+            }
+        )
+
+    manager = get_driver(PG_DEFAULT_DRIVER).connection_manager(
+        pfl_inst.profiler_data['server_id'])
+    conn = manager.connection(
+        did=pfl_inst.profiler_data['database_id'],
+        conn_id=pfl_inst.profiler_data['conn_id'])
+
+    port_number = ''
+
+    if conn.connected():
+        status, result = conn.poll()
+        notify = conn.messages()
+        # Not sure what to do here
+
+        return make_json_response(
+            data={'status': status, 'result': 'connected'}
+        )
+    else:
+        result = gettext(
+            'Not connected to server or connection with the '
+            'server has been closed.'
+        )
+        return internal_server_error(errormsg=str(result))
+
+
+@blueprint.route(
     '/start_execution/<int:trans_id>/<int:port_num>', methods=['GET'],
     endpoint='start_execution'
 )
@@ -510,7 +618,7 @@ def start_execution(trans_id, port_num):
         return internal_server_error(errormsg=str(msg))
 
     # find the debugger version and execute the query accordingly
-    pfl_version = 1.0 # TODO: determine profiler version
+    pfl_version = 1.0 # TODO: determine profiler version, there is plprofiler function for this
     #if dbg_version <= 2:
     #    template_path = 'debugger/sql/v1'
     #else:

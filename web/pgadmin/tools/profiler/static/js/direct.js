@@ -911,39 +911,6 @@ define([
       this.panels = [];
 
       pgBrowser.bind_beforeunload();
-      self.initializePanels(); // temporary
-
-      baseUrl = url_for('profiler.get_parameters', {
-        'trans_id': trans_id,
-      });
-
-      $.ajax({
-        url: baseUrl,
-        method: 'GET',
-      })
-        .done(function(res) {
-          if (res.data.status === 'Success') {
-            controller.AddParameters(res.data.result);
-          }
-
-          else if (res.data.status === 'NotConnected') {
-            Alertify.alert(
-              gettext('Profiler Error'),
-              gettext('Error while fetching parameters.')
-            );
-          }
-        })
-        .fail(function() {
-          Alertify.alert(
-            gettext('Debugger Error'),
-            gettext('Error while fetching parameters.')
-          );
-        });
-
-      // Direct profiling
-      //if (trans_id != undefined && profile_type) {
-
-      //}
 
       // Below code will be executed for indirect profiling
       // indirect profiling - 0  and for direct profiling - 1
@@ -980,15 +947,11 @@ define([
           });
 
         */
-      } else if (trans_id != undefined && profile_type) {
-
-        // Make ajax call to execute the and start the target for execution
-        /*
+      } else if (trans_id != undefined && profile_type) { // Direct profiling
         baseUrl = url_for('profiler.start_listener', {
           'trans_id': trans_id,
         });
 
-        /*
         $.ajax({
           url: baseUrl,
           method: 'GET',
@@ -1006,27 +969,24 @@ define([
               }
             } catch (e) {
               Alertify.alert(
-                gettext('Profiler Error'),
+                gettext('Debugger Error'),
                 gettext('Error while starting profiling listener.')
               );
             }
           });
-          */
       } else {
-        //this.initializePanels();
+        this.initializePanels();
       }
     },
 
     // Read the messages of the database server and get the port ID and attach
     // the executer to that port.
     messages: function(trans_id) {
-      console.warn(trans_id);
-      /*var self = this;
+      var self = this;
       // Make ajax call to listen the database message
       var baseUrl = url_for('profiler.messages', {
         'trans_id': trans_id,
-      });*/
-      /*
+      });
 
       $.ajax({
         url: baseUrl,
@@ -1036,6 +996,32 @@ define([
           if (res.data.status === 'Success') {
             self.initializePanels();
             controller.enable_toolbar_buttons();
+            baseUrl = url_for('profiler.get_parameters', {
+              'trans_id': trans_id,
+            });
+
+            $.ajax({
+              url: baseUrl,
+              method: 'GET',
+            })
+              .done(function(res) {
+                if (res.data.status === 'Success') {
+                  controller.AddParameters(res.data.result);
+                }
+
+                else if (res.data.status === 'NotConnected') {
+                  Alertify.alert(
+                    gettext('Profiler Error'),
+                    gettext('Error while fetching parameters.')
+                  );
+                }
+              })
+              .fail(function() {
+                Alertify.alert(
+                  gettext('Debugger Error'),
+                  gettext('Error while fetching parameters.')
+                );
+              });
             // If status is Success then find the port number to attach the executer.
             controller.start_execution(trans_id, res.data.result);
           } else if (res.data.status === 'Busy') {
@@ -1054,7 +1040,6 @@ define([
             gettext('Error while fetching messages information.')
           );
         });
-        */
 
     },
 

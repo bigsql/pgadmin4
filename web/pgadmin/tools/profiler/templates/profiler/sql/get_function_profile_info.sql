@@ -1,5 +1,4 @@
 {### To fetch profile function information ###}
-{### To fetch debug function information ###}
 SELECT
     p.proname AS name,  -- procedure name
     p.prosrc,           -- procedure source
