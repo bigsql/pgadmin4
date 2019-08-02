@@ -670,13 +670,11 @@ define([
         var param_obj = [];
         if (result.length != 0) {
           for (var i = 0; i < result.length; i++) {
-            if (result[i].varclass == 'A') {
-              param_obj.push({
-                'name': result[i].name,
-                'type': result[i].dtype,
-                'value': result[i].value,
-              });
-            }
+            param_obj.push({
+              'name': result[i].name,
+              'type': result[i].type,
+              'value': result[i].value,
+            });
           }
         }
 
@@ -874,16 +872,15 @@ define([
       console.warn(profile_type);
       console.warn(function_name_with_arguments);
       console.warn(layout);
-      /*
+
       // We do not want to initialize the module multiple times.
       var self = this;
       _.bindAll(pgTools.DirectProfile, 'messages');
-      */
 
       if (this.initialized)
         return;
 
-      //var baseUrl;
+      var baseUrl;
 
       this.initialized = true;
       this.trans_id = trans_id;
@@ -914,8 +911,34 @@ define([
       this.panels = [];
 
       pgBrowser.bind_beforeunload();
-      this.initializePanels();
-      console.warn('a');
+      self.initializePanels(); // temporary
+
+      baseUrl = url_for('profiler.get_parameters', {
+        'trans_id': trans_id,
+      });
+
+      $.ajax({
+        url: baseUrl,
+        method: 'GET',
+      })
+        .done(function(res) {
+          if (res.data.status === 'Success') {
+            controller.AddParameters(res.data.result);
+          }
+
+          else if (res.data.status === 'NotConnected') {
+            Alertify.alert(
+              gettext('Profiler Error'),
+              gettext('Error while fetching parameters.')
+            );
+          }
+        })
+        .fail(function() {
+          Alertify.alert(
+            gettext('Debugger Error'),
+            gettext('Error while fetching parameters.')
+          );
+        });
 
       // Direct profiling
       //if (trans_id != undefined && profile_type) {

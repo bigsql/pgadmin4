@@ -91,6 +91,7 @@ class ProfilerModule(PgAdminModule):
                 'profiler.init_for_trigger',
                 'profiler.direct', 'profiler.initialize_target_for_function',
                 'profiler.initialize_target_for_trigger', 'profiler.close',
+                'profiler.get_parameters',
                 #'profiler.restart',
                 #'profiler.start_listener', 'profiler.execute_query',
                 #'profiler.messages',
@@ -538,6 +539,50 @@ def start_execution(trans_id, port_num):
 
     return true
 
+@blueprint.route(
+    '/get_parameters/<int:trans_id>', methods=['GET'],
+    endpoint='get_parameters'
+)
+@login_required
+def get_parameters(trans_id):
+    pfl_inst = ProfilerInstance(trans_id)
+    if pfl_inst.profiler_data is None:
+        return make_json_response(
+            data={
+                'status': 'NotConnected',
+                'result': gettext(
+                    'Not connected to server or connection with the server '
+                    'has been closed.'
+                )
+            }
+        )
+
+    # Create asynchronous connection using random connection id.
+    exe_conn_id = str(random.randint(1, 9999999))
+    try:
+        manager = get_driver(PG_DEFAULT_DRIVER).connection_manager(
+            pfl_inst.profiler_data['server_id'])
+        conn = manager.connection(
+            did=pfl_inst.profiler_data['database_id'],
+            conn_id=exe_conn_id)
+    except Exception as e:
+        return internal_server_error(errormsg=str(e))
+
+    # Connect the Server
+    status, msg = conn.connect()
+    if not status:
+        return internal_server_error(errormsg=str(msg))
+
+    arg_names = pfl_inst.function_data['args_name']
+    arg_types = pfl_inst.function_data['args_type']
+    arg_values = pfl_inst.function_data['args_value']
+
+    return make_json_response(
+        data={
+            'status': 'Success',
+            'result': arg_values
+        }
+    )
 
 
 
