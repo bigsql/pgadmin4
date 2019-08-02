@@ -53,9 +53,13 @@ define([
         self.enable('save' , false);
       },
 
-      // Function to start the executer and execute the user requested option for profiling
+      // Function to profile
       start_execution: function(trans_id, port_num) {
+        console.warn(trans_id);
+        console.warn(port_num);
+
         var self = this;
+
         // Make ajax call to listen the database message
         var baseUrl = url_for(
           'profiler.start_execution', {
@@ -68,8 +72,9 @@ define([
         })
           .done(function(res) {
             if (res.data.status === 'Success') {
-            // If status is Success then find the port number to attach the executer.
-              self.execute_query(trans_id);
+              // If status is Success then open the generated html report
+              // self.execute_query(trans_id);
+              window.open(, _blank);
             } else if (res.data.status === 'NotConnected') {
               Alertify.alert(
                 gettext('Profiler Error'),
@@ -87,6 +92,8 @@ define([
 
       // Execute the query and get the first functions profile information from the server
       execute_query: function(trans_id) {
+        console.warn(trans_id);
+        /*
         var self = this;
         // Make ajax call to listen the database message
         var baseUrl = url_for(
@@ -94,7 +101,8 @@ define([
             'trans_id': trans_id,
             'query_type': 'wait_for_breakpoint',
           });
-        $.ajax({
+        */
+        /*$.ajax({
           url: baseUrl,
           method: 'GET',
         })
@@ -127,6 +135,7 @@ define([
               gettext('Error while executing requested profiling information.')
             );
           });
+        */
       },
 
 
@@ -135,6 +144,8 @@ define([
         "step-over" actions and get the other updated information from the server.
       */
       poll_result: function(trans_id) {
+        console.warn(trans_id);
+        /*
         var self = this;
 
         // Do we need to poll?
@@ -147,12 +158,14 @@ define([
             'trans_id': trans_id,
           }),
           poll_timeout;
+        */
 
         /*
           During the execution we should poll the result in minimum seconds but
           once the execution is completed and wait for the another profiling
           session then we should decrease the polling frequency.
         */
+        /*
         if (pgTools.DirectProfile.polling_timeout_idle) {
           // Poll the result after 1 second
           poll_timeout = 1000;
@@ -246,7 +259,7 @@ define([
                 );
               });
           }, poll_timeout);
-
+        */
       },
 
       // This function will update messages tab
@@ -273,6 +286,8 @@ define([
         the result  until new execution starts.
       */
       poll_end_execution_result: function(trans_id) {
+        console.warn(trans_id);
+        /*
         var self = this;
 
         // Do we need to poll?
@@ -285,12 +300,14 @@ define([
             'trans_id': trans_id,
           }),
           poll_end_timeout;
+        */
 
         /*
          * During the execution we should poll the result in minimum seconds
          * but once the execution is completed and wait for the another
          * profiling session then we should decrease the polling frequency.
          */
+        /*
         if (pgTools.DirectProfile.polling_timeout_idle) {
           // Poll the result to check that execution is completed or not
           // after 1200 ms
@@ -314,7 +331,7 @@ define([
                    "result" is undefined only in case of EDB procedure.
                    As Once the EDB procedure execution is completed then we are
                    not getting any result so we need ignore the result.
-                  */
+
                     self.setActiveLine(-1);
                     pgTools.DirectProfile.direct_execution_completed = true;
                     pgTools.DirectProfile.polling_timeout_idle = true;
@@ -424,10 +441,12 @@ define([
                 );
               });
           }, poll_end_timeout);
-
+        */
       },
 
       Restart: function(trans_id) {
+        console.warn(trans_id);
+        /*
 
         var self = this,
           baseUrl = url_for('profiler.restart', {'trans_id': trans_id});
@@ -441,19 +460,20 @@ define([
           .find('.messages')
           .html('');
 
+        /*
         $.ajax({
           url: baseUrl,
         })
           .done(function(res) {
           // Restart the same function profiling with previous arguments
-            var restart_dbg = res.data.restart_profile ? 1 : 0;
+            var restart_pfl = res.data.restart_profile ? 1 : 0;
 
             // Start pooling again
             pgTools.DirectProfile.polling_timeout_idle = false;
             pgTools.DirectProfile.is_polling_required = true;
             self.poll_result(trans_id);
 
-            if (restart_dbg) {
+            if (restart_pfl) {
               pgTools.DirectProfile.profile_restarted = true;
             }
 
@@ -462,9 +482,9 @@ define([
            dialog? If yes then we will get the previous arguments from database
            and populate the input dialog, If no then we should directly start the
            listener.
-          */
+
             if (res.data.result.require_input) {
-              profile_function_again(res.data.result, restart_dbg);
+              profile_function_again(res.data.result, restart_pfl);
             } else {
             // Profiling of void function is started again so we need to start
             // the listener again
@@ -499,9 +519,12 @@ define([
               console.warn(e.stack || e);
             }
           });
+        */
       },
 
       Stop: function(trans_id) {
+        console.warn(trans_id);
+        /*
         var self = this;
         self.disable_toolbar_buttons();
 
@@ -511,6 +534,7 @@ define([
             'trans_id': trans_id,
             'query_type': 'abort_target',
           });
+        /*
         $.ajax({
           url: baseUrl,
           method: 'GET',
@@ -545,6 +569,7 @@ define([
               gettext('Error while executing stop in profiling session.')
             );
           });
+        */
       },
 
       AddResults: function(columns, result) {
@@ -683,7 +708,8 @@ define([
           .append(param_grid.el);
       },
       deposit_parameter_value: function(model) {
-        var self = this;
+        console.warn(model);
+        /*var self = this;
 
         // variable name and value list that is changed by user
         var name_value_list = [];
@@ -698,6 +724,7 @@ define([
         var baseUrl = url_for('profiler.deposit_value', {
           'trans_id': pgTools.DirectProfile.trans_id,
         });
+        /*
         $.ajax({
           url: baseUrl,
           method: 'POST',
@@ -723,9 +750,12 @@ define([
               gettext('Error while depositing variable value.')
             );
           });
+        */
       },
 
       select_frame: function() {
+        console.warn('a');
+        /*
         var self = this;
 
         // Make ajax call to listen the database message
@@ -733,6 +763,7 @@ define([
           'trans_id': pgTools.DirectProfile.trans_id,
           'frame_id': self.frame_id,
         });
+        /*
         $.ajax({
           url: baseUrl,
           method: 'GET',
@@ -752,6 +783,7 @@ define([
               gettext('Error while selecting frame.')
             );
           });
+        */
       },
     }
   );
@@ -815,7 +847,6 @@ define([
     on_save: function() {
       controller.save(pgTools.DirectProfile.trans_id);
     },
-    // ?
     keyAction: function (event) {
       let panel_type='';
 
@@ -842,14 +873,20 @@ define([
   _.extend(DirectProfile.prototype, {
     /* We should get the transaction id from the server during initialization here */
     load: function(trans_id, profile_type, function_name_with_arguments, layout) {
+      console.warn(trans_id);
+      console.warn(profile_type);
+      console.warn(function_name_with_arguments);
+      console.warn(layout);
+      /*
       // We do not want to initialize the module multiple times.
       var self = this;
       _.bindAll(pgTools.DirectProfile, 'messages');
+      */
 
       if (this.initialized)
         return;
 
-      var baseUrl;
+      //var baseUrl;
 
       this.initialized = true;
       this.trans_id = trans_id;
@@ -880,22 +917,30 @@ define([
       this.panels = [];
 
       pgBrowser.bind_beforeunload();
+      this.initializePanels();
+      console.warn('a');
+
+      // Direct profiling
+      if (trans_id != undefined && profile_type) {
+
+      }
 
       // Below code will be executed for indirect profiling
       // indirect profiling - 0  and for direct profiling - 1
       if (trans_id != undefined && !profile_type) {
         // Make ajax call to execute the and start the target for execution
-        baseUrl = url_for('profiler.start_listener', {
-          'trans_id': trans_id,
-        });
+        //baseUrl = url_for('profiler.start_listener', {
+        //  'trans_id': trans_id,
+        //});
 
+        /*
         $.ajax({
           url: baseUrl,
           method: 'GET',
         })
           .done(function(res) {
             if (res.data.status) {
-              self.intializePanels();
+              self.initializePanels();
               controller.enable_toolbar_buttons();
               controller.poll_result(trans_id);
             }
@@ -913,12 +958,17 @@ define([
               );
             }
           });
+
+        */
       } else if (trans_id != undefined && profile_type) {
+
         // Make ajax call to execute the and start the target for execution
+        /*
         baseUrl = url_for('profiler.start_listener', {
           'trans_id': trans_id,
         });
 
+        /*
         $.ajax({
           url: baseUrl,
           method: 'GET',
@@ -941,18 +991,22 @@ define([
               );
             }
           });
-      } else
-        this.intializePanels();
+          */
+      } else {
+        //this.initializePanels();
+      }
     },
 
     // Read the messages of the database server and get the port ID and attach
     // the executer to that port.
     messages: function(trans_id) {
-      var self = this;
+      console.warn(trans_id);
+      /*var self = this;
       // Make ajax call to listen the database message
       var baseUrl = url_for('profiler.messages', {
         'trans_id': trans_id,
-      });
+      });*/
+      /*
 
       $.ajax({
         url: baseUrl,
@@ -960,7 +1014,7 @@ define([
       })
         .done(function(res) {
           if (res.data.status === 'Success') {
-            self.intializePanels();
+            self.initializePanels();
             controller.enable_toolbar_buttons();
             // If status is Success then find the port number to attach the executer.
             controller.start_execution(trans_id, res.data.result);
@@ -980,6 +1034,7 @@ define([
             gettext('Error while fetching messages information.')
           );
         });
+        */
 
     },
 
@@ -994,7 +1049,7 @@ define([
     },
 
     // Create the profiler layout with splitter and display the appropriate data received from server.
-    intializePanels: function() {
+    initializePanels: function() {
       var self = this;
       this.registerPanel(
         'code', self.function_name_with_arguments, '100%', '50%',
@@ -1103,8 +1158,6 @@ define([
       var onLoad = function() {
         self.docker.finishLoading(100);
         self.docker.off(wcDocker.EVENT.LOADED);
-        // Register the callback when user set/clear the breakpoint on gutter area.
-        self.editor.on('gutterClick', self.onBreakPoint.bind(self), self);
         /* Set focus to the profiler container
          * Focus does not work in firefox without tabindex attr
          * so, setting focus to parent of $container which is #container
@@ -1147,7 +1200,7 @@ define([
       self.docker.on(wcDocker.EVENT.LOADED, onLoad);
 
       // Create the toolbar view for profiling the function
-      this.toolbarView = new ProfilerToolBarView();
+      this.toolbarView = new ProfilerToolbarView();
 
       /* wcDocker focuses on window always, and all our shortcuts are
        * bind to editor-panel. So when we use wcDocker focus, editor-panel
@@ -1178,6 +1231,18 @@ define([
       self.toolbarView.preferences = self.preferences;
 
       /* TODO: Update the shortcuts of the buttons */
+      /* Update the shortcuts of the buttons */
+      self.toolbarView.$el.find('#btn-start')
+        .attr('title', keyboardShortcuts.shortcut_accesskey_title('Start',self.preferences.btn_step_into))
+        .attr('accesskey', keyboardShortcuts.shortcut_key(self.preferences.start));
+
+      self.toolbarView.$el.find('#btn-stop')
+        .attr('title', keyboardShortcuts.shortcut_accesskey_title('Stop',self.preferences.btn_step_over))
+        .attr('accesskey', keyboardShortcuts.shortcut_key(self.preferences.stop));
+
+      self.toolbarView.$el.find('#btn-save')
+        .attr('title', keyboardShortcuts.shortcut_accesskey_title('Save',self.preferences.btn_start))
+        .attr('accesskey', keyboardShortcuts.shortcut_key(self.preferences.save));
 
     },
     // Register the panel with new profiler docker instance.
