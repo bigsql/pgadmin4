@@ -55,10 +55,7 @@ define([
 
       // Function to profile
       start_execution: function(trans_id, port_num) {
-        console.warn(trans_id);
-        console.warn(port_num);
-
-        var self = this;
+        //var self = this;
 
         // Make ajax call to listen the database message
         var baseUrl = url_for(
@@ -74,7 +71,7 @@ define([
             if (res.data.status === 'Success') {
               // If status is Success then open the generated html report
               // self.execute_query(trans_id);
-              window.open(, _blank);
+              window.open(baseUrl, '_blank');
             } else if (res.data.status === 'NotConnected') {
               Alertify.alert(
                 gettext('Profiler Error'),
@@ -921,9 +918,9 @@ define([
       console.warn('a');
 
       // Direct profiling
-      if (trans_id != undefined && profile_type) {
+      //if (trans_id != undefined && profile_type) {
 
-      }
+      //}
 
       // Below code will be executed for indirect profiling
       // indirect profiling - 0  and for direct profiling - 1

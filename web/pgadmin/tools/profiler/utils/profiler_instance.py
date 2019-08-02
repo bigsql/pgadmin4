@@ -73,6 +73,10 @@ class ProfilerInstance:
                 profiler_data=self.profiler_data
             )
 
+            print("AAAAAAAAAAAAAAAAAAAAAAAA")
+            print('data: ' + str(session['__profiler_sessions'][str(self.trans_id)]))
+            print("BBBBBBBBBBBBBBBBBBBBBBBB")
+
     def clear(self):
         with profiler_sessions_lock:
             if '__profiler_sessions' in session:

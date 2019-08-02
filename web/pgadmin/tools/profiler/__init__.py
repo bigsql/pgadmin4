@@ -37,6 +37,8 @@ from pgadmin.settings import get_setting
 from config import PG_DEFAULT_DRIVER
 from pgadmin.tools.profiler.utils.profiler_instance import ProfilerInstance
 
+# plprofiler import
+import plprofiler
 
 # Constants
 ASYNC_OK = 1
@@ -92,7 +94,7 @@ class ProfilerModule(PgAdminModule):
                 #'profiler.restart',
                 #'profiler.start_listener', 'profiler.execute_query',
                 #'profiler.messages',
-                #'profiler.start_execution', 'profiler.set_breakpoint',
+                'profiler.start_execution',# 'profiler.set_breakpoint',
                 #'profiler.clear_all_breakpoint', 'profiler.deposit_value',
                 #'profiler.select_frame', 'profiler.get_arguments',
                 #'profiler.set_arguments',
@@ -457,6 +459,87 @@ def initialize_target(profile_type, trans_id, sid, did,
 
     return make_json_response(data={'status': status,
                                     'profilerTransId': trans_id})
+
+@blueprint.route(
+    '/start_execution/<int:trans_id>/<int:port_num>', methods=['GET'],
+    endpoint='start_execution'
+)
+@login_required
+def start_execution(trans_id, port_num):
+    """
+    start_execution(trans_id, port_num)
+
+    This method is responsible for creating an asynchronous connection for
+    execution thread. Also store the session id into session return with
+    attach port query for the indirect profiling.
+
+    Parameters:
+        trans_id
+        - Transaction ID
+        port_num TODO: Check if this is still necessary
+        - Port number to attach
+    """
+
+    pfl_inst = ProfilerInstance(trans_id)
+    if pfl_inst.profiler_data is None:
+        return make_json_response(
+            data={
+                'status': 'NotConnected',
+                'result': gettext(
+                    'Not connected to server or connection with the server '
+                    'has been closed.'
+                )
+            }
+        )
+
+    # Create asynchronous connection using random connection id.
+    exe_conn_id = str(random.randint(1, 9999999))
+    try:
+        manager = get_driver(PG_DEFAULT_DRIVER).connection_manager(
+            pfl_inst.profiler_data['server_id'])
+        conn = manager.connection(
+            did=pfl_inst.profiler_data['database_id'],
+            conn_id=exe_conn_id)
+    except Exception as e:
+        return internal_server_error(errormsg=str(e))
+
+    # Connect the Server
+    status, msg = conn.connect()
+    if not status:
+        return internal_server_error(errormsg=str(msg))
+
+    # find the debugger version and execute the query accordingly
+    pfl_version = 1.0 # TODO: determine profiler version
+    #if dbg_version <= 2:
+    #    template_path = 'debugger/sql/v1'
+    #else:
+    #    template_path = 'debugger/sql/v2'
+
+    # Render the sql by hand here
+    sql = 'SELECT ' + func_name + '('
+    for arg_name in func_args_names:
+        sql += arg_name + ', '
+    sql = sql.rstrip()
+    if sql[len(sql) - 1] is ',':
+        sql[len(sql) - 1] = ')'
+    else:
+        sql += ')'
+    sql += ' VALUES ('
+    for arg in func_args:
+        sql += arg_name + ', '
+    sql = sql.rstrip()
+    if sql[len(sql) - 1] is ',':
+        sql[len(sql) - 1] = ')'
+    else:
+        sql += ')'
+    sql += ';'
+    print("AAAAAAAAAAAAAAAAAAAAAAAA")
+    print(sql)
+
+    return true
+
+
+
 
 @blueprint.route(
     '/close/<int:trans_id>', methods=["DELETE"], endpoint='close'
