@@ -771,6 +771,7 @@ define([
         tabOrientation: wcDocker.TAB.TOP,
       });
       docker.addPanel('results', wcDocker.DOCK.STACKED, parameters_panel);
+      docker.addPanel('Reports', wcDocker.DOCK.STACKED, parameters_panel);
     },
 
     // Create the profiler layout with splitter and display the appropriate data received from server.
@@ -813,10 +814,22 @@ define([
             content: '<div id="profile_results" class="profile_results" tabindex="0"></div>',
           });
 
+          // Create the reports panel to display saved profiling reports
+          var reports = new pgAdmin.Browser.Panel({
+            name: 'reports',
+            title: gettext('Saved Reports'),
+            width: '100%',
+            height: '100%',
+            isCloseable: false,
+            isPrivate: true,
+            content: '<div id ="parameters" class="parameters" tabindex="0"></div>',
+          });
+
           // Load all the created panels
           parameters.load(self.docker);
           messages.load(self.docker);
           results.load(self.docker);
+          reports.load(self.docker);
         });
 
       // restore the layout if present else fallback to buildDefaultLayout
@@ -830,6 +843,7 @@ define([
       self.parameters_panel = self.docker.findPanels('parameters')[0];
       self.messages_panel = self.docker.findPanels('messages')[0];
       self.results_panel = self.docker.findPanels('results')[0];
+      self.reports = self.docker.findPanels('reports')[0];
 
       var editor_pane = $('<div id="stack_editor_pane" ' +
         'class="pg-panel-content info"></div>');
