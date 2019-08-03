@@ -500,11 +500,11 @@ def start_profiler_listener(trans_id):
 
     if conn.connected():
         if pfl_inst.profiler_data['profile_type'] == 'direct':
-            sql = """SET search_path to """ + pfl_inst.function_data['schema'] + """";"""
+            sql = 'SET search_path to ' + pfl_inst.function_data['schema'] + ';'
             conn.execute_async(sql)
-            sql = """SELECT pl_profiler_reset_local();"""
+            sql = 'SELECT pl_profiler_reset_local();'
             status, result = conn.execute_async(sql)
-            conn.execute_async("""RESET search_path""")
+            conn.execute_async('RESET search_path')
             if not status:
                 return internal_server_error(errormsg=result)
 
@@ -559,7 +559,7 @@ def messages(trans_id):
         # Not sure what to do here
 
         return make_json_response(
-            data={'status': status, 'result': 'connected'}
+            data={'status': 'Success', 'result': 'connected'}
         )
     else:
         result = gettext(
@@ -625,27 +625,34 @@ def start_execution(trans_id, port_num):
     #    template_path = 'debugger/sql/v2'
 
     # Render the sql by hand here
-    sql = 'SELECT ' + func_name + '('
-    for arg_name in func_args_names:
-        sql += arg_name + ', '
-    sql = sql.rstrip()
-    if sql[len(sql) - 1] is ',':
-        sql[len(sql) - 1] = ')'
-    else:
-        sql += ')'
-    sql += ' VALUES ('
-    for arg in func_args:
-        sql += arg_name + ', '
-    sql = sql.rstrip()
-    if sql[len(sql) - 1] is ',':
-        sql[len(sql) - 1] = ')'
-    else:
-        sql += ')'
-    sql += ';'
-    print("AAAAAAAAAAAAAAAAAAAAAAAA")
-    print(sql)
+    func_name = pfl_inst.function_data['name']
+    func_args = pfl_inst.function_data['args_value']
 
-    return true
+    sql = 'SELECT * FROM ' + func_name + '('
+    for arg_idx in range(len(func_args)):
+        sql += str(func_args[arg_idx]['type']) + ' '
+        sql += '\'' + str(func_args[arg_idx]['value']) + '\''
+        if (arg_idx < len(func_args) - 1):
+            sql += ', '
+
+    sql += ');'
+
+    conn.execute_async('SET search_path to ' + pfl_inst.function_data['schema'] + ';')
+    conn.execute_async('SELECT pl_profiler_set_enabled_local(true)')
+    conn.execute_async('SELECT pl_profiler_set_collect_interval(0)')
+    status, result = conn.execute_async(sql)
+    conn.execute_async('SELECT pl_profiler_set_enabled_local(false)')
+    conn.execute_async('RESET search_path')
+
+    html = ''
+
+    return make_json_response(
+        data={
+            'status': 'Success',
+            'result': str(result),
+            'html'  : html
+        }
+    )
 
 @blueprint.route(
     '/get_parameters/<int:trans_id>', methods=['GET'],
@@ -681,8 +688,6 @@ def get_parameters(trans_id):
     if not status:
         return internal_server_error(errormsg=str(msg))
 
-    arg_names = pfl_inst.function_data['args_name']
-    arg_types = pfl_inst.function_data['args_type']
     arg_values = pfl_inst.function_data['args_value']
 
     return make_json_response(

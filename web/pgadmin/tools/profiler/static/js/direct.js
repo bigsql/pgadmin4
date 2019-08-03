@@ -56,12 +56,13 @@ define([
       // Function to profile
       start_execution: function(trans_id, port_num) {
         //var self = this;
+        console.warn(port_num);
 
         // Make ajax call to listen the database message
         var baseUrl = url_for(
           'profiler.start_execution', {
             'trans_id': trans_id,
-            'port_num': port_num,
+            'port_num': 1000,
           });
         $.ajax({
           url: baseUrl,
@@ -87,177 +88,6 @@ define([
           });
       },
 
-      // Execute the query and get the first functions profile information from the server
-      execute_query: function(trans_id) {
-        console.warn(trans_id);
-        /*
-        var self = this;
-        // Make ajax call to listen the database message
-        var baseUrl = url_for(
-          'profiler.execute_query', {
-            'trans_id': trans_id,
-            'query_type': 'wait_for_breakpoint',
-          });
-        */
-        /*$.ajax({
-          url: baseUrl,
-          method: 'GET',
-        })
-          .done(function(res) {
-            if (res.data.status === 'Success') {
-            // set the return code to the code editor text area
-              if (
-                res.data.result[0].src != null &&
-              res.data.result[0].linenumber != null
-              ) {
-                pgTools.DirectProfile.editor.setValue(res.data.result[0].src);
-
-                self.setActiveLine(res.data.result[0].linenumber - 2);
-              }
-              // Call function to create and update local variables ....
-              self.GetStackInformation(trans_id);
-              if (pgTools.DirectProfile.profile_type) {
-                self.poll_end_execution_result(trans_id);
-              }
-            } else if (res.data.status === 'NotConnected') {
-              Alertify.alert(
-                gettext('Profiler Error'),
-                gettext('Error while executing requested profiling information.')
-              );
-            }
-          })
-          .fail(function() {
-            Alertify.alert(
-              gettext('Profiler Error'),
-              gettext('Error while executing requested profiling information.')
-            );
-          });
-        */
-      },
-
-
-      /*
-        poll the actual result after user has executed the "continue", "step-into",
-        "step-over" actions and get the other updated information from the server.
-      */
-      poll_result: function(trans_id) {
-        console.warn(trans_id);
-        /*
-        var self = this;
-
-        // Do we need to poll?
-        if (!pgTools.DirectProfile.is_polling_required) {
-          return;
-        }
-
-        // Make ajax call to listen the database message
-        var baseUrl = url_for('profiler.poll_result', {
-            'trans_id': trans_id,
-          }),
-          poll_timeout;
-        */
-
-        /*
-          During the execution we should poll the result in minimum seconds but
-          once the execution is completed and wait for the another profiling
-          session then we should decrease the polling frequency.
-        */
-        /*
-        if (pgTools.DirectProfile.polling_timeout_idle) {
-          // Poll the result after 1 second
-          poll_timeout = 1000;
-        } else {
-          // Poll the result after 200 ms
-          poll_timeout = 200;
-        }
-
-        setTimeout(
-          function() {
-            $.ajax({
-              url: baseUrl,
-              method: 'GET',
-              beforeSend: function(xhr) {
-                xhr.setRequestHeader(
-                  pgAdmin.csrf_token_header, pgAdmin.csrf_token
-                );
-              },
-            })
-              .done(function(res) {
-
-                if (res.data.status === 'Success') {
-                // If no result then poll again to wait for results.
-                  if (res.data.result == null || res.data.result.length == 0) {
-                    self.poll_result(trans_id);
-                  } else {
-                    if (res.data.result[0].src != undefined || res.data.result[0].src != null) {
-                      pgTools.DirectProfile.polling_timeout_idle = false;
-                      pgTools.DirectProfile.docker.finishLoading(50);
-                      if (res.data.result[0].src != pgTools.DirectProfile.editor.getValue()) {
-                        pgTools.DirectProfile.editor.setValue(res.data.result[0].src);
-                        self.UpdateBreakpoint(trans_id);
-                      }
-                      self.setActiveLine(res.data.result[0].linenumber - 2);
-                      // Update the stack, local variables and parameters information
-                      self.GetStackInformation(trans_id);
-
-                    } else if (!pgTools.DirectProfile.profile_type && !pgTools.DirectProfile.first_time_indirect_profile) {
-                      pgTools.DirectProfile.docker.finishLoading(50);
-                      self.setActiveLine(-1);
-                      self.clear_all_breakpoint(trans_id);
-                      self.execute_query(trans_id);
-                      pgTools.DirectProfile.first_time_indirect_profile = true;
-                      pgTools.DirectProfile.polling_timeout_idle = false;
-                    } else {
-                      pgTools.DirectProfile.polling_timeout_idle = false;
-                      pgTools.DirectProfile.docker.finishLoading(50);
-                      // If the source is really changed then only update the breakpoint information
-                      if (res.data.result[0].src != pgTools.DirectProfile.editor.getValue()) {
-                        pgTools.DirectProfile.editor.setValue(res.data.result[0].src);
-                        self.UpdateBreakpoint(trans_id);
-                      }
-
-                      self.setActiveLine(res.data.result[0].linenumber - 2);
-                      // Update the stack, local variables and parameters information
-                      self.GetStackInformation(trans_id);
-                    }
-
-                    // Enable all the buttons as we got the results
-                    // TODO: Fix this properly so a timeout isn't required.
-                    setTimeout(function() {
-                      self.enable_toolbar_buttons();
-                    }, 500);
-                  }
-                } else if (res.data.status === 'Busy') {
-                  pgTools.DirectProfile.polling_timeout_idle = true;
-                  // If status is Busy then poll the result by recursive call to the poll function
-                  if (!pgTools.DirectProfile.profile_type) {
-                    pgTools.DirectProfile.docker.startLoading(
-                      gettext('Waiting for another session to invoke the target...')
-                    );
-
-                    // As we are waiting for another session to invoke the target,disable all the buttons
-                    self.disable_toolbar_buttons();
-                    pgTools.DirectProfile.first_time_indirect_profile = false;
-                    self.poll_result(trans_id);
-                  } else {
-                    self.poll_result(trans_id);
-                  }
-                } else if (res.data.status === 'NotConnected') {
-                  Alertify.alert(
-                    gettext('Profiler Error'),
-                    gettext('Error while polling result.')
-                  );
-                }
-              })
-              .fail(function() {
-                Alertify.alert(
-                  gettext('Profiler Error'),
-                  gettext('Error while polling result.')
-                );
-              });
-          }, poll_timeout);
-        */
-      },
 
       // This function will update messages tab
       update_messages: function(msg) {
@@ -441,83 +271,6 @@ define([
         */
       },
 
-      Restart: function(trans_id) {
-        console.warn(trans_id);
-        /*
-
-        var self = this,
-          baseUrl = url_for('profiler.restart', {'trans_id': trans_id});
-
-        self.disable_toolbar_buttons();
-
-        // Clear msg tab
-        pgTools.DirectProfile
-          .messages_panel
-          .$container
-          .find('.messages')
-          .html('');
-
-        /*
-        $.ajax({
-          url: baseUrl,
-        })
-          .done(function(res) {
-          // Restart the same function profiling with previous arguments
-            var restart_pfl = res.data.restart_profile ? 1 : 0;
-
-            // Start pooling again
-            pgTools.DirectProfile.polling_timeout_idle = false;
-            pgTools.DirectProfile.is_polling_required = true;
-            self.poll_result(trans_id);
-
-            if (restart_pfl) {
-              pgTools.DirectProfile.profile_restarted = true;
-            }
-
-            /*
-           Need to check if restart profiling really require to open the input
-           dialog? If yes then we will get the previous arguments from database
-           and populate the input dialog, If no then we should directly start the
-           listener.
-
-            if (res.data.result.require_input) {
-              profile_function_again(res.data.result, restart_pfl);
-            } else {
-            // Profiling of void function is started again so we need to start
-            // the listener again
-              var baseUrl = url_for('profiler.start_listener', {
-                'trans_id': trans_id,
-              });
-
-              $.ajax({
-                url: baseUrl,
-                method: 'GET',
-              })
-                .done(function() {
-                  if (pgTools.DirectProfile.profile_type) {
-                    self.poll_end_execution_result(trans_id);
-                  }
-                })
-                .fail(function() {
-                  Alertify.alert(
-                    gettext('Profiler Error'),
-                    gettext('Error while polling result.')
-                  );
-                });
-            }
-          })
-          .fail(function(xhr) {
-            try {
-              var err = JSON.parse(xhr.responseText);
-              if (err.success == 0) {
-                Alertify.alert(gettext('Profiler Error'), err.errormsg);
-              }
-            } catch (e) {
-              console.warn(e.stack || e);
-            }
-          });
-        */
-      },
 
       Stop: function(trans_id) {
         console.warn(trans_id);
@@ -748,38 +501,6 @@ define([
         */
       },
 
-      select_frame: function() {
-        console.warn('a');
-        /*
-        var self = this;
-
-        // Make ajax call to listen the database message
-        var baseUrl = url_for('profiler.select_frame', {
-          'trans_id': pgTools.DirectProfile.trans_id,
-          'frame_id': self.frame_id,
-        });
-        /*
-        $.ajax({
-          url: baseUrl,
-          method: 'GET',
-        })
-          .done(function(res) {
-            if (res.data.status) {
-              pgTools.DirectProfile.editor.setValue(res.data.result[0].src);
-              self.UpdateBreakpoint(pgTools.DirectProfile.trans_id);
-              self.setActiveLine(res.data.result[0].linenumber - 2);
-              // Call function to create and update local variables ....
-              self.GetLocalVariables(pgTools.DirectProfile.trans_id);
-            }
-          })
-          .fail(function() {
-            Alertify.alert(
-              gettext('Profiler Error'),
-              gettext('Error while selecting frame.')
-            );
-          });
-        */
-      },
     }
   );
 
@@ -834,7 +555,7 @@ define([
       }
     },
     on_start: function() {
-      controller.start(pgTools.DirectProfile.trans_id);
+      controller.start_execution(pgTools.DirectProfile.trans_id);
     },
     on_stop: function() {
       controller.stop(pgTools.DirectProfile.trans_id);
@@ -969,7 +690,7 @@ define([
               }
             } catch (e) {
               Alertify.alert(
-                gettext('Debugger Error'),
+                gettext('Profiler Error'),
                 gettext('Error while starting profiling listener.')
               );
             }
@@ -983,6 +704,7 @@ define([
     // the executer to that port.
     messages: function(trans_id) {
       var self = this;
+
       // Make ajax call to listen the database message
       var baseUrl = url_for('profiler.messages', {
         'trans_id': trans_id,
@@ -1022,8 +744,6 @@ define([
                   gettext('Error while fetching parameters.')
                 );
               });
-            // If status is Success then find the port number to attach the executer.
-            controller.start_execution(trans_id, res.data.result);
           } else if (res.data.status === 'Busy') {
           // If status is Busy then poll the result by recursive call to the poll function
             self.messages(trans_id);
