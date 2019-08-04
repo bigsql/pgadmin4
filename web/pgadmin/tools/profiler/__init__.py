@@ -15,6 +15,8 @@ MODULE_NAME = 'profiler'
 import simplejson as json
 import random
 import re # unnecessary?
+from datetime import datetime
+import os
 
 # Flask imports
 from flask import url_for, Response, render_template, request, session, \
@@ -786,8 +788,6 @@ def generate_direct_report(conn, name, opt_top, func_oids = None):
         if row is None:
             raise Exception("function with Oid %d not found\n" %func_oid)
 
-        print(linestats[func_oid])
-
         # ----
         # With that we can start the definition.
         # ----
@@ -822,15 +822,20 @@ def generate_direct_report(conn, name, opt_top, func_oids = None):
         # ----
         # Get the callgraph data.
         # ----
-        status, result = conn.execute_async("""SELECT array_to_string(pl_profiler_get_stack(stack), ';'),
-                            stack,
-                            call_count, us_total, us_children, us_self
+        status, result = \
+            conn.execute_async_list("""SELECT
+                                           array_to_string(pl_profiler_get_stack(stack), ';'),
+                                           stack,
+                                           call_count,
+                                           us_total,
+                                           us_children,
+                                           us_self
                         FROM pl_profiler_callgraph_local()""")
         flamedata = ""
         callgraph = []
-        for row in cur:
-            flamedata += str(row[0]) + " " + str(row[5]) + "\n"
-            callgraph.append(row[1:])
+        for row in result:
+            flamedata += str(row['array_to_string']) + " " + str(row['us_self']) + "\n"
+            callgraph.append([row['stack'], row['call_count'], row['call_count'], row['us_total'], row['us_children'], row['us_self']])
 
 
         return {
@@ -848,6 +853,7 @@ def generate_direct_report(conn, name, opt_top, func_oids = None):
 
 def save_direct_report(report_data, name, dbname):
     now = datetime.now().strftime("%Y-%m-%d;%H:%M")
+    print(current_app.root_path)
     path = os.path.join(current_app.root_path, ('instance/direct/' + now + '.html'))
 
     with open(path, 'w') as output_fd:
