@@ -1012,6 +1012,84 @@ WHERE
 
         return True, res
 
+    def execute_async_list(self, query, params=None, formatted_exception_msg=True):
+        """
+        This function executes the given query asynchronously and returns
+        a dict that is the result of the query.
+
+        Args:
+            query: SQL query to run.
+            params: extra parameters to the function
+            formatted_exception_msg: if True then function return the
+            formatted exception message
+        """
+
+        # Convert the params based on python_encoding
+        params = self.escape_params_sqlascii(params)
+
+        res = []
+
+        self.__async_cursor = None
+        status, cur = self.__cursor()
+
+        if not status:
+            return False, str(cur)
+        query_id = random.randint(1, 9999999)
+
+        encoding = self.python_encoding
+
+        query = query.encode(encoding)
+
+        current_app.logger.log(
+            25,
+            u"Execute (async) for server #{server_id} - {conn_id} (Query-id: "
+            u"{query_id}):\n{query}".format(
+                server_id=self.manager.sid,
+                conn_id=self.conn_id,
+                query=query.decode(encoding),
+                query_id=query_id
+            )
+        )
+
+        try:
+            self.__notices = []
+            self.__notifies = []
+            self.execution_aborted = False
+            cur.execute(query, params)
+            self._wait_timeout(cur.connection)
+
+            for row in cur:
+                res.append(row)
+        except psycopg2.Error as pe:
+            errmsg = self._formatted_exception_msg(pe, formatted_exception_msg)
+            current_app.logger.error(
+                u"Failed to execute query (execute_async) for the server "
+                u"#{server_id} - {conn_id}(Query-id: {query_id}):\n"
+                u"Error Message:{errmsg}".format(
+                    server_id=self.manager.sid,
+                    conn_id=self.conn_id,
+                    query=query.decode(encoding),
+                    errmsg=errmsg,
+                    query_id=query_id
+                )
+            )
+
+            # Check for the asynchronous notifies.
+            self.check_notifies()
+
+            if self.is_disconnected(pe):
+                raise ConnectionLost(
+                    self.manager.sid,
+                    self.db,
+                    None if self.conn_id[0:3] == u'DB:' else self.conn_id[5:]
+                )
+            return False, errmsg
+
+        self.__async_cursor = cur
+        self.__async_query_id = query_id
+
+        return True, res
+
     def execute_void(self, query, params=None, formatted_exception_msg=False):
         """
         This function executes the given query with no result.

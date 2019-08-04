@@ -283,3 +283,44 @@ class QueryHistoryModel(db.Model):
     dbname = db.Column(db.String(), nullable=False, primary_key=True)
     query_info = db.Column(db.String(), nullable=False)
     last_updated_flag = db.Column(db.String(), nullable=False)
+
+class ProfilerFunctionArguments(db.Model):
+    """Define the profiler input function arguments."""
+    __tablename__ = 'profiler_function_arguments'
+    server_id = db.Column(db.Integer(), nullable=False, primary_key=True)
+    database_id = db.Column(db.Integer(), nullable=False, primary_key=True)
+    schema_id = db.Column(db.Integer(), nullable=False, primary_key=True)
+    function_id = db.Column(db.Integer(), nullable=False, primary_key=True)
+    arg_id = db.Column(db.Integer(), nullable=False, primary_key=True)
+    is_null = db.Column(
+        db.Integer(),
+        db.CheckConstraint('is_null >= 0 AND is_null <= 1'),
+        nullable=False
+    )
+    is_expression = db.Column(
+        db.Integer(),
+        db.CheckConstraint(
+            'is_expression >= 0 AND is_expression <= 1'
+        ),
+        nullable=False
+    )
+    use_default = db.Column(
+        db.Integer(),
+        db.CheckConstraint(
+            'use_default >= 0 AND use_default <= 1'
+        ),
+        nullable=False
+    )
+
+    value = db.Column(db.String(), nullable=True)
+
+
+
+class ProfilerSavedReports(db.Model):
+    """Define the saved profiling reports table."""
+    __tablename__ = 'saved_reports'
+    rid = db.Column(db.Integer(), primary_key=True, nullable=False)
+    name = db.Column(db.String(), nullable=False)
+    direct = db.Column(db.Boolean(), nullable=False)
+    dbname = db.Column(db.String(), nullable=False)
+    time = db.Column(db.String(), nullable=False)

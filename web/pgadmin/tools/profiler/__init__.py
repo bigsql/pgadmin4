@@ -35,9 +35,10 @@ from pgadmin.settings import get_setting
 
 # other imports
 from config import PG_DEFAULT_DRIVER
+from pgadmin.model import db#, ProfilerFunctionArguments
 from pgadmin.tools.profiler.utils.profiler_instance import ProfilerInstance
 
-# plprofiler import
+#
 import plprofiler
 
 # Constants
@@ -642,9 +643,9 @@ def start_execution(trans_id, port_num):
     conn.execute_async('SELECT pl_profiler_set_collect_interval(0)')
     status, result = conn.execute_async(sql)
     conn.execute_async('SELECT pl_profiler_set_enabled_local(false)')
+    report_data = generate_direct_report(conn, 'temp_name', 10) # TODO: Add support for K top
+    save_direct_report(report_data, 'temp_name', 'dbname')
     conn.execute_async('RESET search_path')
-
-    html = ''
 
     return make_json_response(
         data={
@@ -653,6 +654,218 @@ def start_execution(trans_id, port_num):
             'html'  : html
         }
     )
+
+def generate_direct_report(conn, name, opt_top, func_oids = None):
+    """
+    generate_report(trans_id)
+
+    This method is used to generate an html report and save it in our sqlite database
+
+    Parameters:
+        conn
+
+        name
+
+        opt_top
+
+        funco_oids
+    """
+    # ----
+    # Create a default config.
+    # ----
+    config = {
+            'name': name,
+            'title': 'PL Profiler Report for %s' %(name, ),
+            'tabstop': '8',
+            'svg_width': '1200',
+            'table_width': '80%',
+            'desc': '<h1>PL Profiler Report for %s</h1>\n' %(name, ) +
+                    '<p>\n<!-- description here -->\n</p>',
+        }
+
+    # ----
+    # If not specified, find the top N functions by self time.
+    # ----
+    found_more_funcs = False
+    if func_oids is None or len(func_oids) == 0:
+        func_oids_by_user = False
+        func_oids = []
+        status, result = \
+            conn.execute_async_list("""SELECT stack[array_upper(stack, 1)] as func_oid,
+                                           sum(us_self) as us_self
+                                       FROM pl_profiler_callgraph_local() C
+                                       GROUP BY func_oid
+                                       ORDER BY us_self DESC
+                                       LIMIT %s""", (opt_top + 1, ))
+        for row in result:
+            func_oids.append(int(row['func_oid']))
+        if len(func_oids) > opt_top:
+            func_oids = func_oids[:-1]
+            found_more_funcs = True
+    else:
+        func_oids_by_user = True
+        func_oids = [int(x) for x in func_oids]
+
+    if len(func_oids) == 0:
+        # Possible causes of error:
+        #   - No functions being profiled
+        #   - Shared_preload_libraries contained the profiler
+        raise Exception("No profiling data found")
+
+    # ----
+    # Get an alphabetically sorted list of the selected functions.
+    # ----
+    status, result = \
+        conn.execute_async_list("""SELECT P.oid, N.nspname, P.proname
+                                   FROM pg_catalog.pg_proc P
+                                   JOIN pg_catalog.pg_namespace N ON N.oid = P.pronamespace
+                                   WHERE P.oid IN (SELECT * FROM unnest(%s))
+                                   ORDER BY upper(nspname), nspname,
+                                            upper(proname), proname""", (func_oids, ))
+    func_list = []
+    for row in result:
+        func_list.append({
+                'funcoid':  str(row['oid']),
+                'schema': str(row['nspname']),
+                'funcname': str(row['proname']),
+            })
+
+    # ----
+    # The view for linestats is extremely inefficient. We select
+    # all of it once and cache it in a hash table.
+    # ----
+    linestats = {}
+    status, result = \
+        conn.execute_async_list("""SELECT L.func_oid, L.line_number,
+                                   sum(L.exec_count)::bigint AS exec_count,
+                                   sum(L.total_time)::bigint AS total_time,
+                                   max(L.longest_time)::bigint AS longest_time,
+                                   S.source
+                               FROM pl_profiler_linestats_local() L
+                               JOIN pl_profiler_funcs_source(pl_profiler_func_oids_local()) S
+                                   ON S.func_oid = L.func_oid
+                                   AND S.line_number = L.line_number
+                               GROUP BY L.func_oid, L.line_number, S.source
+                               ORDER BY L.func_oid, L.line_number""")
+    for row in result:
+        if row['func_oid'] not in linestats:
+            linestats[row['func_oid']] = []
+        linestats[row['func_oid']].append([row['func_oid'],
+                                           row['line_number'],
+                                           row['exec_count'],
+                                           row['total_time'],
+                                           row['longest_time'],
+                                           row['source']])
+
+    # ----
+    # Build a list of function definitions in the order, specified
+    # by the func_oids list. This is either the oids, requested by
+    # the user or the oids determined above in descending order of
+    # self_time.
+    # ----
+    func_defs = []
+    for func_oid in func_oids:
+        # ----
+        # First get the function definition and overall stats.
+        # ----
+        status, result = \
+            conn.execute_async_list("""WITH SELF AS (SELECT
+                                               stack[array_upper(stack, 1)] as func_oid,
+                                                   sum(us_self) as us_self
+                                               FROM pl_profiler_callgraph_local()
+                                               GROUP BY func_oid)
+                                       SELECT P.oid, N.nspname, P.proname,
+                                           pg_catalog.pg_get_function_result(P.oid),
+                                           pg_catalog.pg_get_function_arguments(P.oid),
+                                           coalesce(SELF.us_self, 0) as self_time
+                                           FROM pg_catalog.pg_proc P
+                                           JOIN pg_catalog.pg_namespace N ON N.oid = P.pronamespace
+                                           LEFT JOIN SELF ON SELF.func_oid = P.oid
+                                           WHERE P.oid = %s""", (func_oid, ))
+        row = result[0]
+        if row is None:
+            raise Exception("function with Oid %d not found\n" %func_oid)
+
+        print(linestats[func_oid])
+
+        # ----
+        # With that we can start the definition.
+        # ----
+        func_def = {
+                'funcoid': func_oid,
+                'schema': row['nspname'],
+                'funcname': row['proname'],
+                'funcresult': row['pg_get_function_result'],
+                'funcargs': row['pg_get_function_arguments'],
+                'total_time': linestats[func_oid][0][3],
+                'self_time': int(row['self_time']),
+                'source': [],
+            }
+
+        # ----
+        # Add all the source code lines to that.
+        # ----
+        for row in linestats[func_oid]:
+            func_def['source'].append({
+                    'line_number': int(row[1]),
+                    'source': row[5],
+                    'exec_count': int(row[2]),
+                    'total_time': int(row[3]),
+                    'longest_time': int(row[4]),
+                })
+
+        # ----
+        # Add this function to the list of function definitions.
+        # ----
+        func_defs.append(func_def)
+
+        # ----
+        # Get the callgraph data.
+        # ----
+        status, result = conn.execute_async("""SELECT array_to_string(pl_profiler_get_stack(stack), ';'),
+                            stack,
+                            call_count, us_total, us_children, us_self
+                        FROM pl_profiler_callgraph_local()""")
+        flamedata = ""
+        callgraph = []
+        for row in cur:
+            flamedata += str(row[0]) + " " + str(row[5]) + "\n"
+            callgraph.append(row[1:])
+
+
+        return {
+                'config': config,
+                'callgraph_overflow': False,
+                'functions_overflow': False,
+                'lines_overflow': False,
+                'func_list': func_list,
+                'func_defs': func_defs,
+                'flamedata': flamedata,
+                'callgraph': callgraph,
+                'func_oids_by_user': func_oids_by_user,
+                'found_more_funcs': found_more_funcs,
+            }
+
+def save_direct_report(report_data, name, dbname):
+    now = datetime.now().strftime("%Y-%m-%d;%H:%M")
+    path = os.path.join(current_app.root_path, ('instance/direct/' + now + '.html'))
+
+    with open(path, 'w') as output_fd:
+        report = plprofiler_report()
+        report.generate(report_data, output_fd)
+
+        output_fd.close()
+
+        profile_report = ProfilerSavedReports(
+            name = name,
+            direct = True,
+            dbname = dbname,
+            time = now
+        )
+
+        db.session.add(profile_report)
+
+        db.session.commit()
 
 @blueprint.route(
     '/get_parameters/<int:trans_id>', methods=['GET'],
