@@ -99,7 +99,7 @@ class ProfilerModule(PgAdminModule):
                 'profiler.start_listener',# 'profiler.execute_query',
                 'profiler.messages',
                 'profiler.start_execution',# 'profiler.set_breakpoint',
-                'profiler.show_report'
+                'profiler.show_report', 'profiler.get_src'
                 #'profiler.clear_all_breakpoint', 'profiler.deposit_value',
                 #'profiler.select_frame', 'profiler.get_arguments',
                 #'profiler.set_arguments',
@@ -675,10 +675,50 @@ def show_report(report_id):
         pass
         # TODO: throw error
 
-    print(report_data.time)
-
     # TODO: Put error checking in js when this method returns
     return render_template('profiler/instance/direct/' + report_data.time + '.html')
+
+@blueprint.route(
+    '/get_src/<int:trans_id>', methods=['GET'],
+    endpoint='get_src'
+)
+@login_required
+def get_src(trans_id):
+    pfl_inst = ProfilerInstance(trans_id)
+    if pfl_inst.profiler_data is None:
+        return make_json_response(
+            data={
+                'status': 'NotConnected',
+                'result': gettext(
+                    'Not connected to server or connection with the server '
+                    'has been closed.'
+                )
+            })
+
+    manager = get_driver(PG_DEFAULT_DRIVER).connection_manager(
+        pfl_inst.profiler_data['server_id'])
+    conn = manager.connection(
+        did=pfl_inst.profiler_data['database_id'],
+        conn_id=pfl_inst.profiler_data['conn_id'])
+
+    template_path = 'profiler/sql'
+    sql = """SELECT p.prosrc
+             FROM pg_catalog.pg_proc p
+                  LEFT JOIN pg_catalog.pg_namespace n ON p.pronamespace = n.oid
+                  LEFT JOIN pg_catalog.pg_language l ON p.prolang = l.oid
+                  LEFT JOIN pg_catalog.pg_type y ON p.prorettype = y.oid
+            WHERE p.oid = """ + str(pfl_inst.function_data['oid']) + """::oid"""
+    #print(sql)
+
+    status, result = conn.execute_dict(sql)
+    print(result['rows'][0]['prosrc'])
+
+    return make_json_response(
+        data={
+            'status': 'Success',
+            'result': result['rows'][0]['prosrc']
+        }
+    )
 
 def generate_direct_report(conn, name, opt_top, func_oids = None):
     """

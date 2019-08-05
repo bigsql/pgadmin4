@@ -457,6 +457,9 @@ define([
           .find('.parameters')
           .append(param_grid.el);
       },
+      AddSrc: function(result) {
+        pgTools.DirectProfile.editor.setValue(result);
+      },
       deposit_parameter_value: function(model) {
         console.warn(model);
         /*var self = this;
@@ -566,6 +569,8 @@ define([
       controller.save(pgTools.DirectProfile.trans_id);
     },
     keyAction: function (event) {
+      console.warn(event);
+      /*
       let panel_type='';
 
       panel_type = keyboardShortcuts.processEventProfiler(
@@ -577,7 +582,7 @@ define([
         setTimeout(function() {
           pgBrowser.Events.trigger(`pgadmin:profiler:${panel_type}:focus`);
         }, 100);
-      }
+      }*/
     },
   });
 
@@ -591,10 +596,7 @@ define([
   _.extend(DirectProfile.prototype, {
     /* We should get the transaction id from the server during initialization here */
     load: function(trans_id, profile_type, function_name_with_arguments, layout) {
-      console.warn(trans_id);
-      console.warn(profile_type);
       console.warn(function_name_with_arguments);
-      console.warn(layout);
 
       // We do not want to initialize the module multiple times.
       var self = this;
@@ -742,10 +744,38 @@ define([
               })
               .fail(function() {
                 Alertify.alert(
-                  gettext('Debugger Error'),
+                  gettext('Profiler Error'),
                   gettext('Error while fetching parameters.')
                 );
               });
+
+            baseUrl = url_for('profiler.get_src', {
+              'trans_id' : trans_id,
+            });
+
+            $.ajax( {
+              url: baseUrl,
+              method: 'GET',
+            })
+              .done(function(res) {
+                if (res.data.status === 'Success') {
+                  controller.AddSrc(res.data.result);
+                }
+
+                else if (res.data.status === 'NotConnected') {
+                  Alertify.alert(
+                    gettext('Profiler Error'),
+                    gettext('Error whiel fetching parameters.')
+                  );
+                }
+              })
+              .fail(function() {
+                Alertify.alert(
+                  gettext('Profiler Error'),
+                  gettext('Error while fetching sql source code.')
+                );
+              });
+
           } else if (res.data.status === 'Busy') {
           // If status is Busy then poll the result by recursive call to the poll function
             self.messages(trans_id);
@@ -773,7 +803,7 @@ define([
         tabOrientation: wcDocker.TAB.TOP,
       });
       docker.addPanel('results', wcDocker.DOCK.STACKED, parameters_panel);
-      docker.addPanel('Reports', wcDocker.DOCK.STACKED, parameters_panel);
+      docker.addPanel('reports', wcDocker.DOCK.STACKED, parameters_panel);
     },
 
     // Create the profiler layout with splitter and display the appropriate data received from server.
@@ -824,7 +854,7 @@ define([
             height: '100%',
             isCloseable: false,
             isPrivate: true,
-            content: '<div id ="parameters" class="parameters" tabindex="0"></div>',
+            content: '<div id ="reports" class="reports" tabindex="0"></div>',
           });
 
           // Load all the created panels
@@ -973,6 +1003,7 @@ define([
 
       /* TODO: Update the shortcuts of the buttons */
       /* Update the shortcuts of the buttons */
+      /*
       self.toolbarView.$el.find('#btn-start')
         .attr('title', keyboardShortcuts.shortcut_accesskey_title('Start',self.preferences.btn_step_into))
         .attr('accesskey', keyboardShortcuts.shortcut_key(self.preferences.start));
@@ -983,7 +1014,7 @@ define([
 
       self.toolbarView.$el.find('#btn-save')
         .attr('title', keyboardShortcuts.shortcut_accesskey_title('Save',self.preferences.btn_start))
-        .attr('accesskey', keyboardShortcuts.shortcut_key(self.preferences.save));
+        .attr('accesskey', keyboardShortcuts.shortcut_key(self.preferences.save));*/
 
     },
     // Register the panel with new profiler docker instance.
