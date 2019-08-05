@@ -111,7 +111,7 @@ def upgrade():
         value VARCHAR(1024) NOT NULL,
 
         PRIMARY KEY (pid, uid),
-        FOREIGN KEY(pid) REFERENCES preferences (pid),
+        FOREIGN KEY(pid) REFERENCES preferences (id),
         FOREIGN KEY(uid) REFERENCES user (id)
         )""")
 

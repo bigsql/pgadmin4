@@ -29,7 +29,7 @@ from flask_sqlalchemy import SQLAlchemy
 #
 ##########################################################################
 
-SCHEMA_VERSION = 23
+SCHEMA_VERSION = 24
 
 ##########################################################################
 #
@@ -319,7 +319,7 @@ class ProfilerFunctionArguments(db.Model):
 class ProfilerSavedReports(db.Model):
     """Define the saved profiling reports table."""
     __tablename__ = 'saved_reports'
-    rid = db.Column(db.Integer(), primary_key=True, nullable=False)
+    rid = db.Column(db.Integer(), autoincrement=True, primary_key=True, nullable=False)
     name = db.Column(db.String(), nullable=False)
     direct = db.Column(db.Boolean(), nullable=False)
     dbname = db.Column(db.String(), nullable=False)

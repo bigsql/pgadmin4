@@ -36,6 +36,7 @@ class _PGCSRFProtect(CSRFProtect):
             'pgadmin.tools.debugger.direct_new',
             'pgadmin.tools.profiler.initialize_target',
             'pgadmin.tools.profiler.direct_new',
+            'pgadmin.tools.profiler.show_report'
         ]
 
         for exempt in exempt_views:

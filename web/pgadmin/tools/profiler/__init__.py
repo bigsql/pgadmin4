@@ -37,11 +37,11 @@ from pgadmin.settings import get_setting
 
 # other imports
 from config import PG_DEFAULT_DRIVER
-from pgadmin.model import db#, ProfilerFunctionArguments
+from pgadmin.model import db, ProfilerSavedReports, ProfilerFunctionArguments
 from pgadmin.tools.profiler.utils.profiler_instance import ProfilerInstance
 
 #
-import plprofiler
+from plprofiler import plprofiler, plprofiler_report
 
 # Constants
 ASYNC_OK = 1
@@ -99,6 +99,7 @@ class ProfilerModule(PgAdminModule):
                 'profiler.start_listener',# 'profiler.execute_query',
                 'profiler.messages',
                 'profiler.start_execution',# 'profiler.set_breakpoint',
+                'profiler.show_report'
                 #'profiler.clear_all_breakpoint', 'profiler.deposit_value',
                 #'profiler.select_frame', 'profiler.get_arguments',
                 #'profiler.set_arguments',
@@ -646,16 +647,38 @@ def start_execution(trans_id, port_num):
     status, result = conn.execute_async(sql)
     conn.execute_async('SELECT pl_profiler_set_enabled_local(false)')
     report_data = generate_direct_report(conn, 'temp_name', 10) # TODO: Add support for K top
-    save_direct_report(report_data, 'temp_name', 'dbname')
+    report_id = save_direct_report(report_data, 'temp_name', 'dbname')
     conn.execute_async('RESET search_path')
 
     return make_json_response(
         data={
             'status': 'Success',
             'result': str(result),
-            'html'  : html
+            'report_id'  : report_id
         }
     )
+
+@blueprint.route(
+    '/show_report/<int:report_id>', methods=['GET'],
+    endpoint='show_report'
+)
+@login_required
+def show_report(report_id):
+    """
+    show_report(report_id)
+
+    Parameters:
+        report_id
+    """
+    report_data = ProfilerSavedReports.query.filter_by(rid=report_id).first()
+    if report_data is None:
+        pass
+        # TODO: throw error
+
+    print(report_data.time)
+
+    # TODO: Put error checking in js when this method returns
+    return render_template('profiler/instance/direct/' + report_data.time + '.html')
 
 def generate_direct_report(conn, name, opt_top, func_oids = None):
     """
@@ -852,12 +875,17 @@ def generate_direct_report(conn, name, opt_top, func_oids = None):
             }
 
 def save_direct_report(report_data, name, dbname):
-    now = datetime.now().strftime("%Y-%m-%d;%H:%M")
-    print(current_app.root_path)
-    path = os.path.join(current_app.root_path, ('instance/direct/' + now + '.html'))
+    """
+    save_direct_report(report_data, name, dbname)
 
-    with open(path, 'w') as output_fd:
-        report = plprofiler_report()
+    Parameters:
+        TODO
+    """
+    now = datetime.now().strftime("%Y-%m-%d;%H:%M")
+    path = '/tools/profiler/templates/profiler/instance/direct/' + now + '.html'
+
+    with open(str(current_app.root_path) + path, 'w') as output_fd:
+        report = plprofiler_report.plprofiler_report()
         report.generate(report_data, output_fd)
 
         output_fd.close()
@@ -872,6 +900,8 @@ def save_direct_report(report_data, name, dbname):
         db.session.add(profile_report)
 
         db.session.commit()
+
+        return profile_report.rid
 
 @blueprint.route(
     '/get_parameters/<int:trans_id>', methods=['GET'],

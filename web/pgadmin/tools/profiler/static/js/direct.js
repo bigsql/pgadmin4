@@ -70,9 +70,11 @@ define([
         })
           .done(function(res) {
             if (res.data.status === 'Success') {
-              // If status is Success then open the generated html report
-              // self.execute_query(trans_id);
-              window.open(baseUrl, '_blank');
+              var reportUrl = url_for(
+                'profiler.show_report', {
+                  'report_id': res.data.report_id,
+                });
+              window.open(reportUrl, '_blank');
             } else if (res.data.status === 'NotConnected') {
               Alertify.alert(
                 gettext('Profiler Error'),
