@@ -16,7 +16,6 @@ import simplejson as json
 import random
 import re # unnecessary?
 from datetime import datetime
-import os
 
 # Flask imports
 from flask import url_for, Response, render_template, request, session, \
@@ -570,10 +569,6 @@ def start_execution(trans_id, port_num):
 
     # find the debugger version and execute the query accordingly
     pfl_version = 1.0 # TODO: determine profiler version, there is plprofiler function for this
-    #if dbg_version <= 2:
-    #    template_path = 'debugger/sql/v1'
-    #else:
-    #    template_path = 'debugger/sql/v2'
 
     # Render the sql by hand here
     func_name = pfl_inst.function_data['name']
@@ -589,17 +584,24 @@ def start_execution(trans_id, port_num):
     conn.execute_async('SET search_path to ' + pfl_inst.function_data['schema'] + ';')
     conn.execute_async('SELECT pl_profiler_set_enabled_local(true)')
     conn.execute_async('SELECT pl_profiler_set_collect_interval(0)')
-    status, result = conn.execute_async(sql)
-    print('RESULT: ' + str(result))
+    status, result = conn.execute_async_list(sql)
     conn.execute_async('SELECT pl_profiler_set_enabled_local(false)')
     report_data = generate_direct_report(conn, 'temp_name', opt_top=10, func_oids={}) # TODO: Add support for K top
     report_id = save_direct_report(report_data, 'temp_name', pfl_inst.function_data['schema'])
     conn.execute_async('RESET search_path')
 
+    columns = {}
+
+    # TODO: Test functionality for multiple return values
+    for res in result:
+        for key in res:
+            columns['name'] = key
+
     return make_json_response(
         data={
             'status': 'Success',
-            'result': str(result),
+            'result':  result,
+            'col_info': [columns],
             'report_id'  : report_id
         }
     )
@@ -651,45 +653,6 @@ def get_src(trans_id):
             'result': pfl_inst.function_data['src']
         }
     )
-
-def convert_data_to_dict(conn, result):
-    """
-    This function helps us to convert result set into dict
-
-    Args:
-        conn: Connection object
-        result: 2d array result set
-
-    Returns:
-        Converted dict data
-    """
-    columns = []
-    col_info = conn.get_column_info()
-    # Check column info is available or not
-    if col_info is not None and len(col_info) > 0:
-        for col in col_info:
-            items = list(col.items())
-            column = dict()
-            column['name'] = items[0][1]
-            column['type_code'] = items[1][1]
-            columns.append(column)
-
-    # We need to convert result from 2D array to dict for BackGrid
-    # BackGrid do not support for 2D array result as it it Backbone Model
-    # based grid, This Conversion is not an overhead as most of the time
-    # result will be smaller
-    _tmp_result = []
-    for row in result:
-        temp = dict()
-        count = 0
-        for item in row:
-            temp[columns[count]['name']] = item
-            count += 1
-        _tmp_result.append(temp)
-    # Replace 2d array with dict result
-    result = _tmp_result
-
-    return columns, result
 
 def generate_direct_report(conn, name, opt_top, func_oids = None):
     """
@@ -891,7 +854,6 @@ def save_direct_report(report_data, name, dbname):
     path = '/instance/direct/' + now + '.html'
 
     with open(str(current_app.root_path) + path, 'w') as output_fd:
-        print(report_data)
         report = plprofiler_report.plprofiler_report()
         report.generate(report_data, output_fd)
 

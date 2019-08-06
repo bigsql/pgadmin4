@@ -55,6 +55,7 @@ define([
 
       // Function to profile for direct profiling
       start_execution: function(trans_id) {
+        var self = this;
 
         // Make ajax call to listen the database message
         var baseUrl = url_for(
@@ -73,6 +74,9 @@ define([
                   'report_id': res.data.report_id,
                 });
               //self.poll_end_execution_result(trans_id);
+              console.warn(res.data.col_info);
+              console.warn(res.data.result);
+              self.AddResults(res.data.col_info, res.data.result);
               window.open(reportUrl, '_blank');
             } else if (res.data.status === 'NotConnected') {
               Alertify.alert(

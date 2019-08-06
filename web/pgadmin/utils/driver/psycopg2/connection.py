@@ -1015,7 +1015,7 @@ WHERE
     def execute_async_list(self, query, params=None, formatted_exception_msg=True):
         """
         This function executes the given query asynchronously and returns
-        a dict that is the result of the query.
+        a list that is the result of the query.
 
         Args:
             query: SQL query to run.

@@ -41,7 +41,7 @@ define([
         callback: 'get_function_information',
         category: gettext('Profiling'),
         priority: 11,
-        label:gettext('Profile'),
+        label:gettext('Direct Profile'),
         data: {
           object: 'function',
         },
