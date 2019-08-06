@@ -53,10 +53,8 @@ define([
         self.enable('save' , false);
       },
 
-      // Function to profile
-      start_execution: function(trans_id, port_num) {
-        //var self = this;
-        console.warn(port_num);
+      // Function to profile for direct profiling
+      start_execution: function(trans_id) {
 
         // Make ajax call to listen the database message
         var baseUrl = url_for(
@@ -74,6 +72,7 @@ define([
                 'profiler.show_report', {
                   'report_id': res.data.report_id,
                 });
+              //self.poll_end_execution_result(trans_id);
               window.open(reportUrl, '_blank');
             } else if (res.data.status === 'NotConnected') {
               Alertify.alert(
@@ -90,25 +89,6 @@ define([
           });
       },
 
-
-      // This function will update messages tab
-      update_messages: function(msg) {
-        // To prevent xss
-        msg = _.escape(msg);
-
-        var old_msgs = '',
-          new_msgs = '';
-        old_msgs = pgTools.DirectProfile.messages_panel.$container.find('.messages').html();
-        if (old_msgs) {
-          new_msgs = (old_msgs + '\n' + msg)
-            .replace(/(?:\r\n|\r|\n)/g, '<br />') // Newlines with <br>
-            .replace(/(<br\ ?\/?>)+/g, '<br />'); // multiple <br> with single <br>
-        } else {
-          new_msgs = msg;
-        }
-        pgTools.DirectProfile.messages_panel.$container.find('.messages').html(new_msgs);
-      },
-
       /*
         For the direct profiling, we need to check weather the functions execution
         is completed or not. After completion of the profiling, we will stop polling
@@ -116,7 +96,6 @@ define([
       */
       poll_end_execution_result: function(trans_id) {
         console.warn(trans_id);
-        /*
         var self = this;
 
         // Do we need to poll?
@@ -129,14 +108,12 @@ define([
             'trans_id': trans_id,
           }),
           poll_end_timeout;
-        */
 
         /*
          * During the execution we should poll the result in minimum seconds
          * but once the execution is completed and wait for the another
          * profiling session then we should decrease the polling frequency.
          */
-        /*
         if (pgTools.DirectProfile.polling_timeout_idle) {
           // Poll the result to check that execution is completed or not
           // after 1200 ms
@@ -154,24 +131,21 @@ define([
               method: 'GET',
             })
               .done(function(res) {
+                console.warn(res.data.status);
+                console.warn(res.data.result);
                 if (res.data.status === 'Success') {
                   if (res.data.result == undefined) {
                   /*
                    "result" is undefined only in case of EDB procedure.
                    As Once the EDB procedure execution is completed then we are
                    not getting any result so we need ignore the result.
+                  */
 
-                    self.setActiveLine(-1);
                     pgTools.DirectProfile.direct_execution_completed = true;
                     pgTools.DirectProfile.polling_timeout_idle = true;
 
                     //Set the alertify message to inform the user that execution is completed.
                     Alertify.success(res.info, 3);
-
-                    // Update the message tab of the profiler
-                    if (res.data.status_message) {
-                      self.update_messages(res.data.status_message);
-                    }
 
                     // Execution completed so disable the buttons other than
                     // "Continue/Start" button because user can still
@@ -187,7 +161,6 @@ define([
                   } else {
                   // Call function to create and update local variables ....
                     if (res.data.result != null) {
-                      self.setActiveLine(-1);
                       self.AddResults(res.data.col_info, res.data.result);
                       pgTools.DirectProfile.results_panel.focus();
                       pgTools.DirectProfile.direct_execution_completed = true;
@@ -195,11 +168,6 @@ define([
 
                       //Set the alertify message to inform the user that execution is completed.
                       Alertify.success(res.info, 3);
-
-                      // Update the message tab of the profiler
-                      if (res.data.status_message) {
-                        self.update_messages(res.data.status_message);
-                      }
 
                       // Execution completed so disable the buttons other than
                       // "Continue/Start" button because user can still
@@ -218,10 +186,7 @@ define([
                 // If status is Busy then poll the result by recursive call to
                 // the poll function
                   self.poll_end_execution_result(trans_id);
-                  // Update the message tab of the profiler
-                  if (res.data.status_message) {
-                    self.update_messages(res.data.status_message);
-                  }
+
                 } else if (res.data.status === 'NotConnected') {
                   Alertify.alert(
                     gettext('Profiler poll end execution error'),
@@ -229,7 +194,6 @@ define([
                   );
                 } else if (res.data.status === 'ERROR') {
                   pgTools.DirectProfile.direct_execution_completed = true;
-                  self.setActiveLine(-1);
 
                   //Set the Alertify message to inform the user that execution is
                   // completed with error.
@@ -237,27 +201,12 @@ define([
                     Alertify.error(res.info, 3);
                   }
 
-                  // Update the message tab of the profiler
-                  if (res.data.status_message) {
-                    self.update_messages(res.data.status_message);
-                  }
-
-                  pgTools.DirectProfile.messages_panel.focus();
-
                   // Execution completed so disable the buttons other than
                   // "Continue/Start" button because user can still start the
                   // same execution again.
+                  self.enable('start', false);
                   self.enable('stop', false);
-                  self.enable('step_over', false);
-                  self.enable('step_into', false);
-                  self.enable('toggle_breakpoint', false);
-                  self.enable('clear_all_breakpoints', false);
-                  // If profiling is stopped by user then do not enable
-                  // continue/restart button
-                  if (!pgTools.DirectProfile.is_user_aborted_profiling) {
-                    self.enable('continue', true);
-                    pgTools.DirectProfile.is_user_aborted_profiling = false;
-                  }
+                  self.enable('save', false);
 
                   // Stop further pooling
                   pgTools.DirectProfile.is_polling_required = false;
@@ -270,7 +219,6 @@ define([
                 );
               });
           }, poll_end_timeout);
-        */
       },
 
 
@@ -600,7 +548,6 @@ define([
 
       // We do not want to initialize the module multiple times.
       var self = this;
-      _.bindAll(pgTools.DirectProfile, 'messages');
 
       if (this.initialized)
         return;
@@ -673,6 +620,8 @@ define([
 
         */
       } else if (trans_id != undefined && profile_type) { // Direct profiling
+
+        // Start the listener
         baseUrl = url_for('profiler.start_listener', {
           'trans_id': trans_id,
         });
@@ -683,7 +632,64 @@ define([
         })
           .done(function(res) {
             if (res.data.status) {
-              self.messages(trans_id);
+              self.initializePanels();
+              controller.enable_toolbar_buttons();
+
+              // Get parameters
+              baseUrl = url_for('profiler.get_parameters', {
+                'trans_id': trans_id,
+              });
+
+              $.ajax({
+                url: baseUrl,
+                method: 'GET',
+              })
+                .done(function(res) {
+                  if (res.data.status === 'Success') {
+                    controller.AddParameters(res.data.result);
+                  }
+
+                  else if (res.data.status === 'NotConnected') {
+                    Alertify.alert(
+                      gettext('Profiler Error'),
+                      gettext('Error while fetching parameters.')
+                    );
+                  }
+                })
+                .fail(function() {
+                  Alertify.alert(
+                    gettext('Profiler Error'),
+                    gettext('Error while fetching parameters.')
+                  );
+                });
+
+              // Get source code
+              baseUrl = url_for('profiler.get_src', {
+                'trans_id' : trans_id,
+              });
+
+              $.ajax( {
+                url: baseUrl,
+                method: 'GET',
+              })
+                .done(function(res) {
+                  if (res.data.status === 'Success') {
+                    controller.AddSrc(res.data.result);
+                  }
+
+                  else if (res.data.status === 'NotConnected') {
+                    Alertify.alert(
+                      gettext('Profiler Error'),
+                      gettext('Error whiel fetching parameters.')
+                    );
+                  }
+                })
+                .fail(function() {
+                  Alertify.alert(
+                    gettext('Profiler Error'),
+                    gettext('Error while fetching sql source code.')
+                  );
+                });
             }
           })
           .fail(function(xhr) {
@@ -704,105 +710,14 @@ define([
       }
     },
 
-    // Read the messages of the database server and get the port ID and attach
-    // the executer to that port.
-    messages: function(trans_id) {
-      var self = this;
-
-      // Make ajax call to listen the database message
-      var baseUrl = url_for('profiler.messages', {
-        'trans_id': trans_id,
-      });
-
-      $.ajax({
-        url: baseUrl,
-        method: 'GET',
-      })
-        .done(function(res) {
-          if (res.data.status === 'Success') {
-            self.initializePanels();
-            controller.enable_toolbar_buttons();
-            baseUrl = url_for('profiler.get_parameters', {
-              'trans_id': trans_id,
-            });
-
-            $.ajax({
-              url: baseUrl,
-              method: 'GET',
-            })
-              .done(function(res) {
-                if (res.data.status === 'Success') {
-                  controller.AddParameters(res.data.result);
-                }
-
-                else if (res.data.status === 'NotConnected') {
-                  Alertify.alert(
-                    gettext('Profiler Error'),
-                    gettext('Error while fetching parameters.')
-                  );
-                }
-              })
-              .fail(function() {
-                Alertify.alert(
-                  gettext('Profiler Error'),
-                  gettext('Error while fetching parameters.')
-                );
-              });
-
-            baseUrl = url_for('profiler.get_src', {
-              'trans_id' : trans_id,
-            });
-
-            $.ajax( {
-              url: baseUrl,
-              method: 'GET',
-            })
-              .done(function(res) {
-                if (res.data.status === 'Success') {
-                  controller.AddSrc(res.data.result);
-                }
-
-                else if (res.data.status === 'NotConnected') {
-                  Alertify.alert(
-                    gettext('Profiler Error'),
-                    gettext('Error whiel fetching parameters.')
-                  );
-                }
-              })
-              .fail(function() {
-                Alertify.alert(
-                  gettext('Profiler Error'),
-                  gettext('Error while fetching sql source code.')
-                );
-              });
-
-          } else if (res.data.status === 'Busy') {
-          // If status is Busy then poll the result by recursive call to the poll function
-            self.messages(trans_id);
-          } else if (res.data.status === 'NotConnected') {
-            Alertify.alert(
-              gettext('Not connected to server or connection with the server has been closed.'),
-              res.data.result
-            );
-          }
-        })
-        .fail(function() {
-          Alertify.alert(
-            gettext('Profiler Error'),
-            gettext('Error while fetching messages information.')
-          );
-        });
-
-    },
 
     buildDefaultLayout: function(docker) {
       let code_editor_panel = docker.addPanel('code', wcDocker.DOCK.TOP);
 
       let parameters_panel = docker.addPanel('parameters', wcDocker.DOCK.BOTTOM, code_editor_panel);
-      docker.addPanel('messages',wcDocker.DOCK.STACKED, parameters_panel, {
+      docker.addPanel('results',wcDocker.DOCK.STACKED, parameters_panel, {
         tabOrientation: wcDocker.TAB.TOP,
       });
-      docker.addPanel('results', wcDocker.DOCK.STACKED, parameters_panel);
       docker.addPanel('reports', wcDocker.DOCK.STACKED, parameters_panel);
     },
 
@@ -822,17 +737,6 @@ define([
             isCloseable: false,
             isPrivate: true,
             content: '<div id ="parameters" class="parameters" tabindex="0"></div>',
-          });
-
-          // Create the messages panel to display the message returned from the database server
-          var messages = new pgAdmin.Browser.Panel({
-            name: 'messages',
-            title: gettext('Messages'),
-            width: '100%',
-            height: '100%',
-            isCloseable: false,
-            isPrivate: true,
-            content: '<div id="messages" class="messages" tabindex="0"></div>',
           });
 
           // Create the result panel to display the result after profiling the function
@@ -859,7 +763,6 @@ define([
 
           // Load all the created panels
           parameters.load(self.docker);
-          messages.load(self.docker);
           results.load(self.docker);
           reports.load(self.docker);
         });
@@ -873,7 +776,6 @@ define([
 
       self.code_editor_panel = self.docker.findPanels('code')[0];
       self.parameters_panel = self.docker.findPanels('parameters')[0];
-      self.messages_panel = self.docker.findPanels('messages')[0];
       self.results_panel = self.docker.findPanels('results')[0];
       self.reports = self.docker.findPanels('reports')[0];
 

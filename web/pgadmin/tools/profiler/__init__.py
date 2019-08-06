@@ -41,7 +41,7 @@ from pgadmin.model import db, ProfilerSavedReports, ProfilerFunctionArguments
 from pgadmin.tools.profiler.utils.profiler_instance import ProfilerInstance
 
 #
-from plprofiler import plprofiler, plprofiler_report
+from plprofiler import  plprofiler_report
 
 # Constants
 ASYNC_OK = 1
@@ -96,14 +96,12 @@ class ProfilerModule(PgAdminModule):
                 'profiler.initialize_target_for_trigger', 'profiler.close',
                 'profiler.get_parameters',
                 #'profiler.restart',
-                'profiler.start_listener',# 'profiler.execute_query',
-                'profiler.messages',
-                'profiler.start_execution',# 'profiler.set_breakpoint',
-                'profiler.show_report', 'profiler.get_src'
-                #'profiler.clear_all_breakpoint', 'profiler.deposit_value',
-                #'profiler.select_frame', 'profiler.get_arguments',
+                'profiler.start_listener',
+                'profiler.start_execution',
+                'profiler.show_report', 'profiler.get_src',
+                #'profiler.deposit_value',
                 #'profiler.set_arguments',
-                #'profiler.poll_end_execution_result', 'profiler.poll_result'
+                #'profiler.poll_end_execution_result'#, 'profiler.poll_result'
                 ]
 
 
@@ -273,6 +271,7 @@ def init_function(node_type, sid, did, scid, fid, trid=None):
     pfl_inst = ProfilerInstance()
     pfl_inst.function_data = {
         'oid': fid,
+        'src': r_set['rows'][0]['prosrc'],
         'name': r_set['rows'][0]['name'],
         'is_func': r_set['rows'][0]['isfunc'],
         'is_ppas_database': ppas_server,
@@ -521,58 +520,6 @@ def start_profiler_listener(trans_id):
 
     return make_json_response(data={'status': status, 'result': result})
 
-
-@blueprint.route(
-    '/messages/<int:trans_id>/', methods=["GET"], endpoint='messages'
-)
-@login_required
-def messages(trans_id):
-    """
-    messages(trans_id)
-
-    This method polls the messages returned by the database server.
-
-    Parameters:
-        trans_id
-        - unique transaction id.
-    """
-
-    pfl_inst = ProfilerInstance(trans_id)
-    if pfl_inst.profiler_data is None:
-        return make_json_response(
-            data={
-                'status': 'NotConnected',
-                'result': gettext(
-                    'Not connected to server or connection with the server '
-                    'has been closed.'
-                )
-            }
-        )
-
-    manager = get_driver(PG_DEFAULT_DRIVER).connection_manager(
-        pfl_inst.profiler_data['server_id'])
-    conn = manager.connection(
-        did=pfl_inst.profiler_data['database_id'],
-        conn_id=pfl_inst.profiler_data['conn_id'])
-
-    port_number = ''
-
-    if conn.connected():
-        status, result = conn.poll()
-        notify = conn.messages()
-        # Not sure what to do here
-
-        return make_json_response(
-            data={'status': 'Success', 'result': 'connected'}
-        )
-    else:
-        result = gettext(
-            'Not connected to server or connection with the '
-            'server has been closed.'
-        )
-        return internal_server_error(errormsg=str(result))
-
-
 @blueprint.route(
     '/start_execution/<int:trans_id>/<int:port_num>', methods=['GET'],
     endpoint='start_execution'
@@ -631,23 +578,22 @@ def start_execution(trans_id, port_num):
     # Render the sql by hand here
     func_name = pfl_inst.function_data['name']
     func_args = pfl_inst.function_data['args_value']
-
     sql = 'SELECT * FROM ' + func_name + '('
     for arg_idx in range(len(func_args)):
         sql += str(func_args[arg_idx]['type']) + ' '
         sql += '\'' + str(func_args[arg_idx]['value']) + '\''
         if (arg_idx < len(func_args) - 1):
             sql += ', '
-
     sql += ');'
 
     conn.execute_async('SET search_path to ' + pfl_inst.function_data['schema'] + ';')
     conn.execute_async('SELECT pl_profiler_set_enabled_local(true)')
     conn.execute_async('SELECT pl_profiler_set_collect_interval(0)')
     status, result = conn.execute_async(sql)
+    print('RESULT: ' + str(result))
     conn.execute_async('SELECT pl_profiler_set_enabled_local(false)')
-    report_data = generate_direct_report(conn, 'temp_name', 10) # TODO: Add support for K top
-    report_id = save_direct_report(report_data, 'temp_name', 'dbname')
+    report_data = generate_direct_report(conn, 'temp_name', opt_top=10, func_oids={}) # TODO: Add support for K top
+    report_id = save_direct_report(report_data, 'temp_name', pfl_inst.function_data['schema'])
     conn.execute_async('RESET search_path')
 
     return make_json_response(
@@ -671,12 +617,16 @@ def show_report(report_id):
         report_id
     """
     report_data = ProfilerSavedReports.query.filter_by(rid=report_id).first()
+    path = str(current_app.root_path) + '/instance/direct/' + report_data.time + '.html'
     if report_data is None:
         pass
         # TODO: throw error
 
-    # TODO: Put error checking in js when this method returns
-    return render_template('profiler/instance/direct/' + report_data.time + '.html')
+    with open(path, 'r') as f:
+        report_data = f.read()
+
+        # TODO: Put error checking in js when this method returns
+        return Response(report_data, mimetype="text/html")
 
 @blueprint.route(
     '/get_src/<int:trans_id>', methods=['GET'],
@@ -695,30 +645,51 @@ def get_src(trans_id):
                 )
             })
 
-    manager = get_driver(PG_DEFAULT_DRIVER).connection_manager(
-        pfl_inst.profiler_data['server_id'])
-    conn = manager.connection(
-        did=pfl_inst.profiler_data['database_id'],
-        conn_id=pfl_inst.profiler_data['conn_id'])
-
-    template_path = 'profiler/sql'
-    sql = """SELECT p.prosrc
-             FROM pg_catalog.pg_proc p
-                  LEFT JOIN pg_catalog.pg_namespace n ON p.pronamespace = n.oid
-                  LEFT JOIN pg_catalog.pg_language l ON p.prolang = l.oid
-                  LEFT JOIN pg_catalog.pg_type y ON p.prorettype = y.oid
-            WHERE p.oid = """ + str(pfl_inst.function_data['oid']) + """::oid"""
-    #print(sql)
-
-    status, result = conn.execute_dict(sql)
-    print(result['rows'][0]['prosrc'])
-
     return make_json_response(
         data={
             'status': 'Success',
-            'result': result['rows'][0]['prosrc']
+            'result': pfl_inst.function_data['src']
         }
     )
+
+def convert_data_to_dict(conn, result):
+    """
+    This function helps us to convert result set into dict
+
+    Args:
+        conn: Connection object
+        result: 2d array result set
+
+    Returns:
+        Converted dict data
+    """
+    columns = []
+    col_info = conn.get_column_info()
+    # Check column info is available or not
+    if col_info is not None and len(col_info) > 0:
+        for col in col_info:
+            items = list(col.items())
+            column = dict()
+            column['name'] = items[0][1]
+            column['type_code'] = items[1][1]
+            columns.append(column)
+
+    # We need to convert result from 2D array to dict for BackGrid
+    # BackGrid do not support for 2D array result as it it Backbone Model
+    # based grid, This Conversion is not an overhead as most of the time
+    # result will be smaller
+    _tmp_result = []
+    for row in result:
+        temp = dict()
+        count = 0
+        for item in row:
+            temp[columns[count]['name']] = item
+            count += 1
+        _tmp_result.append(temp)
+    # Replace 2d array with dict result
+    result = _tmp_result
+
+    return columns, result
 
 def generate_direct_report(conn, name, opt_top, func_oids = None):
     """
@@ -735,18 +706,6 @@ def generate_direct_report(conn, name, opt_top, func_oids = None):
 
         funco_oids
     """
-    # ----
-    # Create a default config.
-    # ----
-    config = {
-            'name': name,
-            'title': 'PL Profiler Report for %s' %(name, ),
-            'tabstop': '8',
-            'svg_width': '1200',
-            'table_width': '80%',
-            'desc': '<h1>PL Profiler Report for %s</h1>\n' %(name, ) +
-                    '<p>\n<!-- description here -->\n</p>',
-        }
 
     # ----
     # If not specified, find the top N functions by self time.
@@ -815,13 +774,12 @@ def generate_direct_report(conn, name, opt_top, func_oids = None):
     for row in result:
         if row['func_oid'] not in linestats:
             linestats[row['func_oid']] = []
-        linestats[row['func_oid']].append([row['func_oid'],
-                                           row['line_number'],
-                                           row['exec_count'],
-                                           row['total_time'],
-                                           row['longest_time'],
-                                           row['source']])
-
+        linestats[row['func_oid']].append((row['func_oid'],
+                                          int(row['line_number']),
+                                          int(row['exec_count']),
+                                          int(row['total_time']),
+                                          int(row['longest_time']),
+                                          row['source']))
     # ----
     # Build a list of function definitions in the order, specified
     # by the func_oids list. This is either the oids, requested by
@@ -882,11 +840,11 @@ def generate_direct_report(conn, name, opt_top, func_oids = None):
         # ----
         func_defs.append(func_def)
 
-        # ----
-        # Get the callgraph data.
-        # ----
-        status, result = \
-            conn.execute_async_list("""SELECT
+    # ----
+    # Get the callgraph data.
+    # ----
+    status, result = \
+        conn.execute_async_list("""SELECT
                                            array_to_string(pl_profiler_get_stack(stack), ';'),
                                            stack,
                                            call_count,
@@ -894,25 +852,33 @@ def generate_direct_report(conn, name, opt_top, func_oids = None):
                                            us_children,
                                            us_self
                         FROM pl_profiler_callgraph_local()""")
-        flamedata = ""
-        callgraph = []
-        for row in result:
-            flamedata += str(row['array_to_string']) + " " + str(row['us_self']) + "\n"
-            callgraph.append([row['stack'], row['call_count'], row['call_count'], row['us_total'], row['us_children'], row['us_self']])
+    flamedata = ""
+    callgraph = []
+    for row in result:
+        flamedata += str(row['array_to_string']) + " " + str(row['us_self']) + "\n"
+        callgraph.append([row['stack'], row['call_count'], row['call_count'], row['us_total'], row['us_children'], row['us_self']])
 
 
-        return {
-                'config': config,
-                'callgraph_overflow': False,
-                'functions_overflow': False,
-                'lines_overflow': False,
-                'func_list': func_list,
-                'func_defs': func_defs,
-                'flamedata': flamedata,
-                'callgraph': callgraph,
-                'func_oids_by_user': func_oids_by_user,
-                'found_more_funcs': found_more_funcs,
-            }
+    return {
+            'config': {
+                       'name': name,
+                       'title': 'PL Profiler Report for %s' %(name, ),
+                       'tabstop': '8',
+                       'svg_width': '1200',
+                       'table_width': '80%',
+                       'desc': '<h1>PL Profiler Report for %s</h1>\n' %(name, ) +
+                               '<p>\n<!-- description here -->\n</p>'
+                      },
+            'callgraph_overflow': False,
+            'functions_overflow': False,
+            'lines_overflow': False,
+            'func_list': func_list,
+            'func_defs': func_defs,
+            'flamedata': flamedata,
+            'callgraph': callgraph,
+            'func_oids_by_user': func_oids_by_user,
+            'found_more_funcs': found_more_funcs,
+        }
 
 def save_direct_report(report_data, name, dbname):
     """
@@ -922,9 +888,10 @@ def save_direct_report(report_data, name, dbname):
         TODO
     """
     now = datetime.now().strftime("%Y-%m-%d;%H:%M")
-    path = '/tools/profiler/templates/profiler/instance/direct/' + now + '.html'
+    path = '/instance/direct/' + now + '.html'
 
     with open(str(current_app.root_path) + path, 'w') as output_fd:
+        print(report_data)
         report = plprofiler_report.plprofiler_report()
         report.generate(report_data, output_fd)
 
@@ -985,6 +952,62 @@ def get_parameters(trans_id):
             'result': arg_values
         }
     )
+
+@blueprint.route(
+    '/poll_result/<int:trans_id>/', methods=["GET"], endpoint='poll_result'
+)
+@login_required
+def poll_result(trans_id):
+    """
+    poll_result(trans_id)
+
+    This method polls the result of the asynchronous query and returns the
+    result.
+
+    Parameters:
+        trans_id
+        - unique transaction id.
+    """
+    pfl_inst = ProfilerInstance(trans_id)
+    if pfl_inst.profiler_data is None:
+        return make_json_response(
+            data={
+                'status': 'NotConnected',
+                'result': gettext(
+                    'Not connected to server or connection with the server '
+                    'has been closed.'
+                )
+            }
+        )
+
+    manager = driver.connection_manager(pfl_inst.profiler_data['server_id'])
+    conn = manager.connection(
+        did=pfl_inst.profiler_data['database_id'],
+        conn_id=pfl_inst.profiler_data['conn_id'])
+
+    if conn.connected():
+        status, result = conn.poll()
+        if not status:
+            status = 'ERROR'
+        elif status == ASYNC_OK and result is not None:
+            status = 'Success'
+            columns, result = convert_data_to_dict(conn, result)
+        else:
+            status = 'Busy'
+    else:
+        status = 'NotConnected'
+        result = gettext(
+            'Not connected to server or connection with the server '
+            'has been closed.'
+        )
+
+    return make_json_response(
+        data={
+            'status': status,
+            'result': result
+        }
+    )
+
 
 
 
