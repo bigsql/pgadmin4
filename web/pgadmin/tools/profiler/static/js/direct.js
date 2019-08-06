@@ -73,9 +73,6 @@ define([
                 'profiler.show_report', {
                   'report_id': res.data.report_id,
                 });
-              //self.poll_end_execution_result(trans_id);
-              console.warn(res.data.col_info);
-              console.warn(res.data.result);
               self.AddResults(res.data.col_info, res.data.result);
               window.open(reportUrl, '_blank');
             } else if (res.data.status === 'NotConnected') {
@@ -135,8 +132,6 @@ define([
               method: 'GET',
             })
               .done(function(res) {
-                console.warn(res.data.status);
-                console.warn(res.data.result);
                 if (res.data.status === 'Success') {
                   if (res.data.result == undefined) {
                   /*
@@ -348,10 +343,6 @@ define([
           model: ProfilerParametersModel,
         });
 
-        ParametersCollection.prototype.on(
-          'change', self.deposit_parameter_value, self
-        );
-
         var paramGridCols = [{
           name: 'name',
           label: gettext('Name'),
@@ -370,6 +361,7 @@ define([
           name: 'value',
           label: gettext('Value'),
           type: 'text',
+          editable: false,
           cell: 'string',
         },
         ];
@@ -412,52 +404,104 @@ define([
       AddSrc: function(result) {
         pgTools.DirectProfile.editor.setValue(result);
       },
-      deposit_parameter_value: function(model) {
-        console.warn(model);
-        /*var self = this;
+      AddReports: function(result) {
+        var self = this;
 
-        // variable name and value list that is changed by user
-        var name_value_list = [];
+        // Remove the existing created grid and update the result values
+        if (self.reports_grid) {
+          self.reports_grid.remove();
+          self.reports_grid = null;
+        }
 
-        name_value_list.push({
-          'name': model.get('name'),
-          'type': model.get('type'),
-          'value': model.get('value'),
-        });
-
-        // Make ajax call to listen the database message
-        var baseUrl = url_for('profiler.deposit_value', {
-          'trans_id': pgTools.DirectProfile.trans_id,
-        });
-        /*
-        $.ajax({
-          url: baseUrl,
-          method: 'POST',
-          data: {
-            'data': JSON.stringify(name_value_list),
+        var ProfilerReportsModel = Backbone.Model.extend({
+          defaults: {
+            name: undefined,
+            profile_type: undefined,
+            database: undefined,
+            time: undefined,
+            link: undefined,
           },
-        })
-          .done(function(res) {
-            if (res.data.status) {
-            // Get the updated variables value
-              self.GetLocalVariables(pgTools.DirectProfile.trans_id);
-              // Show the message to the user that deposit value is success or failure
-              if (res.data.result) {
-                Alertify.success(res.data.info, 3);
-              } else {
-                Alertify.error(res.data.info, 3);
-              }
-            }
-          })
-          .fail(function() {
-            Alertify.alert(
-              gettext('Profiler Error'),
-              gettext('Error while depositing variable value.')
-            );
-          });
-        */
-      },
+        });
 
+        // Collection which contains the model for report informations.
+        var ReportsCollection = self.ReportsCollection = Backbone.Collection.extend({
+          model: ProfilerReportsModel,
+        });
+
+        // TODO: implement delete functionality
+        //ReportsCollection.prototype.on(
+        //  'change', self.deposit_parameter_value, self
+        //);
+
+        var reportsGridCols = [{
+          name: 'name',
+          label: gettext('Name'),
+          type: 'text',
+          editable: false,
+          cell: 'string',
+        },
+        {
+          name: 'profile_type',
+          label: gettext('Profile Type'),
+          type: 'text',
+          editable: false,
+          cell: 'string',
+        },
+        {
+          name: 'database',
+          label: gettext('Database'),
+          type: 'text',
+          editable: false,
+          cell: 'string',
+        },
+        {
+          name: 'time',
+          label: gettext('Time'),
+          type: 'text',
+          editable: false,
+          cell: 'string',
+        },
+        {
+          name: 'link',
+          label: gettext('Link'),
+          type: 'text',
+          editable: false,
+          cell: 'string',
+        },
+        ];
+
+        var reports_obj = [];
+        if (result.length != 0) {
+          for (var i = 0; i < result.length; i++) {
+            reports_obj.push({
+              'name': result[i].name,
+              'profile_type':result[i].profile_type,
+              'database': result[i].database,
+              'time': result[i].time,
+              'link': result[i].link,
+            });
+          }
+        }
+
+        // Initialize a new Grid instance
+        var reports_grid = this.reports_grid = new Backgrid.Grid({
+          emptyText: 'No data found',
+          columns: reportsGridCols,
+          collection: new ReportsCollection(reports_obj),
+          className: 'backgrid table table-bordered table-noouter-border table-bottom-border',
+        });
+
+        console.warn(reports_grid);
+
+        reports_grid.render();
+
+        // Render the result grid into result panel
+        console.warn('Rendering saved_reports panel');
+        pgTools.DirectProfile.reports_panel
+          .$container
+          .find('.reports')
+          .append(reports_grid.el);
+      },
     }
   );
 
@@ -640,12 +684,11 @@ define([
               controller.enable_toolbar_buttons();
 
               // Get parameters
-              baseUrl = url_for('profiler.get_parameters', {
+              var paramUrl = url_for('profiler.get_parameters', {
                 'trans_id': trans_id,
               });
-
               $.ajax({
-                url: baseUrl,
+                url: paramUrl,
                 method: 'GET',
               })
                 .done(function(res) {
@@ -668,12 +711,11 @@ define([
                 });
 
               // Get source code
-              baseUrl = url_for('profiler.get_src', {
+              var srcUrl = url_for('profiler.get_src', {
                 'trans_id' : trans_id,
               });
-
-              $.ajax( {
-                url: baseUrl,
+              $.ajax({
+                url: srcUrl,
                 method: 'GET',
               })
                 .done(function(res) {
@@ -692,6 +734,24 @@ define([
                   Alertify.alert(
                     gettext('Profiler Error'),
                     gettext('Error while fetching sql source code.')
+                  );
+                });
+
+              // Get reports
+              var reportsUrl = url_for('profiler.get_reports');
+              $.ajax({
+                url: reportsUrl,
+                method: 'GET',
+              })
+                .done(function(res) {
+                  if (res.data.status === 'Success') {
+                    controller.AddReports(res.data.result);
+                  }
+                })
+                .fail(function() {
+                  Alertify.alert(
+                    gettext('Profiler Error'),
+                    gettext('Error while fetching reports.')
                   );
                 });
             }
@@ -793,7 +853,7 @@ define([
       self.code_editor_panel = self.docker.findPanels('code')[0];
       self.parameters_panel = self.docker.findPanels('parameters')[0];
       self.results_panel = self.docker.findPanels('results')[0];
-      self.reports = self.docker.findPanels('reports')[0];
+      self.reports_panel = self.docker.findPanels('reports')[0];
       self.report_options = self.docker.findPanels('report_options')[0];
 
       var editor_pane = $('<div id="stack_editor_pane" ' +

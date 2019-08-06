@@ -98,6 +98,7 @@ class ProfilerModule(PgAdminModule):
                 'profiler.start_listener',
                 'profiler.start_execution',
                 'profiler.show_report', 'profiler.get_src',
+                'profiler.get_reports',
                 #'profiler.deposit_value',
                 #'profiler.set_arguments',
                 #'profiler.poll_end_execution_result'#, 'profiler.poll_result'
@@ -907,11 +908,36 @@ def get_parameters(trans_id):
         return internal_server_error(errormsg=str(msg))
 
     arg_values = pfl_inst.function_data['args_value']
+    print('ARG_VALUES: ' + str(arg_values))
 
     return make_json_response(
         data={
             'status': 'Success',
             'result': arg_values
+        }
+    )
+
+@blueprint.route(
+    '/get_reports', methods=['GET'],
+    endpoint='get_reports'
+)
+@login_required
+def get_reports():
+    saved_reports = ProfilerSavedReports.query.all()
+
+    reports = []
+    for report in saved_reports:
+        reports.append({'name' : report.name,
+                        'database' : report.dbname,
+                        'time' : report.time,
+                        'profile_type' : report.direct,
+                        'link' : report.rid})
+
+
+    return make_json_response(
+        data={
+            'status': 'Success',
+            'result': reports
         }
     )
 
