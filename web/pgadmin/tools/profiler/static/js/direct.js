@@ -765,10 +765,22 @@ define([
             content: '<div id ="reports" class="reports" tabindex="0"></div>',
           });
 
+          // Create the reports panel to display saved report options
+          var report_options = new pgAdmin.Browser.Panel({
+            name: 'report_options',
+            title: gettext('Report Options'),
+            width: '100%',
+            height: '100%',
+            isCloseable: false,
+            isPrivate: true,
+            content: '<div id ="report_options" class="report_options" tabindex="0"></div>',
+          });
+
           // Load all the created panels
           parameters.load(self.docker);
           results.load(self.docker);
           reports.load(self.docker);
+          report_options.load(self.docker);
         });
 
       // restore the layout if present else fallback to buildDefaultLayout
@@ -782,6 +794,7 @@ define([
       self.parameters_panel = self.docker.findPanels('parameters')[0];
       self.results_panel = self.docker.findPanels('results')[0];
       self.reports = self.docker.findPanels('reports')[0];
+      self.report_options = self.docker.findPanels('report_options')[0];
 
       var editor_pane = $('<div id="stack_editor_pane" ' +
         'class="pg-panel-content info"></div>');
