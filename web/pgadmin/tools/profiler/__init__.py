@@ -582,13 +582,15 @@ def start_execution(trans_id, port_num):
             sql += ', '
     sql += ');'
 
+    report_name = func_name
+
     conn.execute_async('SET search_path to ' + pfl_inst.function_data['schema'] + ';')
     conn.execute_async('SELECT pl_profiler_set_enabled_local(true)')
     conn.execute_async('SELECT pl_profiler_set_collect_interval(0)')
     status, result = conn.execute_async_list(sql)
     conn.execute_async('SELECT pl_profiler_set_enabled_local(false)')
-    report_data = generate_direct_report(conn, 'temp_name', opt_top=10, func_oids={}) # TODO: Add support for K top
-    report_id = save_direct_report(report_data, 'temp_name', pfl_inst.function_data['schema'])
+    report_data = generate_direct_report(conn, report_name, opt_top=10, func_oids={}) # TODO: Add support for K top
+    report_id = save_direct_report(report_data, report_name, pfl_inst.function_data['schema'])
     conn.execute_async('RESET search_path')
 
     columns = {}
@@ -908,7 +910,6 @@ def get_parameters(trans_id):
         return internal_server_error(errormsg=str(msg))
 
     arg_values = pfl_inst.function_data['args_value']
-    print('ARG_VALUES: ' + str(arg_values))
 
     return make_json_response(
         data={

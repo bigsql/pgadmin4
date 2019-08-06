@@ -74,6 +74,25 @@ define([
                   'report_id': res.data.report_id,
                 });
               self.AddResults(res.data.col_info, res.data.result);
+
+              // Update saved reports
+              var reportsUrl = url_for('profiler.get_reports');
+              $.ajax({
+                url: reportsUrl,
+                method: 'GET',
+              })
+                .done(function(res) {
+                  if (res.data.status === 'Success') {
+                    controller.AddReports(res.data.result);
+                  }
+                })
+                .fail(function() {
+                  Alertify.alert(
+                    gettext('Profiler Error'),
+                    gettext('Error while fetching reports.')
+                  );
+                });
+
               window.open(reportUrl, '_blank');
             } else if (res.data.status === 'NotConnected') {
               Alertify.alert(
@@ -433,6 +452,27 @@ define([
         //  'change', self.deposit_parameter_value, self
         //);
 
+        var buttonCell = Backgrid.Cell.extend({
+          events: {
+            'click button' : 'generateReport',
+          },
+
+          generateReport: function() {
+            var reportUrl = url_for(
+              'profiler.show_report', {
+                'report_id': this.model.get('link'),
+              });
+
+            window.open(reportUrl, '_blank');
+          },
+
+          render: function() {
+            this.$el.html('<button> Show </button>');
+            return this;
+          },
+
+        });
+
         var reportsGridCols = [{
           name: 'name',
           label: gettext('Name'),
@@ -466,7 +506,7 @@ define([
           label: gettext('Link'),
           type: 'text',
           editable: false,
-          cell: 'string',
+          cell: buttonCell,
         },
         ];
 
@@ -491,12 +531,9 @@ define([
           className: 'backgrid table table-bordered table-noouter-border table-bottom-border',
         });
 
-        console.warn(reports_grid);
-
         reports_grid.render();
 
         // Render the result grid into result panel
-        console.warn('Rendering saved_reports panel');
         pgTools.DirectProfile.reports_panel
           .$container
           .find('.reports')
@@ -783,6 +820,7 @@ define([
         tabOrientation: wcDocker.TAB.TOP,
       });
       docker.addPanel('reports', wcDocker.DOCK.STACKED, parameters_panel);
+      docker.addPanel('report_options', wcDocker.DOCK.STACKED, parameters_panel);
     },
 
     // Create the profiler layout with splitter and display the appropriate data received from server.
@@ -817,7 +855,7 @@ define([
           // Create the reports panel to display saved profiling reports
           var reports = new pgAdmin.Browser.Panel({
             name: 'reports',
-            title: gettext('Saved Reports'),
+            title: gettext('Profiling Reports'),
             width: '100%',
             height: '100%',
             isCloseable: false,
