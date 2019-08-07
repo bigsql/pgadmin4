@@ -432,7 +432,7 @@ define([
             profile_type: undefined,
             database: undefined,
             time: undefined,
-            link: undefined,
+            report_id: undefined,
           },
         });
 
@@ -454,7 +454,7 @@ define([
           generateReport: function() {
             var reportUrl = url_for(
               'profiler.show_report', {
-                'report_id': this.model.get('link'),
+                'report_id': this.model.get('report_id'),
               });
 
             window.open(reportUrl, '_blank');
@@ -496,8 +496,8 @@ define([
           cell: 'string',
         },
         {
-          name: 'link',
-          label: gettext('Link'),
+          name: 'report_id',
+          label: gettext('Show Report'),
           type: 'text',
           editable: false,
           cell: buttonCell,
@@ -512,7 +512,7 @@ define([
               'profile_type':result[i].profile_type,
               'database': result[i].database,
               'time': result[i].time,
-              'link': result[i].link,
+              'report_id': result[i].report_id,
             });
           }
         }

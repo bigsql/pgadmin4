@@ -10,12 +10,12 @@
 define([
   'sources/gettext', 'sources/url_for', 'jquery', 'underscore',
   'underscore.string', 'alertify', 'sources/pgadmin', 'pgadmin.browser',
-  /*'backbone', 'pgadmin.backgrid', 'codemirror', 'pgadmin.backform',*/
+  'backbone', 'pgadmin.backgrid', 'codemirror', 'pgadmin.backform',
   'pgadmin.tools.profiler.ui', 'pgadmin.tools.profiler.utils',
   'wcdocker', 'pgadmin.browser.frame',
 ], function(
-  gettext, url_for, $, _, S, Alertify, pgAdmin, pgBrowser, /*Backbone, Backgrid,
-  CodeMirror, Backform,*/ get_function_arguments, profilerUtils
+  gettext, url_for, $, _, S, Alertify, pgAdmin, pgBrowser, Backbone, Backgrid,
+  CodeMirror, Backform, get_function_arguments, profilerUtils
 ) {
   var pgTools = pgAdmin.Tools = pgAdmin.Tools || {},
     wcDocker = window.wcDocker;
@@ -80,9 +80,40 @@ define([
     },
 
     can_profile: function(itemData, item, data) {
-      console.warn(itemData);
-      console.warn(item);
       console.warn(data);
+
+      var t = pgBrowser.tree,
+        i = item,
+        d = itemData;
+      // To iterate over tree to check parent node
+      while (i) {
+        if ('catalog' == d._type) {
+          //Check if we are not child of catalog
+          return false;
+        }
+        i = t.hasParent(i) ? t.parent(i) : null;
+        d = i ? t.itemData(i) : null;
+      }
+
+      // Find the function is really available in database
+      var tree = pgBrowser.tree,
+        info = tree.selected(),
+        d_ = info && info.length == 1 ? tree.itemData(info) : undefined;
+
+      if (!d_)
+        return false;
+
+      // For trigger node, language will be undefined - we should allow indirect debugging for trigger node
+      if ((d_.language == undefined && d_._type == 'trigger') ||
+        (d_.language == undefined && d_._type == 'edbfunc') ||
+        (d_.language == undefined && d_._type == 'edbproc')) {
+        return true;
+      }
+
+      if (d_.language != 'plpgsql' && d_.language != 'edbspl') {
+        return false;
+      }
+
       return true;
     },
 

@@ -1092,7 +1092,7 @@ def get_reports():
                         'database' : report.dbname,
                         'time' : report.time,
                         'profile_type' : report.direct,
-                        'link' : report.rid})
+                        'report_id' : report.rid})
 
 
     return make_json_response(
