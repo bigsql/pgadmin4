@@ -490,7 +490,7 @@ define([
         },
         {
           name: 'time',
-          label: gettext('Time'),
+          label: gettext('Date/Time'),
           type: 'text',
           editable: false,
           cell: 'string',
@@ -509,7 +509,7 @@ define([
           for (var i = 0; i < result.length; i++) {
             reports_obj.push({
               'name': result[i].name,
-              'profile_type':result[i].profile_type,
+              'profile_type': (result[i].profile_type === 'true' ? 'Direct' : 'Indirect'),
               'database': result[i].database,
               'time': result[i].time,
               'report_id': result[i].report_id,

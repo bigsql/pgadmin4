@@ -205,18 +205,26 @@ def init_function(node_type, sid, did, scid, fid, trid=None):
     server_type = manager.server_type
     user = manager.user_info
 
-    # Check server type is ppas or not
-    ppas_server = False
-    is_proc_supported = False
-    if server_type == 'ppas':
-        ppas_server = True
-    else:
-        is_proc_supported = True if manager.version >= 110000 else False
-
     # Set the template path required to read the sql files
     template_path = 'profiler/sql'
 
     sql = ''
+
+    if node_type == 'trigger':
+        # Find trigger function id from trigger id
+        sql = render_template(
+            "/".join([template_path, 'get_trigger_function_info.sql']),
+            table_id=fid, trigger_id=trid
+        )
+
+        status, tr_set = conn.execute_dict(sql)
+        if not status:
+            current_app.logger.debug(
+                "Error retrieving trigger function information from database")
+            return internal_server_error(errormsg=tr_set)
+
+        fid = tr_set['rows'][0]['tgfoid']
+
     sql = render_template(
         "/".join([template_path, 'get_function_profile_info.sql']),
         is_ppas_database=False, # edb/other packages not supported fo rnow
@@ -424,17 +432,55 @@ def initialize_target(profile_type, trans_id, sid, did,
         return internal_server_error(errormsg=str(msg))
 
     user = manager.user_info
-    if profile_type == 'indirect':
-        # TODO: global profiling error checking
-        raise Exception('Indirect(global) profiling not currently support')
 
-    # TODO: PPAS/EPAS 11 & above support
+    status_in, rid_pre = conn.execute_scalar("SHOW shared_preload_libraries")
+    if not status_in:
+        return internal_server_error(
+            gettext("Could not fetch profiler plugin information.")
+        )
+
+    # Need to check if plugin is really loaded or not with "plprofiler" string
+    if profile_type == 'indirect':
+        if "plprofiler" not in rid_pre:
+            msg = gettext(
+                "The profiler plugin is not enabled. "
+                "Please add the plugin to the shared_preload_libraries "
+                "setting in the postgresql.conf file and restart the "
+                "database server for indirect profiling."
+            )
+            current_app.logger.debug(msg)
+            return internal_server_error(msg)
+
+    # Need to check if plugin is not loaded or not with "plprofiler" string
+    if profile_type == 'direct':
+        if "plprofiler" in rid_pre:
+            msg = gettext(
+                "The profiler plugin is enabled globally. "
+                "Please remove the plugin to the shared_preload_libraries "
+                "setting in the postgresql.conf file and restart the "
+                "database server for direct profiling."
+            )
+            current_app.logger.debug(msg)
+            return internal_server_error(msg)
+
 
     # Set the template path required to read the sql files
     template_path = 'profiler/sql'
 
-    # TODO: trigger func support
-    # TODO: Version check
+    if tri_id is not None:
+        # Find trigger function id from trigger id
+        sql = render_template(
+            "/".join([template_path, 'get_trigger_function_info.sql']),
+            table_id=func_id, trigger_id=tri_id
+        )
+
+        status, tr_set = conn.execute_dict(sql)
+        if not status:
+            current_app.logger.debug(
+                "Error retrieving trigger function information from database")
+            return internal_server_error(errormsg=tr_set)
+
+        func_id = tr_set['rows'][0]['tgfoid']
 
     pfl_inst = ProfilerInstance(trans_id)
     if request.method == 'POST':
@@ -442,10 +488,6 @@ def initialize_target(profile_type, trans_id, sid, did,
         if data:
             pfl_inst.function_data['args_value'] = data
 
-    # Update the profiler data session variable
-    # Here frame_id is required when user profiler the multilevel function.
-    # When user select the frame from client we need to update the frame
-    # here and set the breakpoint information on that function oid
     pfl_inst.profiler_data = {
         'conn_id': conn_id,
         'server_id': sid,
@@ -455,7 +497,6 @@ def initialize_target(profile_type, trans_id, sid, did,
         'function_name': pfl_inst.function_data['name'],
         'profile_type': profile_type,
         'profiler_version': 1.0, # Placeholder
-        'frame_id': 0,
         'restart_profile': 0
     }
 
@@ -571,7 +612,7 @@ def start_execution(trans_id, port_num):
     # find the debugger version and execute the query accordingly
     pfl_version = 1.0 # TODO: determine profiler version, there is plprofiler function for this
 
-    # Render the sql by hand here
+    # Render the sql to run the function/procedure here
     func_name = pfl_inst.function_data['name']
     func_args = pfl_inst.function_data['args_value']
     sql = 'SELECT * FROM ' + func_name + '('
@@ -892,22 +933,6 @@ def get_parameters(trans_id):
                 )
             }
         )
-
-    # Create asynchronous connection using random connection id.
-    exe_conn_id = str(random.randint(1, 9999999))
-    try:
-        manager = get_driver(PG_DEFAULT_DRIVER).connection_manager(
-            pfl_inst.profiler_data['server_id'])
-        conn = manager.connection(
-            did=pfl_inst.profiler_data['database_id'],
-            conn_id=exe_conn_id)
-    except Exception as e:
-        return internal_server_error(errormsg=str(e))
-
-    # Connect the Server
-    status, msg = conn.connect()
-    if not status:
-        return internal_server_error(errormsg=str(msg))
 
     arg_values = pfl_inst.function_data['args_value']
 

@@ -173,7 +173,7 @@ define([
       in the user input dialog
     */
     /*
-     * TODO: Does not support procedures, trigger functions, edb/ppass functions/procedures
+     * TODO: Does not support procedures, trigger functions
     */
     get_function_information: function(args, item) {
       var t = pgBrowser.tree,
