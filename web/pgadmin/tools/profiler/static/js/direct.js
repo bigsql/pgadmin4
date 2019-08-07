@@ -509,7 +509,7 @@ define([
           for (var i = 0; i < result.length; i++) {
             reports_obj.push({
               'name': result[i].name,
-              'profile_type': (result[i].profile_type === 'true' ? 'Direct' : 'Indirect'),
+              'profile_type': (result[i].profile_type === true ? 'Direct' : 'Indirect'),
               'database': result[i].database,
               'time': result[i].time,
               'report_id': result[i].report_id,
@@ -630,7 +630,7 @@ define([
       if (this.initialized)
         return;
 
-      var baseUrl;
+      //var baseUrl;
 
       this.initialized = true;
       this.trans_id = trans_id;
@@ -698,106 +698,79 @@ define([
 
         */
       } else if (trans_id != undefined && profile_type) { // Direct profiling
+        self.initializePanels();
+        controller.enable_toolbar_buttons();
 
-        // Start the listener
-        baseUrl = url_for('profiler.start_listener', {
+        // Get parameters
+        var paramUrl = url_for('profiler.get_parameters', {
           'trans_id': trans_id,
         });
-
         $.ajax({
-          url: baseUrl,
+          url: paramUrl,
           method: 'GET',
         })
           .done(function(res) {
-            if (res.data.status) {
-              self.initializePanels();
-              controller.enable_toolbar_buttons();
-
-              // Get parameters
-              var paramUrl = url_for('profiler.get_parameters', {
-                'trans_id': trans_id,
-              });
-              $.ajax({
-                url: paramUrl,
-                method: 'GET',
-              })
-                .done(function(res) {
-                  if (res.data.status === 'Success') {
-                    controller.AddParameters(res.data.result);
-                  }
-
-                  else if (res.data.status === 'NotConnected') {
-                    Alertify.alert(
-                      gettext('Profiler Error'),
-                      gettext('Error while fetching parameters.')
-                    );
-                  }
-                })
-                .fail(function() {
-                  Alertify.alert(
-                    gettext('Profiler Error'),
-                    gettext('Error while fetching parameters.')
-                  );
-                });
-
-              // Get source code
-              var srcUrl = url_for('profiler.get_src', {
-                'trans_id' : trans_id,
-              });
-              $.ajax({
-                url: srcUrl,
-                method: 'GET',
-              })
-                .done(function(res) {
-                  if (res.data.status === 'Success') {
-                    controller.AddSrc(res.data.result);
-                  }
-
-                  else if (res.data.status === 'NotConnected') {
-                    Alertify.alert(
-                      gettext('Profiler Error'),
-                      gettext('Error whiel fetching parameters.')
-                    );
-                  }
-                })
-                .fail(function() {
-                  Alertify.alert(
-                    gettext('Profiler Error'),
-                    gettext('Error while fetching sql source code.')
-                  );
-                });
-
-              // Get reports
-              var reportsUrl = url_for('profiler.get_reports');
-              $.ajax({
-                url: reportsUrl,
-                method: 'GET',
-              })
-                .done(function(res) {
-                  if (res.data.status === 'Success') {
-                    controller.AddReports(res.data.result);
-                  }
-                })
-                .fail(function() {
-                  Alertify.alert(
-                    gettext('Profiler Error'),
-                    gettext('Error while fetching reports.')
-                  );
-                });
+            if (res.data.status === 'Success') {
+              controller.AddParameters(res.data.result);
             }
-          })
-          .fail(function(xhr) {
-            try {
-              var err = JSON.parse(xhr.responseText);
-              if (err.success == 0) {
-                Alertify.alert(gettext('Profiler Error'), err.errormsg);
-              }
-            } catch (e) {
+
+            else if (res.data.status === 'NotConnected') {
               Alertify.alert(
                 gettext('Profiler Error'),
-                gettext('Error while starting profiling listener.')
+                gettext('Error while fetching parameters.')
               );
             }
+          })
+          .fail(function() {
+            Alertify.alert(
+              gettext('Profiler Error'),
+              gettext('Error while fetching parameters.')
+            );
+          });
+
+        // Get source code
+        var srcUrl = url_for('profiler.get_src', {
+          'trans_id' : trans_id,
+        });
+        $.ajax({
+          url: srcUrl,
+          method: 'GET',
+        })
+          .done(function(res) {
+            if (res.data.status === 'Success') {
+              controller.AddSrc(res.data.result);
+            }
+
+            else if (res.data.status === 'NotConnected') {
+              Alertify.alert(
+                gettext('Profiler Error'),
+                gettext('Error whiel fetching parameters.')
+              );
+            }
+          })
+          .fail(function() {
+            Alertify.alert(
+              gettext('Profiler Error'),
+              gettext('Error while fetching sql source code.')
+            );
+          });
+
+        // Get reports
+        var reportsUrl = url_for('profiler.get_reports');
+        $.ajax({
+          url: reportsUrl,
+          method: 'GET',
+        })
+          .done(function(res) {
+            if (res.data.status === 'Success') {
+              controller.AddReports(res.data.result);
+            }
+          })
+          .fail(function() {
+            Alertify.alert(
+              gettext('Profiler Error'),
+              gettext('Error while fetching reports.')
+            );
           });
       } else {
         this.initializePanels();
