@@ -623,7 +623,6 @@ define([
   _.extend(DirectProfile.prototype, {
     /* We should get the transaction id from the server during initialization here */
     load: function(trans_id, profile_type, function_name_with_arguments, layout) {
-      console.warn(function_name_with_arguments);
 
       // We do not want to initialize the module multiple times.
       var self = this;

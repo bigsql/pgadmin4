@@ -282,7 +282,7 @@ def init_function(node_type, sid, did, scid, fid, trid=None):
         'src': r_set['rows'][0]['prosrc'],
         'name': r_set['rows'][0]['name'],
         'is_func': r_set['rows'][0]['isfunc'],
-        'is_ppas_database': ppas_server,
+        'is_ppas_database': False,
         'is_callable': False,
         'schema': r_set['rows'][0]['schemaname'],
         'language': r_set['rows'][0]['lanname'],

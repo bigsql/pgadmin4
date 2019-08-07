@@ -41,9 +41,23 @@ define([
         callback: 'get_function_information',
         category: gettext('Profiling'),
         priority: 11,
-        label:gettext('Direct Profile'),
+        label:gettext('Profile'),
         data: {
           object: 'function',
+        },
+        icon: 'fa fa-arrow-circle-right',
+        enable: 'can_profile',
+      }, {
+        name: 'procedure_direct_profiler',
+        node: 'procedure',
+        module: this,
+        applies: ['object', 'context'],
+        callback: 'get_function_information',
+        category: gettext('Profiling'),
+        priority: 10,
+        label: gettext('Profile'),
+        data: {
+          object: 'procedure',
         },
         icon: 'fa fa-arrow-circle-right',
         enable: 'can_profile',
@@ -117,14 +131,12 @@ define([
       if (!d_)
         return false;
 
-      // For trigger node, language will be undefined - we should allow indirect debugging for trigger node
-      if ((d_.language == undefined && d_._type == 'trigger') ||
-        (d_.language == undefined && d_._type == 'edbfunc') ||
-        (d_.language == undefined && d_._type == 'edbproc')) {
+      // For trigger node, language will be undefined
+      if (d_.language == undefined && d_._type == 'trigger'){
         return true;
       }
 
-      if (d_.language != 'plpgsql' && d_.language != 'edbspl') {
+      if (d_.language != 'plpgsql') {
         return false;
       }
 
@@ -188,10 +200,10 @@ define([
 
       // Generate the URL to create a profiler instance
       var treeInfo = node.getTreeNodeHierarchy.apply(node, [i]),
-        _url = this.generate_url('init', treeInfo, node);
+        initUrl = this.generate_url('init', treeInfo, node);
 
       $.ajax({
-        url:_url,
+        url:initUrl,
         cache: false,
       })
         .done(function(res) {
@@ -214,12 +226,12 @@ define([
               return;
 
             var treeInfo = node.getTreeNodeHierarchy.apply(node, [i]),
-              baseUrl;
+              initTargetUrl;
 
-            if (d._type == 'function' || d._type == 'edbfunc') {
-              baseUrl = url_for(
+            if (d._type == 'function') {
+              initTargetUrl = url_for(
                 'profiler.initialize_target_for_function', {
-                  'profile': 'direct',
+                  'profile_type': 'direct',
                   'trans_id': trans_id,
                   'sid': treeInfo.server._id,
                   'did': treeInfo.database._id,
@@ -227,57 +239,70 @@ define([
                   'func_id': profilerUtils.getFunctionId(treeInfo),
                 }
               );
+            } else if(d._type == 'procedure' || d._type == 'edbproc') {
+              initTargetUrl = url_for(
+                'profiler.initialize_target_for_function', {
+                  'profile_type': 'direct',
+                  'trans_id': trans_id,
+                  'sid': treeInfo.server._id,
+                  'did': treeInfo.database._id,
+                  'scid': treeInfo.schema._id,
+                  'func_id': profilerUtils.getProcedureId(treeInfo),
+                }
+              );
+            }
 
-              $.ajax({
-                url: baseUrl,
-                method: 'GET',
-              })
-                .done(function() {
+            $.ajax({
+              url: initTargetUrl,
+              method: 'GET',
+            })
+              .done(function() {
 
-                  var url = url_for('profiler.direct', {
-                    'trans_id': trans_id,
-                  });
+                var url = url_for('profiler.direct', {
+                  'trans_id': trans_id,
+                });
 
-                  if (self.preferences.profiler_new_browser_tab) {
-                    window.open(url, '_blank');
-                  } else {
-                    pgBrowser.Events.once(
-                      'pgadmin-browser:frame:urlloaded:frm_profiler',
-                      function(frame) {
-                        frame.openURL(url);
-                      }
+                if (self.preferences.profiler_new_browser_tab) {
+                  window.open(url, '_blank');
+                } else {
+                  pgBrowser.Events.once(
+                    'pgadmin-browser:frame:urlloaded:frm_profiler',
+                    function(frame) {
+                      frame.openURL(url);
+                    }
+                  );
+
+                  // Create the profiler panel as per the data received from user input dialog.
+                  var dashboardPanel = pgBrowser.docker.findPanels(
+                      'properties'
+                    ),
+                    panel = pgBrowser.docker.addPanel(
+                      'frm_profiler', wcDocker.DOCK.STACKED, dashboardPanel[0]
                     );
 
-                    // Create the debugger panel as per the data received from user input dialog.
-                    var dashboardPanel = pgBrowser.docker.findPanels(
-                        'properties'
-                      ),
-                      panel = pgBrowser.docker.addPanel(
-                        'frm_profiler', wcDocker.DOCK.STACKED, dashboardPanel[0]
-                      );
+                  panel.focus();
 
-                    panel.focus();
-
-                    // Register Panel Closed event
-                    panel.on(wcDocker.EVENT.CLOSED, function() {
-                      var closeUrl = url_for('profiler.close', {
-                        'trans_id': trans_id,
-                      });
-                      $.ajax({
-                        url: closeUrl,
-                        method: 'DELETE',
-                      });
+                  // Register Panel Closed event
+                  panel.on(wcDocker.EVENT.CLOSED, function() {
+                    var closeUrl = url_for('profiler.close', {
+                      'trans_id': trans_id,
                     });
-                  }
-                })
-                .fail(function(e) {
-                  Alertify.alert(
-                    gettext('Debugger Target Initialization Error'),
-                    e.responseJSON.errormsg
-                  );
-                });
-            }
+                    $.ajax({
+                      url: closeUrl,
+                      method: 'DELETE',
+                    });
+                  });
+                }
+              })
+              .fail(function(e) {
+                Alertify.alert(
+                  gettext('Profiler Target Initialization Error'),
+                  e.responseJSON.errormsg
+                );
+              });
+
           }
+          
         });
 
     },
