@@ -46,7 +46,21 @@ define([
           object: 'function',
         },
         icon: 'fa fa-arrow-circle-right',
-        enable: 'can_profile', //TODO: make a can_profiler func
+        enable: 'can_profile',
+      }, {
+        name: 'indirect_profiler',
+        node: 'database',
+        module: this,
+        applies: ['object', 'context'],
+        callback: 'get_function_information',
+        category: gettext('Profiling'),
+        priority: 11,
+        label:gettext('Monitor'),
+        data: {
+          object: 'function',
+        },
+        icon: 'fa fa-arrow-circle-right',
+        enable: 'can_profile_global',
       },
 
         //TODO: more menus
@@ -114,6 +128,10 @@ define([
         return false;
       }
 
+      return true;
+    },
+
+    can_profile_global: function() {
       return true;
     },
 
