@@ -42,14 +42,12 @@ define([
       enable_toolbar_buttons: function() {
         var self = this;
         self.enable('start', true);
-        self.enable('stop' , true);
         self.enable('save' , true);
       },
 
       disable_toolbar_buttons: function() {
         var self = this;
         self.enable('start', false);
-        self.enable('stop' , false);
         self.enable('save' , false);
       },
 
@@ -164,7 +162,6 @@ define([
                     // start the same execution again.
                     setTimeout(function() {
                       self.enable('start', false);
-                      self.enable('stop', false);
                       self.enable('save', false);
                     }, 500);
 
@@ -186,7 +183,6 @@ define([
                       // start the same execution again.
                       setTimeout(function() {
                         self.enable('start', false);
-                        self.enable('stop', false);
                         self.enable('save', false);
                       }, 500);
 
@@ -217,7 +213,6 @@ define([
                   // "Continue/Start" button because user can still start the
                   // same execution again.
                   self.enable('start', false);
-                  self.enable('stop', false);
                   self.enable('save', false);
 
                   // Stop further pooling
@@ -231,57 +226,6 @@ define([
                 );
               });
           }, poll_end_timeout);
-      },
-
-
-      Stop: function(trans_id) {
-        console.warn(trans_id);
-        /*
-        var self = this;
-        self.disable_toolbar_buttons();
-
-        // Make ajax call to listen the database message
-        var baseUrl = url_for(
-          'profiler.execute_query', {
-            'trans_id': trans_id,
-            'query_type': 'abort_target',
-          });
-        /*
-        $.ajax({
-          url: baseUrl,
-          method: 'GET',
-        })
-          .done(function(res) {
-            if (res.data.status) {
-            // Call function to create and update local variables ....
-              self.setActiveLine(-1);
-              pgTools.DirectProfile.direct_execution_completed = true;
-              pgTools.DirectProfile.is_user_aborted_profiling = true;
-
-              // Stop further pooling
-              pgTools.DirectProfile.is_polling_required = false;
-
-              // Restarting profiling in the same transaction do not work
-              // We will give same behaviour as pgAdmin3 and disable all buttons
-              self.enable('continue', false);
-
-              // Set the Alertify message to inform the user that execution
-              // is completed.
-              Alertify.success(res.info, 3);
-            } else if (res.data.status === 'NotConnected') {
-              Alertify.alert(
-                gettext('Profiler Error'),
-                gettext('Error while executing stop in profiling session.')
-              );
-            }
-          })
-          .fail(function() {
-            Alertify.alert(
-              gettext('Profiler Error'),
-              gettext('Error while executing stop in profiling session.')
-            );
-          });
-        */
       },
 
       AddResults: function(columns, result) {
@@ -544,28 +488,15 @@ define([
     el: '.profiler_main_container',
     initialize: function() {
       controller.on('pgProfiler:button:state:start', this.enable_start, this);
-      controller.on('pgProfiler:button:state:stop' , this.enable_stop, this);
       controller.on('pgProfiler:button:state:save' , this.enable_save, this);
     },
     events: {
       'click .btn-start': 'on_start',
-      'click .btn-stop' : 'on stop',
       'click .btn-save' : 'on_save',
       'keydown': 'keyAction',
     },
     enable_start: function(enable) {
       var $btn = this.$el.find('.btn-start');
-
-      if (enable) {
-        $btn.prop('disabled', false);
-        $btn.removeAttr('disabled');
-      } else {
-        $btn.prop('disabled', true);
-        $btn.attr('disabled', 'disabled');
-      }
-    },
-    enable_stop: function(enable) {
-      var $btn = this.$el.find('.btn-stop');
 
       if (enable) {
         $btn.prop('disabled', false);
@@ -588,9 +519,6 @@ define([
     },
     on_start: function() {
       controller.start_execution(pgTools.DirectProfile.trans_id);
-    },
-    on_stop: function() {
-      controller.stop(pgTools.DirectProfile.trans_id);
     },
     on_save: function() {
       controller.save(pgTools.DirectProfile.trans_id);
@@ -991,9 +919,6 @@ define([
         .attr('title', keyboardShortcuts.shortcut_accesskey_title('Start',self.preferences.btn_step_into))
         .attr('accesskey', keyboardShortcuts.shortcut_key(self.preferences.start));
 
-      self.toolbarView.$el.find('#btn-stop')
-        .attr('title', keyboardShortcuts.shortcut_accesskey_title('Stop',self.preferences.btn_step_over))
-        .attr('accesskey', keyboardShortcuts.shortcut_key(self.preferences.stop));
 
       self.toolbarView.$el.find('#btn-save')
         .attr('title', keyboardShortcuts.shortcut_accesskey_title('Save',self.preferences.btn_start))
