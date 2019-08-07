@@ -180,30 +180,46 @@ define([
             this.set('trans_id', trans_id);
 
             // Variables to store the data sent from sqlite database
-            // var func_args_data = this.func_args_data = [];
+            var func_args_data = this.func_args_data = [];
 
             // As we are not getting pgBrowser.tree when we profile again
             // so tree info will be updated from the server data
             if (restart_profile == 0) {
               var t = pgBrowser.tree,
                 i = t.selected(),
-                d = i && i.length == 1 ? t.itemData(i) : undefined;
-              //node = d && pgBrowser.Nodes[d._type];
+                d = i && i.length == 1 ? t.itemData(i) : undefined,
+                node = d && pgBrowser.Nodes[d._type];
 
               if (!d)
                 return;
 
-              //var treeInfo = node.getTreeNodeHierarchy.apply(node, [i]);
-            }
+              var treeInfo = node.getTreeNodeHierarchy.apply(node, [i]),
+                _Url;
 
-            /* To get existing params from sqlite db
-             * Currently not implemented
-            var _Url = url_for('profiler.get_arguments', {
-              'sid': profile_info.server_id,
-              'did': profile_info.database_id,
-              'scid': profile_info.schema_id,
-              'func_id': profile_info.function_id,
-            });
+              if (d._type == 'function') {
+                _Url = url_for('profiler.get_arguments', {
+                  'sid': treeInfo.server._id,
+                  'did': treeInfo.database._id,
+                  'scid': treeInfo.schema._id,
+                  'func_id': treeInfo.function._id,
+                });
+              } else if (d._type == 'procedure') {
+                //TODO
+                try {
+                  //something;
+                } catch (err) {
+                  //something;
+
+                }
+              }
+            } else {
+              _Url = url_for('profiler.get_arguments', {
+                'sid': profile_info.server._id,
+                'did': profile_info.database._id,
+                'scid': profile_info.schema._id,
+                'func_id': profile_info.function._id,
+              });
+            }
 
             $.ajax({
               url: _Url,
@@ -211,8 +227,19 @@ define([
               async: false,
             })
               .done(function(res) {
-                console.warn(res); // temp to pass jslint
-                // store the function params into sqlite database
+                // The given func/proc accepts args
+                if (res.data.args_count != 0) {
+                  for (i = 0; i < res.data.result.length; i++) {
+                  // Below will format the data to be stored in sqlite database
+                    func_args_data.push({
+                      'arg_id': res.data.result[i]['arg_id'],
+                      'is_null': res.data.result[i]['is_null'],
+                      'is_expression': res.data.result[i]['is_expression'],
+                      'use_default': res.data.result[i]['use_default'],
+                      'value': res.data.result[i]['value'],
+                    });
+                  }
+                }
               })
               .fail(function() {
                 Alertify.alert(
@@ -220,7 +247,6 @@ define([
                   gettext('unable to fetch the arguments from the server')
                 );
               });
-            */
 
             var argname, argtype, argmode, default_args_count, default_args, arg_cnt;
 
@@ -282,13 +308,11 @@ define([
               ];
 
             var my_obj = [];
-            // var func_obj = []; // For getting/setting params from sqlite db
+            var func_obj = []; // For getting/setting params from sqlite db
 
-            /* TODO: sqlite db support
             // Below will calculate the input argument id required to store in sqlite database
             var input_arg_id = this.input_arg_id = [],
               k;
-            //
             if (profile_info['proargmodes'] != null) {
               var argmode_1 = profile_info['proargmodes'].split(',');
               for (k = 0; k < argmode_1.length; k++) {
@@ -303,11 +327,9 @@ define([
                 input_arg_id.push(k);
               }
             }
-            */
 
             argtype = profile_info['proargtypenames'].split(',');
 
-            // ??
             if (profile_info['proargmodes'] != null) {
               argmode = profile_info['proargmodes'].split(',');
             }
@@ -319,7 +341,7 @@ define([
               arg_cnt = default_args_count;
             }
 
-            // var vals, values, index; // For late use with params in sqlite db
+            var vals, values, index;
             var use_def_value, j;
 
             // if the procedure has arguments
@@ -382,6 +404,39 @@ define([
                       'default_value': def_val_list[i],
                     });
                   }
+                }
+              }
+
+              // Need to update the func_obj variable from sqlite database if available
+              if (func_args_data.length != 0) {
+                for (i = 0; i < func_args_data.length; i++) {
+                  if (profile_info['proargmodes'] != null &&
+                    (argmode[i] == 'o' && !is_edb_proc)) {
+                    continue;
+                  }
+
+                  index = func_args_data[i]['arg_id'];
+                  values = [];
+                  if (argtype[index].indexOf('[]') != -1) {
+                    vals = func_args_data[i]['value'].split(',');
+                    _.each(vals, function(val) {
+                      values.push({
+                        'value': val,
+                      });
+                    });
+                  } else {
+                    values = func_args_data[i]['value'];
+                  }
+
+                  func_obj.push({
+                    'name': argname[index],
+                    'type': argtype[index],
+                    'is_null': func_args_data[i]['is_null'] ? true : false,
+                    'expr': func_args_data[i]['is_expression'] ? true : false,
+                    'value': values,
+                    'use_default': func_args_data[i]['use_default'] ? true : false,
+                    'default_value': def_val_list[index],
+                  });
                 }
               }
             } else {
@@ -454,19 +509,46 @@ define([
                       });
                     }
                   }
+
+                  // Need to update the func_obj variable from sqlite database if available
+                  if (func_args_data.length != 0) {
+                    for (i = 0; i < func_args_data.length; i++) {
+                      index = func_args_data[i]['arg_id'];
+                      values = [];
+                      if (argtype[index].indexOf('[]') != -1) {
+                        vals = func_args_data[i]['value'].split(',');
+                        _.each(vals, function(val) {
+                          values.push({
+                            'value': val,
+                          });
+                        });
+                      } else {
+                        values = func_args_data[i]['value'];
+                      }
+                      func_obj.push({
+                        'name': myargname[index],
+                        'type': argtype[index],
+                        'is_null': func_args_data[i]['is_null'] ? true : false,
+                        'expr': func_args_data[i]['is_expression'] ? true : false,
+                        'value': values,
+                        'use_default': func_args_data[i]['use_default'] ? true : false,
+                        'default_value': def_val_list[index],
+                      });
+                    }
+                  }
                 }
               }
             }
 
             // Check if the arguments already available in the sqlite database
             // then we should use the existing arguments
-            //if (func_args_data.length == 0) {
-            this.profilerInputArgsColl =
+            if (func_args_data.length == 0) {
+              this.profilerInputArgsColl =
               new ProfilerInputArgCollections(my_obj);
-            //} else {
-            //  this.profilerInputArgsColl =
-            //    new ProfilerInputArgCollections(func_obj);
-            //}
+            } else {
+              this.profilerInputArgsColl =
+                new ProfilerInputArgCollections(func_obj);
+            }
 
             // Initialize a new Grid instance
             if (this.grid) {
@@ -544,7 +626,7 @@ define([
               }
 
               var args_value_list = [];
-              // var sqlite_func_args_list = this.sqlite_func_args_list = [];
+              var sqlite_func_args_list = this.sqlite_func_args_list = [];
               var int_count = 0;
 
               // Store arguments values into args_value_list
@@ -574,8 +656,6 @@ define([
                   }
                 }
 
-                // TODO: Add support to store settings in sqlite
-                /*
                 if (self.setting('restart_profile') == 0) {
                   var f_id;
                   if (d._type == 'function') {
@@ -614,7 +694,6 @@ define([
                     'value': m.get('value'),
                   });
                 }
-                */
 
                 int_count = int_count + 1;
               });
@@ -632,6 +711,14 @@ define([
                     'scid': treeInfo.schema._id,
                     'func_id': treeInfo.function._id,
                   });
+                } else if (d._type == 'procedure') {
+                  //TODO
+                  try {
+                    //something;
+                  } catch (err) {
+                    //something;
+
+                  }
                 }
 
                 $.ajax({
@@ -677,8 +764,6 @@ define([
                       });
                     }
 
-                    /*
-                     * TODO: support for sqlite db
                     var _Url;
 
                     if (d._type == 'function') {
@@ -688,13 +773,22 @@ define([
                         'scid': treeInfo.schema._id,
                         'func_id': treeInfo.function._id,
                       });
+                    } else if (d._type == 'procedure') {
+                      //TODO
+                      try {
+                        //something;
+                      } catch (err) {
+                        //something;
+
+                      }
                     }
+
                     $.ajax({
                       url: _Url,
                       method: 'POST',
                       data: {
                         'data': JSON.stringify(sqlite_func_args_list),
-                      }
+                      },
                     })
                       .done(function() {})
                       .fail(function() {
@@ -703,7 +797,6 @@ define([
                           gettext('Uable to set the arguments on the server')
                         );
                       });
-                    */
                   })
                   .fail(function(e) {
                     Alertify.alert(
@@ -742,18 +835,17 @@ define([
              If we already have data available in sqlite database then we should
              enable the profile button otherwise disable the profile button.
             */
-            /* TODO: sqlite
             if (this.func_args_data.length == 0) {
               this.__internal.buttons[1].element.disabled = true;
-            } else {*/
-            this.__internal.buttons[1].element.disabled = false;
-            //}
+            } else {
+              this.__internal.buttons[1].element.disabled = false;
+            }
 
             /*
              Listen to the grid change event so that if any value changed by user then we can enable/disable the
              profile button.
             */
-            this.grid.listenTo(this.profileInputArgsColl, 'backgrid:edited',
+            this.grid.listenTo(this.profilerInputArgsColl, 'backgrid:edited',
               (function(obj) {
 
                 return function() {

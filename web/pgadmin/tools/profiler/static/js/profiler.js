@@ -46,7 +46,7 @@ define([
           object: 'function',
         },
         icon: 'fa fa-arrow-circle-right',
-        enable: true,
+        enable: 'can_profile', //TODO: make a can_profiler func
       },
 
         //TODO: more menus
@@ -77,6 +77,13 @@ define([
         self.preferences = pgBrowser.get_preferences_for_module('profiler');
       });
 
+    },
+
+    can_profile: function(itemData, item, data) {
+      console.warn(itemData);
+      console.warn(item);
+      console.warn(data);
+      return true;
     },
 
     // generates the endpoint url that will correspond to the correct method for the server to perform
@@ -117,15 +124,15 @@ define([
       in the user input dialog
     */
     /*
-     * Does not support procedures, trigger functions, edb/ppass functions/procedures
+     * TODO: Does not support procedures, trigger functions, edb/ppass functions/procedures
     */
     get_function_information: function(args, item) {
       var t = pgBrowser.tree,
         i = item || t.selected(),
         d = i && i.length == 1 ? t.itemData(i) : undefined,
-        node = d && pgBrowser.Nodes[d._type]; //,
-        //self = this,
-        // is_edb_proc = d._type == 'edbproc';
+        node = d && pgBrowser.Nodes[d._type],
+        self = this,
+        is_edb_proc = d._type == 'edbproc';
 
       if (!d)
         return;
@@ -144,7 +151,7 @@ define([
             trans_id = res.data.trans_id;
           // Open Alertify the dialog to take the input arguments from user if function having input arguments
           if (profile_info[0]['require_input']) {
-            get_function_arguments(profile_info[0], 0, false /* is_edb_proc */, trans_id);
+            get_function_arguments(profile_info[0], 0, is_edb_proc, trans_id);
           } else {
             // Initialize the target and create asynchronous connection and unique transaction ID
             // If there is no arguments to the functions then we should not ask for for function arguments and

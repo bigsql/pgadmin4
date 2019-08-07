@@ -69,10 +69,6 @@ define([
         })
           .done(function(res) {
             if (res.data.status === 'Success') {
-              var reportUrl = url_for(
-                'profiler.show_report', {
-                  'report_id': res.data.report_id,
-                });
               self.AddResults(res.data.col_info, res.data.result);
 
               // Update saved reports
@@ -92,8 +88,6 @@ define([
                     gettext('Error while fetching reports.')
                   );
                 });
-
-              window.open(reportUrl, '_blank');
             } else if (res.data.status === 'NotConnected') {
               Alertify.alert(
                 gettext('Profiler Error'),

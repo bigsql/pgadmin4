@@ -100,7 +100,7 @@ class ProfilerModule(PgAdminModule):
                 'profiler.show_report', 'profiler.get_src',
                 'profiler.get_reports',
                 #'profiler.deposit_value',
-                #'profiler.set_arguments',
+                'profiler.set_arguments', 'profiler.get_arguments'
                 #'profiler.poll_end_execution_result'#, 'profiler.poll_result'
                 ]
 
@@ -917,6 +917,166 @@ def get_parameters(trans_id):
             'result': arg_values
         }
     )
+
+@blueprint.route(
+    '/get_arguments/<int:sid>/<int:did>/<int:scid>/<int:func_id>',
+    methods=['GET'], endpoint='get_arguments'
+)
+@login_required
+def get_arguments_sqlite(sid, did, scid, func_id):
+    """
+    get_arguments_sqlite(sid, did, scid, func_id)
+
+    This method is responsible to get the function arguments saved to sqlite
+    database during first debugging.
+
+    Parameters:
+        sid
+        - Server Id
+        did
+        - Database Id
+        scid
+        - Schema Id
+        func_id
+        - Function Id
+    """
+    PflFuncArgsCount = ProfilerFunctionArguments.query.filter_by(
+        server_id=sid,
+        database_id=did,
+        schema_id=scid,
+        function_id=func_id
+    ).count()
+
+    args_data = []
+
+    if PflFuncArgsCount:
+        """Update the Profiler Function Arguments settings"""
+        PflFuncArgs = ProfilerFunctionArguments.query.filter_by(
+            server_id=sid,
+            database_id=did,
+            schema_id=scid,
+            function_id=func_id
+        )
+
+        args_list = PflFuncArgs.all()
+
+        for i in range(0, PflFuncArgsCount):
+            info = {
+                "arg_id": args_list[i].arg_id,
+                "is_null": args_list[i].is_null,
+                "is_expression": args_list[i].is_expression,
+                "use_default": args_list[i].use_default,
+                "value": args_list[i].value
+            }
+            args_data.append(info)
+
+        # As we do have entry available for that function so we need to add
+        # that entry
+        return make_json_response(
+            data={'result': args_data, 'args_count': PflFuncArgsCount}
+        )
+    else:
+        # As we do not have any entry available for that function so we need
+        # to add that entry
+        return make_json_response(
+            data={'result': 'result', 'args_count': PflFuncArgsCount}
+        )
+
+@blueprint.route(
+    '/set_arguments/<int:sid>/<int:did>/<int:scid>/<int:func_id>',
+    methods=['POST'], endpoint='set_arguments'
+)
+@login_required
+def set_arguments_sqlite(sid, did, scid, func_id):
+    """
+    set_arguments_sqlite(sid, did, scid, func_id)
+
+    This method is responsible for setting the value of function arguments
+    to sqlite database
+
+    Parameters:
+        sid
+        - Server Id
+        did
+        - Database Id
+        scid
+        - Schema Id
+        func_id
+        - Function Id
+    """
+
+    if request.values['data']:
+        data = json.loads(request.values['data'], encoding='utf-8')
+
+    try:
+        for i in range(0, len(data)):
+            PflFuncArgsExists = ProfilerFunctionArguments.query.filter_by(
+                server_id=data[i]['server_id'],
+                database_id=data[i]['database_id'],
+                schema_id=data[i]['schema_id'],
+                function_id=data[i]['function_id'],
+                arg_id=data[i]['arg_id']
+            ).count()
+
+            # handle the Array list sent from the client
+            array_string = ''
+            if 'value' in data[i]:
+                if data[i]['value'].__class__.__name__ in (
+                        'list') and data[i]['value']:
+                    for k in range(0, len(data[i]['value'])):
+                        if data[i]['value'][k]['value'] is None:
+                            array_string += 'NULL'
+                        else:
+                            array_string += str(data[i]['value'][k]['value'])
+                        if k != (len(data[i]['value']) - 1):
+                            array_string += ','
+                elif data[i]['value'].__class__.__name__ in (
+                        'list') and not data[i]['value']:
+                    array_string = ''
+                else:
+                    array_string = data[i]['value']
+
+            # Check if data is already available in database then update the
+            # existing value otherwise add the new value
+            if PflFuncArgsExists:
+                PflFuncArgs = ProfilerFunctionArguments.query.filter_by(
+                    server_id=data[i]['server_id'],
+                    database_id=data[i]['database_id'],
+                    schema_id=data[i]['schema_id'],
+                    function_id=data[i]['function_id'],
+                    arg_id=data[i]['arg_id']
+                ).first()
+
+                PflFuncArgs.is_null = data[i]['is_null']
+                PflFuncArgs.is_expression = data[i]['is_expression']
+                PflFuncArgs.use_default = data[i]['use_default']
+                PflFuncArgs.value = array_string
+            else:
+                profiler_func_args = ProfilerFunctionArguments(
+                    server_id=data[i]['server_id'],
+                    database_id=data[i]['database_id'],
+                    schema_id=data[i]['schema_id'],
+                    function_id=data[i]['function_id'],
+                    arg_id=data[i]['arg_id'],
+                    is_null=data[i]['is_null'],
+                    is_expression=data[i]['is_expression'],
+                    use_default=data[i]['use_default'],
+                    value=array_string
+                )
+
+                db.session.add(profiler_func_args)
+
+            db.session.commit()
+
+    except Exception as e:
+        current_app.logger.exception(e)
+        return make_json_response(
+            status=410,
+            success=0,
+            errormsg=e.message
+        )
+
+    return make_json_response(data={'status': True, 'result': 'Success'})
 
 @blueprint.route(
     '/get_reports', methods=['GET'],
