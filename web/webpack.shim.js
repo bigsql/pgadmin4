@@ -278,7 +278,7 @@ var webpackShimConfig = {
     'pgadmin.tools.debugger.ui': path.join(__dirname, './pgadmin/tools/debugger/static/js/debugger_ui'),
     'pgadmin.tools.debugger.utils': path.join(__dirname, './pgadmin/tools/debugger/static/js/debugger_utils'),
     'pgadmin.tools.profiler.controller': path.join(__dirname, './pgadmin/tools/profiler/static/js/profiler'),
-    'pgadmin.tools.profiler.direct': path.join(__dirname, './pgadmin/tools/profiler/static/js/direct'),
+    'pgadmin.tools.profiler.profile': path.join(__dirname, './pgadmin/tools/profiler/static/js/profile'),
     'pgadmin.tools.profiler.ui': path.join(__dirname, './pgadmin/tools/profiler/static/js/profiler_ui'),
     'pgadmin.tools.profiler.options': path.join(__dirname, './pgadmin/tools/profiler/static/js/profiler_options'),
     'pgadmin.tools.profiler.utils': path.join(__dirname, './pgadmin/tools/profiler/static/js/profiler_utils'),

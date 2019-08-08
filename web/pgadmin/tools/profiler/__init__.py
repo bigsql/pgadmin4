@@ -91,17 +91,16 @@ class ProfilerModule(PgAdminModule):
     def get_exposed_url_endpoints(self):
         return ['profiler.index', 'profiler.init_for_database',
                 'profiler.init_for_trigger', 'profiler.init_for_function',
-                'profiler.direct', 'profiler.initialize_target_for_function',
+                'profiler.profile',
+                'profiler.initialize_target_for_function',
                 'profiler.initialize_target_for_trigger', 'profiler.close',
                 'profiler.get_parameters',
                 'profiler.initialize_target_indirect',
-                #'profiler.start_listener',
+                'profiler.start_monitor',
                 'profiler.start_execution',
                 'profiler.show_report', 'profiler.get_src',
                 'profiler.get_reports',
-                #'profiler.deposit_value',
                 'profiler.set_arguments', 'profiler.get_arguments'
-                #'profiler.poll_end_execution_result'#, 'profiler.poll_result'
                 ]
 
 
@@ -207,7 +206,7 @@ def init_function(node_type, sid, did, scid=None, fid=None, trid=None):
 
     # Determine profiling type
     profile_type = ''
-    if node_type is 'database':
+    if node_type.strip() == 'database':
         profile_type = 'indirect'
 
     # Get the server version, server type and user information
@@ -333,9 +332,9 @@ def init_function(node_type, sid, did, scid=None, fid=None, trid=None):
             status=200
         )
 
-@blueprint.route('/direct/<int:trans_id>', methods=['GET'], endpoint='direct')
-#@login_required
-def direct_new(trans_id):
+@blueprint.route('/profile/<int:trans_id>', methods=['GET'], endpoint='profile')
+@login_required
+def profile_new(trans_id):
     pfl_inst = ProfilerInstance(trans_id)
 
     # Return from the function if transaction id not found
@@ -373,34 +372,40 @@ def direct_new(trans_id):
     # TODO: keyboard shortcuts
     user_agent = UserAgent(request.headers.get('User-Agent'))
 
-    function_arguments = '('
-    if pfl_inst.profiler_data is not None:
-        if 'args_name' in pfl_inst.profiler_data and \
-            pfl_inst.profiler_data['args_name'] is not None and \
-                pfl_inst.profiler_data['args_name'] != '':
-            args_name_list = pfl_inst.profiler_data['args_name'].split(",")
-            args_type_list = pfl_inst.profiler_data['args_type'].split(",")
-            index = 0
-            for args_name in args_name_list:
-                function_arguments = '{}{} {}, '.format(function_arguments,
-                                                        args_name,
-                                                        args_type_list[index])
-                index += 1
-            # Remove extra comma and space from the arguments list
-            if len(args_name_list) > 0:
-                function_arguments = function_arguments[:-2]
+    if profile_type == 1:
 
-    function_arguments += ')'
+        function_arguments = '('
+        if pfl_inst.profiler_data is not None:
+            if 'args_name' in pfl_inst.profiler_data and \
+                pfl_inst.profiler_data['args_name'] is not None and \
+                    pfl_inst.profiler_data['args_name'] != '':
+                args_name_list = pfl_inst.profiler_data['args_name'].split(",")
+                args_type_list = pfl_inst.profiler_data['args_type'].split(",")
+                index = 0
+                for args_name in args_name_list:
+                    function_arguments = '{}{} {}, '.format(function_arguments,
+                                                            args_name,
+                                                            args_type_list[index])
+                    index += 1
+                # Remove extra comma and space from the arguments list
+                if len(args_name_list) > 0:
+                    function_arguments = function_arguments[:-2]
+
+        function_arguments += ')'
+
+        function_name_with_arguments = \
+            pfl_inst.profiler_data['function_name'] + function_arguments
+
+    else:
+        function_name = "Indirect"
+        function_name_with_arguments = "Indirect"
 
     layout = get_setting('Profiler/Layout')
-
-    function_name_with_arguments = \
-        pfl_inst.profiler_data['function_name'] + function_arguments
 
     return render_template(
         "profiler/direct.html",
         _=gettext,
-        function_name=pfl_inst.profiler_data['function_name'],
+        function_name=function_name,
         uniqueId=trans_id,
         profile_type=profile_type,
         is_desktop_mode=current_app.PGADMIN_RUNTIME,
@@ -416,7 +421,7 @@ def direct_new(trans_id):
     endpoint='initialize_target_indirect'
 )
 @login_required
-def initialize_target(profile_type, trans_id, sid, did):
+def initialize_target_indirect(profile_type, trans_id, sid, did):
     # Create asynchronous connection using random connection id.
     conn_id = str(random.randint(1, 9999999))
     try:
@@ -438,6 +443,10 @@ def initialize_target(profile_type, trans_id, sid, did):
             gettext("Could not fetch profiler plugin information.")
         )
 
+    pfl_inst = ProfilerInstance(trans_id)
+    if request.method == 'POST':
+        data = json.loads(request.values['data'], encoding='utf-8')
+
     # Need to check if plugin is really loaded or not with "plprofiler" string
     if profile_type == 'indirect':
         if "plprofiler" not in rid_pre:
@@ -449,6 +458,22 @@ def initialize_target(profile_type, trans_id, sid, did):
             )
             current_app.logger.debug(msg)
             return internal_server_error(msg)
+
+    pfl_inst.profiler_data = {
+        'conn_id': conn_id,
+        'server_id': sid,
+        'database_id': did,
+        'profile_type': profile_type,
+        'restart_profile': 0,
+        'duration' : data[0]['value'],
+        'interval' : data[1]['value'],
+        'pid'      : data[2]['value']
+    }
+
+    pfl_inst.update_session()
+
+    return make_json_response(data={'status': status,
+                                    'profilerTransId': trans_id})
 
 @blueprint.route(
     '/initialize_target/<profile_type>/<int:trans_id>/<int:sid>/<int:did>/'
@@ -561,13 +586,86 @@ def initialize_target(profile_type, trans_id, sid, did,
                                     'profilerTransId': trans_id})
 
 @blueprint.route(
-    '/start_execution/<int:trans_id>/<int:port_num>', methods=['GET'],
+    '/start_monitor/<int:trans_id>', methods=['GET'],
+    endpoint='start_monitor'
+)
+@login_required
+def start_monitor(trans_id):
+    pfl_inst = ProfilerInstance(trans_id)
+    if pfl_inst.profiler_data is None:
+        return make_json_response(
+            data={
+                'status': 'NotConnected',
+                'result': gettext(
+                    'Not connected to server or connection with the server '
+                    'has been closed.'
+                )
+            }
+        )
+
+    duration = pfl_inst.profiler_data['duration']
+    interval = pfl_inst.profiler_data['interval']
+    pid = pfl_inst.profiler_data['pid']
+
+    # Create asynchronous connection using random connection id.
+    exe_conn_id = str(random.randint(1, 9999999))
+    try:
+        manager = get_driver(PG_DEFAULT_DRIVER).connection_manager(
+            pfl_inst.profiler_data['server_id'])
+        conn = manager.connection(
+            did=pfl_inst.profiler_data['database_id'],
+            conn_id=exe_conn_id)
+    except Exception as e:
+        return internal_server_error(errormsg=str(e))
+
+    # Connect the Server
+    status, msg = conn.connect()
+    if not status:
+        return internal_server_error(errormsg=str(msg))
+
+    status, res = conn.execute_async_list("""
+                    SELECT N.nspname
+                    FROM pg_catalog.pg_extension E
+                    JOIN pg_catalog.pg_namespace N ON N.oid = E.extnamespace
+                    WHERE E.extname = 'plprofiler'
+                """)
+    namespace = res[0]['nspname']
+
+    conn.execute_async('SET search_path to ' + namespace)
+    conn.execute_async('SELECT pl_profiler_set_enabled_local(true);')
+    conn.execute_async('SELECT pl_profiler_reset_shared()')
+    if (pid is not None):
+        conn.execute_async('SELECT pl_profiler_set_enable_pid(%s)', pid)
+    else:
+        conn.execute_async('SELECT pl_profiler_set_enabled_global(true)')
+    conn.execute_async('SELECT pl_profiler_set_collect_interval' + interval)
+    conn.execute_async('RESET search_path')
+    try:
+        time.sleep(int(duration))
+    finally:
+        conn.execute_async('SET search_path to ' + namespace)
+        conn.execute_async('SELECT pl_profiler_set_enabled_global(false)')
+        conn.execute_async('SELECT pl_profiler_set_enabled_pid(0)')
+        conn.execute_async('RESET search_path')
+
+
+    return make_json_response(
+        data = {
+            'status': 'Success'
+        }
+    )
+
+
+
+
+@blueprint.route(
+    '/start_execution/<int:trans_id>', methods=['GET'],
     endpoint='start_execution'
 )
 @login_required
-def start_execution(trans_id, port_num):
+def start_execution(trans_id):
     """
-    start_execution(trans_id, port_num)
+    start_execution(trans_id)
 
     This method is responsible for creating an asynchronous connection for
     execution thread. Also store the session id into session return with
@@ -576,8 +674,6 @@ def start_execution(trans_id, port_num):
     Parameters:
         trans_id
         - Transaction ID
-        port_num TODO: Check if this is still necessary
-        - Port number to attach
     """
 
     pfl_inst = ProfilerInstance(trans_id)
@@ -626,11 +722,12 @@ def start_execution(trans_id, port_num):
 
     conn.execute_async('SET search_path to ' + pfl_inst.function_data['schema'] + ';')
     conn.execute_async('SELECT pl_profiler_set_enabled_local(true)')
+    conn.execute_async('SELECT pl_profiler_reset_local(true)')
     conn.execute_async('SELECT pl_profiler_set_collect_interval(0)')
     status, result = conn.execute_async_list(sql)
     conn.execute_async('SELECT pl_profiler_set_enabled_local(false)')
-    report_data = generate_direct_report(conn, report_name, opt_top=10, func_oids={}) # TODO: Add support for K top
-    report_id = save_direct_report(report_data, report_name, pfl_inst.function_data['schema'])
+    report_data = generate__report(conn, report_name, opt_top=10, func_oids={}, 'local') # TODO: Add support for K top
+    report_id = save_report(report_data, report_name, pfl_inst.function_data['schema'])
     conn.execute_async('RESET search_path')
 
     columns = {}
@@ -697,7 +794,7 @@ def get_src(trans_id):
         }
     )
 
-def generate_direct_report(conn, name, opt_top, func_oids = None):
+def generate_report(conn, name, opt_top, func_oids = None, data_location):
     """
     generate_report(trans_id)
 
@@ -711,6 +808,8 @@ def generate_direct_report(conn, name, opt_top, func_oids = None):
         opt_top
 
         func_oids
+
+        data_location
     """
 
     # ----
@@ -889,9 +988,9 @@ def generate_direct_report(conn, name, opt_top, func_oids = None):
             'found_more_funcs': found_more_funcs,
         }
 
-def save_direct_report(report_data, name, dbname):
+def save_report(report_data, name, dbname):
     """
-    save_direct_report(report_data, name, dbname)
+    save_report(report_data, name, dbname)
 
     Parameters:
         TODO

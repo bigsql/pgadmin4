@@ -4,12 +4,12 @@
 
 try {
   require(
-    ['sources/generated/profiler_direct'],
-    function(pgDirectProfile) {
-      var pgDirectProfile = pgDirectProfile || pgAdmin.Tools.DirectProfile;
-      var $ = pgDirectProfile.jquery;
+    ['sources/generated/profiler_profile'],
+    function(pgProfile) {
+      var pgProfile = pgProfile|| pgAdmin.Tools.Profile;
+      var $ = pgProfile.jquery;
 
-      pgDirectProfile.load({{ uniqueId }}, {{ profile_type }}, '{{ function_name_with_arguments }}', '{{layout|safe}}');
+      pgProfile.load({{ uniqueId }}, {{ profile_type }}, '{{ function_name_with_arguments }}', '{{layout|safe}}');
 
       // Register unload event on window close.
       /* If opened in new tab, close the connection only on tab/window close and

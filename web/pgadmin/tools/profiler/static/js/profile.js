@@ -27,8 +27,8 @@ define([
 
   var pgTools = pgAdmin.Tools = pgAdmin.Tools || {};
 
-  if (pgTools.DirectProfile)
-    return pgTools.DirectProfile;
+  if (pgTools.Profile)
+    return pgTools.Profile;
 
   var controller = new(function() {});
 
@@ -101,131 +101,54 @@ define([
           });
       },
 
-      /*
-        For the direct profiling, we need to check weather the functions execution
-        is completed or not. After completion of the profiling, we will stop polling
-        the result  until new execution starts.
-      */
-      poll_end_execution_result: function(trans_id) {
-        console.warn(trans_id);
+      // function to start indirect profiling (global monitoring)
+      start_monitor: function(trans_id) {
         var self = this;
 
-        // Do we need to poll?
-        if (!pgTools.DirectProfile.is_polling_required) {
-          return;
-        }
-
         // Make ajax call to listen the database message
-        var baseUrl = url_for('profiler.poll_end_execution_result', {
+        var baseUrl = url_for(
+          'profiler.start_monitor', {
             'trans_id': trans_id,
-          }),
-          poll_end_timeout;
+          });
+        $.ajax({
+          url: baseUrl,
+          method: 'GET',
+        })
+          .done(function(res) {
+            if (res.data.status === 'Success') {
+              self.AddResults(res.data.col_info, res.data.result);
 
-        /*
-         * During the execution we should poll the result in minimum seconds
-         * but once the execution is completed and wait for the another
-         * profiling session then we should decrease the polling frequency.
-         */
-        if (pgTools.DirectProfile.polling_timeout_idle) {
-          // Poll the result to check that execution is completed or not
-          // after 1200 ms
-          poll_end_timeout = 1200;
-        } else {
-          // Poll the result to check that execution is completed or not
-          // after 350 ms
-          poll_end_timeout = 250;
-        }
-
-        setTimeout(
-          function() {
-            $.ajax({
-              url: baseUrl,
-              method: 'GET',
-            })
-              .done(function(res) {
-                if (res.data.status === 'Success') {
-                  if (res.data.result == undefined) {
-                  /*
-                   "result" is undefined only in case of EDB procedure.
-                   As Once the EDB procedure execution is completed then we are
-                   not getting any result so we need ignore the result.
-                  */
-
-                    pgTools.DirectProfile.direct_execution_completed = true;
-                    pgTools.DirectProfile.polling_timeout_idle = true;
-
-                    //Set the alertify message to inform the user that execution is completed.
-                    Alertify.success(res.info, 3);
-
-                    // Execution completed so disable the buttons other than
-                    // "Continue/Start" button because user can still
-                    // start the same execution again.
-                    setTimeout(function() {
-                      self.enable('start', false);
-                      self.enable('save', false);
-                    }, 500);
-
-                    // Stop further polling
-                    pgTools.DirectProfile.is_polling_required = false;
-                  } else {
-                  // Call function to create and update local variables ....
-                    if (res.data.result != null) {
-                      self.AddResults(res.data.col_info, res.data.result);
-                      pgTools.DirectProfile.results_panel.focus();
-                      pgTools.DirectProfile.direct_execution_completed = true;
-                      pgTools.DirectProfile.polling_timeout_idle = true;
-
-                      //Set the alertify message to inform the user that execution is completed.
-                      Alertify.success(res.info, 3);
-
-                      // Execution completed so disable the buttons other than
-                      // "Continue/Start" button because user can still
-                      // start the same execution again.
-                      setTimeout(function() {
-                        self.enable('start', false);
-                        self.enable('save', false);
-                      }, 500);
-
-                      // Stop further pooling
-                      pgTools.DirectProfile.is_polling_required = false;
-                    }
-                  }
-                } else if (res.data.status === 'Busy') {
-                // If status is Busy then poll the result by recursive call to
-                // the poll function
-                  self.poll_end_execution_result(trans_id);
-
-                } else if (res.data.status === 'NotConnected') {
-                  Alertify.alert(
-                    gettext('Profiler poll end execution error'),
-                    res.data.result
-                  );
-                } else if (res.data.status === 'ERROR') {
-                  pgTools.DirectProfile.direct_execution_completed = true;
-
-                  //Set the Alertify message to inform the user that execution is
-                  // completed with error.
-                  if (!pgTools.DirectProfile.is_user_aborted_profiling) {
-                    Alertify.error(res.info, 3);
-                  }
-
-                  // Execution completed so disable the buttons other than
-                  // "Continue/Start" button because user can still start the
-                  // same execution again.
-                  self.enable('start', false);
-                  self.enable('save', false);
-
-                  // Stop further pooling
-                  pgTools.DirectProfile.is_polling_required = false;
-                }
+              // Update saved reports
+              var reportsUrl = url_for('profiler.get_reports');
+              $.ajax({
+                url: reportsUrl,
+                method: 'GET',
               })
-              .fail(function() {
-                Alertify.alert(
-                  gettext('Profiler Error'),
-                  gettext('Error while polling result.')
-                );
-              });
-          }, poll_end_timeout);
+                .done(function(res) {
+                  if (res.data.status === 'Success') {
+                    controller.AddReports(res.data.result);
+                  }
+                })
+                .fail(function() {
+                  Alertify.alert(
+                    gettext('Profiler Error'),
+                    gettext('Error while fetching reports.')
+                  );
+                });
+            } else if (res.data.status === 'NotConnected') {
+              Alertify.alert(
+                gettext('Profiler Error'),
+                gettext('Error while starting profiling session.')
+              );
+            }
+          })
+          .fail(function() {
+            Alertify.alert(
+              gettext('Profiler Error'),
+              gettext('Error while starting profiling session.')
+            );
+          });
+
       },
 
       AddResults: function(columns, result) {
@@ -272,7 +195,7 @@ define([
         result_grid.render();
 
         // Render the result grid into result panel
-        pgTools.DirectProfile.results_panel
+        pgTools.Profile.results_panel
           .$container
           .find('.profile_results')
           .append(result_grid.el);
@@ -345,7 +268,7 @@ define([
         param_grid.collection.on(
           'backgrid:edited', (ch1, ch2, command) => {
             profilerUtils.setFocusToProfilerEditor(
-              pgTools.DirectProfile.editor, command
+              pgTools.Profile.editor, command
             );
           }
         );
@@ -353,16 +276,15 @@ define([
         param_grid.render();
 
         // Render the parameters grid into parameter panel
-        pgTools.DirectProfile.parameters_panel
+        pgTools.Profile.parameters_panel
           .$container
           .find('.parameters')
           .append(param_grid.el);
       },
       AddSrc: function(result) {
-        pgTools.DirectProfile.editor.setValue(result);
+        pgTools.Profile.editor.setValue(result);
       },
       AddReports: function(result) {
-        console.warn('adding reports');
         var self = this;
 
         // Remove the existing created grid and update the result values
@@ -473,7 +395,7 @@ define([
         reports_grid.render();
 
         // Render the result grid into result panel
-        pgTools.DirectProfile.reports_panel
+        pgTools.Profile.reports_panel
           .$container
           .find('.reports')
           .append(reports_grid.el);
@@ -519,10 +441,14 @@ define([
       }
     },
     on_start: function() {
-      controller.start_execution(pgTools.DirectProfile.trans_id);
+      if (pgTools.Profile.profile_type == 1) {
+        controller.start_execution(pgTools.Profile.trans_id);
+      } else {
+        controller.start_monitor(pgTools.Profile.trans_id);
+      }
     },
     on_save: function() {
-      controller.save(pgTools.DirectProfile.trans_id);
+      controller.save(pgTools.Profile.trans_id);
     },
     keyAction: function (event) {
       console.warn(event);
@@ -547,9 +473,9 @@ define([
     Function is responsible to create the new wcDocker instance for profiler and
     initialize the profiler panel inside the docker instance.
   */
-  var DirectProfile = function() {};
+  var Profile = function() {};
 
-  _.extend(DirectProfile.prototype, {
+  _.extend(Profile.prototype, {
     /* We should get the transaction id from the server during initialization here */
     load: function(trans_id, profile_type, function_name_with_arguments, layout) {
 
@@ -591,45 +517,36 @@ define([
 
       pgBrowser.bind_beforeunload();
 
+      self.initializePanels();
+      controller.enable_toolbar_buttons();
+
+      // Get reports
+      var reportsUrl = url_for('profiler.get_reports');
+      $.ajax({
+        url: reportsUrl,
+        method: 'GET',
+      })
+        .done(function(res) {
+          if (res.data.status === 'Success') {
+            setTimeout(function(){
+            }, 100);
+
+            controller.AddReports(res.data.result);
+          }
+        })
+        .fail(function() {
+          Alertify.alert(
+            gettext('Profiler Error'),
+            gettext('Error while fetching reports.')
+          );
+        });
+
       // Below code will be executed for indirect profiling
       // indirect profiling - 0  and for direct profiling - 1
       if (trans_id != undefined && !profile_type) {
-        // Make ajax call to execute the and start the target for execution
-        //baseUrl = url_for('profiler.start_listener', {
-        //  'trans_id': trans_id,
-        //});
-
-        /*
-        $.ajax({
-          url: baseUrl,
-          method: 'GET',
-        })
-          .done(function(res) {
-            if (res.data.status) {
-              self.initializePanels();
-              controller.enable_toolbar_buttons();
-              controller.poll_result(trans_id);
-            }
-          })
-          .fail(function(xhr) {
-            try {
-              var err = JSON.parse(xhr.responseText);
-              if (err.success == 0) {
-                Alertify.alert(gettext('Profiler Error'), err.errormsg);
-              }
-            } catch (e) {
-              Alertify.alert(
-                gettext('Profiler Error'),
-                gettext('Error while starting profiling listener.')
-              );
-            }
-          });
-
-        */
+        // TODO: Fix formatting
+        controller.AddSrc(['']);
       } else if (trans_id != undefined && profile_type) { // Direct profiling
-        self.initializePanels();
-        controller.enable_toolbar_buttons();
-
         // Get parameters
         var paramUrl = url_for('profiler.get_parameters', {
           'trans_id': trans_id,
@@ -681,27 +598,6 @@ define([
             Alertify.alert(
               gettext('Profiler Error'),
               gettext('Error while fetching sql source code.')
-            );
-          });
-
-        // Get reports
-        var reportsUrl = url_for('profiler.get_reports');
-        $.ajax({
-          url: reportsUrl,
-          method: 'GET',
-        })
-          .done(function(res) {
-            if (res.data.status === 'Success') {
-              setTimeout(function(){
-              }, 100);
-
-              controller.AddReports(res.data.result);
-            }
-          })
-          .fail(function() {
-            Alertify.alert(
-              gettext('Profiler Error'),
-              gettext('Error while fetching reports.')
             );
           });
       } else {
@@ -957,8 +853,8 @@ define([
     },
   });
 
-  pgTools.DirectProfile = new DirectProfile();
-  pgTools.DirectProfile['jquery'] = $;
+  pgTools.Profile = new Profile();
+  pgTools.Profile['jquery'] = $;
 
-  return pgTools.DirectProfile;
+  return pgTools.Profile;
 });

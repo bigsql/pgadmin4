@@ -180,6 +180,7 @@ define([
               });
 
               var baseUrl = url_for('profiler.initialize_target_indirect', {
+                'profile_type' : 'indirect',
                 'trans_id' : self.setting('trans_id'),
                 'sid' : treeInfo.server._id,
                 'did' : treeInfo.database._id,
@@ -194,7 +195,7 @@ define([
               })
                 .done(function(res) {
                   var url = url_for(
-                    'profiler.indirect', {
+                    'profiler.profile', {
                       'trans_id' : res.data.profilerTransId,
                     }
                   );
@@ -203,14 +204,14 @@ define([
                     window.open(url, '_blank');
                   } else {
                     pgBrowser.Events.once(
-                      'pgadmin-browser:fram:urlload:frm_profiler_indirect',
+                      'pgadmin-browser:fram:urlload:frm_profiler',
                       function(frame) {
                         frame.openURL(url);
                       });
 
                     var dashboardPanel = pgBrowser.docker.findPanels('properties'),
                       panel = pgBrowser.docker.addPanel(
-                        'frm_profiler_indirect', wcDocker.DOCK.STACKED, dashboardPanel[0]
+                        'frm_profiler', wcDocker.DOCK.STACKED, dashboardPanel[0]
                       );
 
                     panel.focus();

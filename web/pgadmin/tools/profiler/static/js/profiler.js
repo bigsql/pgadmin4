@@ -91,19 +91,7 @@ define([
         url: 'about:blank',
       });
 
-      // Create and load the new frame required for debugger panel
-      this.frame_indirect = new pgBrowser.Frame({
-        name: 'frm_profiler_indirect',
-        title: gettext('Profiler - Indirect'),
-        width: 500,
-        isCloseable: true,
-        isPrivate: true,
-        icon: 'fa fa-bullseye',
-        url: 'about:blank',
-      });
-
       this.frame.load(pgBrowser.docker);
-      this.frame_indirect.load(pgBrowser.docker);
 
       let self = this;
       let cacheIntervalId = setInterval(function() {

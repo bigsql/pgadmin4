@@ -730,7 +730,7 @@ define([
                 })
                   .done(function(res) {
                     var url = url_for(
-                      'profiler.direct', {
+                      'profiler.profile', {
                         'trans_id': res.data.profilerTransId,
                       }
                     );
