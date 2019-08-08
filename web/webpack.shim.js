@@ -280,6 +280,7 @@ var webpackShimConfig = {
     'pgadmin.tools.profiler.controller': path.join(__dirname, './pgadmin/tools/profiler/static/js/profiler'),
     'pgadmin.tools.profiler.direct': path.join(__dirname, './pgadmin/tools/profiler/static/js/direct'),
     'pgadmin.tools.profiler.ui': path.join(__dirname, './pgadmin/tools/profiler/static/js/profiler_ui'),
+    'pgadmin.tools.profiler.options': path.join(__dirname, './pgadmin/tools/profiler/static/js/profiler_options'),
     'pgadmin.tools.profiler.utils': path.join(__dirname, './pgadmin/tools/profiler/static/js/profiler_utils'),
     'pgadmin.tools.grant_wizard': path.join(__dirname, './pgadmin/tools/grant_wizard/static/js/grant_wizard'),
     'pgadmin.tools.import_export': path.join(__dirname, './pgadmin/tools/import_export/static/js/import_export'),

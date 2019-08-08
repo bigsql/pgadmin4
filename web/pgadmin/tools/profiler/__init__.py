@@ -89,12 +89,12 @@ class ProfilerModule(PgAdminModule):
     # TODO: Keyboard shortcuts
 
     def get_exposed_url_endpoints(self):
-        return ['profiler.index', 'profiler.init_for_function',
-                'profiler.init_for_trigger',
+        return ['profiler.index', 'profiler.init_for_database',
+                'profiler.init_for_trigger', 'profiler.init_for_function',
                 'profiler.direct', 'profiler.initialize_target_for_function',
                 'profiler.initialize_target_for_trigger', 'profiler.close',
                 'profiler.get_parameters',
-                #'profiler.restart',
+                'profiler.initialize_target_indirect',
                 #'profiler.start_listener',
                 'profiler.start_execution',
                 'profiler.show_report', 'profiler.get_src',
@@ -161,6 +161,10 @@ def script_profiler_direct_js():
 ####################################################################################################
 
 @blueprint.route(
+    '/init/<node_type>/<int:sid>/<int:did>',
+    methods=['GET'], endpoint='init_for_database'
+)
+@blueprint.route(
     '/init/<node_type>/<int:sid>/<int:did>/<int:scid>/<int:fid>',
     methods=['GET'], endpoint='init_for_function'
 )
@@ -169,7 +173,7 @@ def script_profiler_direct_js():
     methods=['GET'], endpoint='init_for_trigger'
 )
 @login_required
-def init_function(node_type, sid, did, scid, fid, trid=None):
+def init_function(node_type, sid, did, scid=None, fid=None, trid=None):
     """
     init_function(node_type, sid, did, scid, fid, trid)
 
@@ -201,6 +205,11 @@ def init_function(node_type, sid, did, scid, fid, trid=None):
     manager = get_driver(PG_DEFAULT_DRIVER).connection_manager(sid)
     conn = manager.connection(did=did)
 
+    # Determine profiling type
+    profile_type = ''
+    if node_type is 'database':
+        profile_type = 'indirect'
+
     # Get the server version, server type and user information
     server_type = manager.server_type
     user = manager.user_info
@@ -210,101 +219,119 @@ def init_function(node_type, sid, did, scid, fid, trid=None):
 
     sql = ''
 
-    if node_type == 'trigger':
-        # Find trigger function id from trigger id
-        sql = render_template(
-            "/".join([template_path, 'get_trigger_function_info.sql']),
-            table_id=fid, trigger_id=trid
+    if profile_type is 'indirect':
+        pfl_inst = ProfilerInstance()
+
+        # No function data because we are not running a function to profile
+        pfl_inst.function_data = {}
+
+        return make_json_response(
+            data=dict(
+                db_info={
+                    'sid' : sid,
+                    'did' : did
+                },
+                trans_id=pfl_inst.trans_id
+            ),
+            status=200
         )
 
-        status, tr_set = conn.execute_dict(sql)
+    else:
+        if node_type == 'trigger':
+            # Find trigger function id from trigger id
+            sql = render_template(
+                "/".join([template_path, 'get_trigger_function_info.sql']),
+                table_id=fid, trigger_id=trid
+            )
+
+            status, tr_set = conn.execute_dict(sql)
+            if not status:
+                current_app.logger.debug(
+                    "Error retrieving trigger function information from database")
+                return internal_server_error(errormsg=tr_set)
+
+            fid = tr_set['rows'][0]['tgfoid']
+
+        sql = render_template(
+            "/".join([template_path, 'get_function_profile_info.sql']),
+            is_ppas_database=False, # edb/other packages not supported fo rnow
+            hasFeatureFunctionDefaults=True,
+            fid=fid,
+            is_proc_supported=False # procedures not supported for now
+        )
+
+        status, r_set = conn.execute_dict(sql)
         if not status:
             current_app.logger.debug(
-                "Error retrieving trigger function information from database")
-            return internal_server_error(errormsg=tr_set)
+                "Error retrieving function information from database")
+            return internal_server_error(errormsg=r_set)
 
-        fid = tr_set['rows'][0]['tgfoid']
+        ret_status = status
 
-    sql = render_template(
-        "/".join([template_path, 'get_function_profile_info.sql']),
-        is_ppas_database=False, # edb/other packages not supported fo rnow
-        hasFeatureFunctionDefaults=True,
-        fid=fid,
-        is_proc_supported=False # procedures not supported for now
-    )
+        # TODO: error checking (e.g. checking if extension is installed)
 
-    status, r_set = conn.execute_dict(sql)
-    if not status:
-        current_app.logger.debug(
-            "Error retrieving function information from database")
-        return internal_server_error(errormsg=r_set)
+        # Return the response that function cannot be profiled...
+        if not ret_status:
+            current_app.logger.debug(msg)
+            return internal_server_error(msg)
 
-    ret_status = status
+        data = {'name': r_set['rows'][0]['proargnames'],
+                'type': r_set['rows'][0]['proargtypenames'],
+                'use_default': r_set['rows'][0]['pronargdefaults'],
+                'default_value': r_set['rows'][0]['proargdefaults'],
+                'require_input': True}
 
-    # TODO: error checking (e.g. checking if extension is installed)
+        # Below will check do we really required for the user input arguments and
+        # show input dialog
+        if not r_set['rows'][0]['proargtypenames']:
+            data['require_input'] = False
+        else:
+            if r_set['rows'][0]['pkg'] != 0 and \
+                    r_set['rows'][0]['pkgconsoid'] != 0:
+                data['require_input'] = True
 
-    # Return the response that function cannot be profiled...
-    if not ret_status:
-        current_app.logger.debug(msg)
-        return internal_server_error(msg)
+            if r_set['rows'][0]['proargmodes']:
+                pro_arg_modes = r_set['rows'][0]['proargmodes'].split(",")
+                for pr_arg_mode in pro_arg_modes:
+                    if pr_arg_mode == 'o' or pr_arg_mode == 't':
+                        data['require_input'] = False
+                        continue
+                    else:
+                        data['require_input'] = True
+                        break
 
-    data = {'name': r_set['rows'][0]['proargnames'],
-            'type': r_set['rows'][0]['proargtypenames'],
+        r_set['rows'][0]['require_input'] = data['require_input']
+
+        # Create a profiler instance
+        pfl_inst = ProfilerInstance()
+        pfl_inst.function_data = {
+            'oid': fid,
+            'src': r_set['rows'][0]['prosrc'],
+            'name': r_set['rows'][0]['name'],
+            'is_func': r_set['rows'][0]['isfunc'],
+            'is_ppas_database': False,
+            'is_callable': False,
+            'schema': r_set['rows'][0]['schemaname'],
+            'language': r_set['rows'][0]['lanname'],
+            'return_type': r_set['rows'][0]['rettype'],
+            'args_type': r_set['rows'][0]['proargtypenames'],
+            'args_name': r_set['rows'][0]['proargnames'],
+            'arg_mode': r_set['rows'][0]['proargmodes'],
             'use_default': r_set['rows'][0]['pronargdefaults'],
             'default_value': r_set['rows'][0]['proargdefaults'],
-            'require_input': True}
+            'pkgname': r_set['rows'][0]['pkgname'],
+            'pkg': r_set['rows'][0]['pkg'],
+            'require_input': data['require_input'],
+            'args_value': ''
+        }
 
-    # Below will check do we really required for the user input arguments and
-    # show input dialog
-    if not r_set['rows'][0]['proargtypenames']:
-        data['require_input'] = False
-    else:
-        if r_set['rows'][0]['pkg'] != 0 and \
-                r_set['rows'][0]['pkgconsoid'] != 0:
-            data['require_input'] = True
-
-        if r_set['rows'][0]['proargmodes']:
-            pro_arg_modes = r_set['rows'][0]['proargmodes'].split(",")
-            for pr_arg_mode in pro_arg_modes:
-                if pr_arg_mode == 'o' or pr_arg_mode == 't':
-                    data['require_input'] = False
-                    continue
-                else:
-                    data['require_input'] = True
-                    break
-
-    r_set['rows'][0]['require_input'] = data['require_input']
-
-    # Create a profiler instance
-    pfl_inst = ProfilerInstance()
-    pfl_inst.function_data = {
-        'oid': fid,
-        'src': r_set['rows'][0]['prosrc'],
-        'name': r_set['rows'][0]['name'],
-        'is_func': r_set['rows'][0]['isfunc'],
-        'is_ppas_database': False,
-        'is_callable': False,
-        'schema': r_set['rows'][0]['schemaname'],
-        'language': r_set['rows'][0]['lanname'],
-        'return_type': r_set['rows'][0]['rettype'],
-        'args_type': r_set['rows'][0]['proargtypenames'],
-        'args_name': r_set['rows'][0]['proargnames'],
-        'arg_mode': r_set['rows'][0]['proargmodes'],
-        'use_default': r_set['rows'][0]['pronargdefaults'],
-        'default_value': r_set['rows'][0]['proargdefaults'],
-        'pkgname': r_set['rows'][0]['pkgname'],
-        'pkg': r_set['rows'][0]['pkg'],
-        'require_input': data['require_input'],
-        'args_value': ''
-    }
-
-    return make_json_response(
-        data=dict(
-            profile_info=r_set['rows'],
-            trans_id=pfl_inst.trans_id
-        ),
-        status=200
-    )
+        return make_json_response(
+            data=dict(
+                profile_info=r_set['rows'],
+                trans_id=pfl_inst.trans_id
+            ),
+            status=200
+        )
 
 @blueprint.route('/direct/<int:trans_id>', methods=['GET'], endpoint='direct')
 #@login_required
@@ -384,6 +411,46 @@ def direct_new(trans_id):
     )
 
 @blueprint.route(
+    '/initialize_target_indirect/<profile_type>/<int:trans_id>/<int:sid>/<int:did>/',
+    methods=['GET', 'POST'],
+    endpoint='initialize_target_indirect'
+)
+@login_required
+def initialize_target(profile_type, trans_id, sid, did):
+    # Create asynchronous connection using random connection id.
+    conn_id = str(random.randint(1, 9999999))
+    try:
+        manager = get_driver(PG_DEFAULT_DRIVER).connection_manager(sid)
+        conn = manager.connection(did=did, conn_id=conn_id)
+    except Exception as e:
+        return internal_server_error(errormsg=str(e))
+
+    # Connect the Server
+    status, msg = conn.connect()
+    if not status:
+        return internal_server_error(errormsg=str(msg))
+
+    user = manager.user_info
+
+    status_in, rid_pre = conn.execute_scalar("SHOW shared_preload_libraries")
+    if not status_in:
+        return internal_server_error(
+            gettext("Could not fetch profiler plugin information.")
+        )
+
+    # Need to check if plugin is really loaded or not with "plprofiler" string
+    if profile_type == 'indirect':
+        if "plprofiler" not in rid_pre:
+            msg = gettext(
+                "The profiler plugin is not enabled. "
+                "Please add the plugin to the shared_preload_libraries "
+                "setting in the postgresql.conf file and restart the "
+                "database server for indirect profiling."
+            )
+            current_app.logger.debug(msg)
+            return internal_server_error(msg)
+
+@blueprint.route(
     '/initialize_target/<profile_type>/<int:trans_id>/<int:sid>/<int:did>/'
     '<int:scid>/<int:func_id>',
     methods=['GET', 'POST'],
@@ -438,18 +505,6 @@ def initialize_target(profile_type, trans_id, sid, did,
         return internal_server_error(
             gettext("Could not fetch profiler plugin information.")
         )
-
-    # Need to check if plugin is really loaded or not with "plprofiler" string
-    if profile_type == 'indirect':
-        if "plprofiler" not in rid_pre:
-            msg = gettext(
-                "The profiler plugin is not enabled. "
-                "Please add the plugin to the shared_preload_libraries "
-                "setting in the postgresql.conf file and restart the "
-                "database server for indirect profiling."
-            )
-            current_app.logger.debug(msg)
-            return internal_server_error(msg)
 
     # Need to check if plugin is not loaded or not with "plprofiler" string
     if profile_type == 'direct':
@@ -655,7 +710,7 @@ def generate_direct_report(conn, name, opt_top, func_oids = None):
 
         opt_top
 
-        funco_oids
+        func_oids
     """
 
     # ----
@@ -700,9 +755,9 @@ def generate_direct_report(conn, name, opt_top, func_oids = None):
     func_list = []
     for row in result:
         func_list.append({
+                'funcname': str(row['proname']),
                 'funcoid':  str(row['oid']),
                 'schema': str(row['nspname']),
-                'funcname': str(row['proname']),
             })
 
     # ----
@@ -726,11 +781,12 @@ def generate_direct_report(conn, name, opt_top, func_oids = None):
         if row['func_oid'] not in linestats:
             linestats[row['func_oid']] = []
         linestats[row['func_oid']].append((row['func_oid'],
-                                          int(row['line_number']),
-                                          int(row['exec_count']),
-                                          int(row['total_time']),
-                                          int(row['longest_time']),
+                                          (row['line_number']),
+                                          (row['exec_count']),
+                                          (row['total_time']),
+                                          (row['longest_time']),
                                           row['source']))
+
     # ----
     # Build a list of function definitions in the order, specified
     # by the func_oids list. This is either the oids, requested by
@@ -807,9 +863,11 @@ def generate_direct_report(conn, name, opt_top, func_oids = None):
     callgraph = []
     for row in result:
         flamedata += str(row['array_to_string']) + " " + str(row['us_self']) + "\n"
-        callgraph.append([row['stack'], row['call_count'], row['call_count'], row['us_total'], row['us_children'], row['us_self']])
-
-
+        callgraph.append((row['stack'],
+                          int(row['call_count']),
+                          int(row['us_total']),
+                          int(row['us_children']),
+                          int(row['us_self'])))
     return {
             'config': {
                        'name': name,

@@ -362,6 +362,7 @@ define([
         pgTools.DirectProfile.editor.setValue(result);
       },
       AddReports: function(result) {
+        console.warn('adding reports');
         var self = this;
 
         // Remove the existing created grid and update the result values
@@ -691,6 +692,9 @@ define([
         })
           .done(function(res) {
             if (res.data.status === 'Success') {
+              setTimeout(function(){
+              }, 100);
+
               controller.AddReports(res.data.result);
             }
           })

@@ -11,11 +11,11 @@ define([
   'sources/gettext', 'sources/url_for', 'jquery', 'underscore',
   'underscore.string', 'alertify', 'sources/pgadmin', 'pgadmin.browser',
   'backbone', 'pgadmin.backgrid', 'codemirror', 'pgadmin.backform',
-  'pgadmin.tools.profiler.ui', 'pgadmin.tools.profiler.utils',
+  'pgadmin.tools.profiler.ui', 'pgadmin.tools.profiler.options', 'pgadmin.tools.profiler.utils',
   'wcdocker', 'pgadmin.browser.frame',
 ], function(
   gettext, url_for, $, _, S, Alertify, pgAdmin, pgBrowser, Backbone, Backgrid,
-  CodeMirror, Backform, get_function_arguments, profilerUtils
+  CodeMirror, Backform, get_function_arguments, get_option_arguments, profilerUtils
 ) {
   var pgTools = pgAdmin.Tools = pgAdmin.Tools || {},
     wcDocker = window.wcDocker;
@@ -66,7 +66,7 @@ define([
         node: 'database',
         module: this,
         applies: ['object', 'context'],
-        callback: 'get_function_information',
+        callback: 'get_options',
         category: gettext('Profiling'),
         priority: 11,
         label:gettext('Monitor'),
@@ -91,7 +91,19 @@ define([
         url: 'about:blank',
       });
 
+      // Create and load the new frame required for debugger panel
+      this.frame_indirect = new pgBrowser.Frame({
+        name: 'frm_profiler_indirect',
+        title: gettext('Profiler - Indirect'),
+        width: 500,
+        isCloseable: true,
+        isPrivate: true,
+        icon: 'fa fa-bullseye',
+        url: 'about:blank',
+      });
+
       this.frame.load(pgBrowser.docker);
+      this.frame_indirect.load(pgBrowser.docker);
 
       let self = this;
       let cacheIntervalId = setInterval(function() {
@@ -106,10 +118,7 @@ define([
       });
 
     },
-
-    can_profile: function(itemData, item, data) {
-      console.warn(data);
-
+    can_profile: function(itemData, item) {
       var t = pgBrowser.tree,
         i = item,
         d = itemData;
@@ -143,6 +152,7 @@ define([
       return true;
     },
 
+    // TODO
     can_profile_global: function() {
       return true;
     },
@@ -180,6 +190,35 @@ define([
       });
     },
 
+    get_options: function(args, item) {
+      var t = pgBrowser.tree,
+        i = item || t.selected(),
+        d = i && i.length == 1 ? t.itemData(i) : undefined,
+        node = d && pgBrowser.Nodes[d._type];
+        //self = this,
+        //is_edb_proc = d._type == 'edbproc';
+
+      if (!d)
+        return;
+
+      // Generate the URL to create a profiler instance
+      var treeInfo = node.getTreeNodeHierarchy.apply(node, [i]),
+        initUrl = this.generate_url('init', treeInfo, node);
+
+      $.ajax({
+        url: initUrl,
+        cache: false,
+      })
+        .done(function(res) {
+
+          let db_info = res.data.db_info,
+            trans_id = res.data.trans_id;
+
+          get_option_arguments(db_info, 0, trans_id);
+        });
+
+    },
+
     /*
       Get the function information for the direct profiling to display the functions arguments and  other informations
       in the user input dialog
@@ -203,7 +242,7 @@ define([
         initUrl = this.generate_url('init', treeInfo, node);
 
       $.ajax({
-        url:initUrl,
+        url: initUrl,
         cache: false,
       })
         .done(function(res) {
@@ -302,7 +341,7 @@ define([
               });
 
           }
-          
+
         });
 
     },
