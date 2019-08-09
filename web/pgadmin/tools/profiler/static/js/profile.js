@@ -297,7 +297,7 @@ define([
           defaults: {
             name: undefined,
             profile_type: undefined,
-            schema: undefined,
+            database: undefined,
             time: undefined,
             report_id: undefined,
           },
@@ -308,17 +308,43 @@ define([
           model: ProfilerReportsModel,
         });
 
-        // TODO: implement delete functionality
-        //ReportsCollection.prototype.on(
-        //  'change', self.deposit_parameter_value, self
-        //);
+        // Custom cell for delete button
+        var deleteCell = Backgrid.Cell.extend({
+          className: 'width_percent_10',
 
-        var buttonCell = Backgrid.Cell.extend({
+          events: {
+            'click button' : 'deleteReport',
+          },
+
+          deleteReport: function(e) {
+            e.preventDefault();
+            var reportUrl = url_for(
+              'profiler.delete_report', {
+                'report_id' : this.model.get('report_id'),
+              });
+
+            $.ajax({
+              url : reportUrl,
+              method: 'POST',
+            });
+          },
+
+          render: function() {
+            this.$el.html('<button> Delete </button>');
+            return this;
+          },
+        });
+
+        // Custom cell for show report button
+        var reportCell = Backgrid.Cell.extend({
+          className: 'width_percent_10',
+          
           events: {
             'click button' : 'generateReport',
           },
 
-          generateReport: function() {
+          generateReport: function(e) {
+            e.preventDefault();
             var reportUrl = url_for(
               'profiler.show_report', {
                 'report_id': this.model.get('report_id'),
@@ -349,8 +375,8 @@ define([
           cell: 'string',
         },
         {
-          name: 'schema',
-          label: gettext('Schema'),
+          name: 'database',
+          label: gettext('Database'),
           type: 'text',
           editable: false,
           cell: 'string',
@@ -367,7 +393,14 @@ define([
           label: gettext('Show Report'),
           type: 'text',
           editable: false,
-          cell: buttonCell,
+          cell: reportCell,
+        },
+        {
+          name: 'delete',
+          label: gettext('Delete Report'),
+          type: 'text',
+          editable: false,
+          cell: deleteCell,
         },
         ];
 
@@ -377,7 +410,7 @@ define([
             reports_obj.push({
               'name': result[i].name,
               'profile_type': (result[i].profile_type === true ? 'Direct' : 'Indirect'),
-              'schema': result[i].schema,
+              'database': result[i].database,
               'time': result[i].time,
               'report_id': result[i].report_id,
             });
@@ -527,6 +560,7 @@ define([
         method: 'GET',
       })
         .done(function(res) {
+          console.warn(res.data.result);
           if (res.data.status === 'Success') {
             setTimeout(function(){
             }, 100);

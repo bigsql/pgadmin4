@@ -127,7 +127,7 @@ def index():
 @blueprint.route("/js/profiler.js")
 @login_required
 def script():
-    """render the main profiler javascript file"""
+    """Render the main profiler javascript file"""
     return Response(
         response=render_template("profiler/js/profiler.js", _=gettext),
         status=200,
@@ -137,7 +137,7 @@ def script():
 @blueprint.route("/js/profiler_ui.js")
 @login_required
 def script_profiler_js():
-    """render the profiler UI javascript file"""
+    """Render the profiler UI javascript file"""
     return Response(
         response=render_template("profiler/js/profiler_ui.js", _=gettext),
         status=200,
@@ -654,7 +654,7 @@ def start_monitor(trans_id):
 
     # At this point we have the data in shared memory and need to create a report from it
     report_data = generate_report(conn, 'shared', name='global', opt_top=10, func_oids={})
-    save_report(report_data, 'global', namespace)
+    save_report(report_data, 'global', conn.as_dict()['database'])
 
 
     return make_json_response(
@@ -734,7 +734,7 @@ def start_execution(trans_id):
     conn.execute_async('SELECT pl_profiler_set_collect_interval(0)')
     status, result = conn.execute_async_list(sql)
     report_data = generate_report(conn, 'local', report_name, opt_top=10, func_oids={}) # TODO: Add support for K top
-    report_id = save_report(report_data, report_name, pfl_inst.function_data['schema'])
+    report_id = save_report(report_data, report_name, conn.as_dict()['database'])
     conn.execute_async('SELECT pl_profiler_set_enabled_local(false)')
     conn.execute_async('RESET search_path')
 
@@ -842,7 +842,7 @@ def generate_report(conn, data_location, name, opt_top, func_oids = None):
         status, result = conn.execute_async_list(
         """SELECT stack[array_upper(stack, 1)] as func_oid,
                   sum(us_self) as us_self
-           FROM pl_profiler_callgraph_""" + data_location + """() C 
+           FROM pl_profiler_callgraph_""" + data_location + """() C
            GROUP BY func_oid
            ORDER BY us_self DESC
            LIMIT %s""", (opt_top + 1, ))
@@ -1027,7 +1027,6 @@ def save_report(report_data, name, dbname):
         )
 
         db.session.add(profile_report)
-
         db.session.commit()
 
         return profile_report.rid
