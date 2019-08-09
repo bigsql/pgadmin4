@@ -297,7 +297,7 @@ define([
           defaults: {
             name: undefined,
             profile_type: undefined,
-            database: undefined,
+            schema: undefined,
             time: undefined,
             report_id: undefined,
           },
@@ -349,8 +349,8 @@ define([
           cell: 'string',
         },
         {
-          name: 'database',
-          label: gettext('Database'),
+          name: 'schema',
+          label: gettext('Schema'),
           type: 'text',
           editable: false,
           cell: 'string',
@@ -377,7 +377,7 @@ define([
             reports_obj.push({
               'name': result[i].name,
               'profile_type': (result[i].profile_type === true ? 'Direct' : 'Indirect'),
-              'database': result[i].database,
+              'schema': result[i].schema,
               'time': result[i].time,
               'report_id': result[i].report_id,
             });

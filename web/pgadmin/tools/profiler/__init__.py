@@ -14,8 +14,9 @@ MODULE_NAME = 'profiler'
 # Python imports
 import simplejson as json
 import random
-import re # unnecessary?
+#import re # unnecessary?
 from datetime import datetime
+import time
 
 # Flask imports
 from flask import url_for, Response, render_template, request, session, \
@@ -373,6 +374,7 @@ def profile_new(trans_id):
     user_agent = UserAgent(request.headers.get('User-Agent'))
 
     if profile_type == 1:
+        function_name = pfl_inst.profiler_data['function_name']
 
         function_arguments = '('
         if pfl_inst.profiler_data is not None:
@@ -631,22 +633,28 @@ def start_monitor(trans_id):
                 """)
     namespace = res[0]['nspname']
 
-    conn.execute_async('SET search_path to ' + namespace)
-    conn.execute_async('SELECT pl_profiler_set_enabled_local(true);')
-    conn.execute_async('SELECT pl_profiler_reset_shared()')
-    if (pid is not None):
-        conn.execute_async('SELECT pl_profiler_set_enable_pid(%s)', pid)
-    else:
-        conn.execute_async('SELECT pl_profiler_set_enabled_global(true)')
-    conn.execute_async('SELECT pl_profiler_set_collect_interval' + interval)
-    conn.execute_async('RESET search_path')
     try:
-        time.sleep(int(duration))
+        conn.execute_async('SET search_path to ' + namespace)
+        conn.execute_async('SELECT pl_profiler_reset_shared()')
+        if (pid is not None and pid is not ''):
+            conn.execute_async('SELECT pl_profiler_set_enable_pid(' + pid + ')')
+        else:
+            conn.execute_async('SELECT pl_profiler_set_enabled_global(true)')
+        conn.execute_async('SELECT pl_profiler_set_collect_interval(' + interval + ')')
+        conn.execute_async('RESET search_path')
+        try:
+            time.sleep(int(duration))
+        finally:
+            pass
     finally:
         conn.execute_async('SET search_path to ' + namespace)
         conn.execute_async('SELECT pl_profiler_set_enabled_global(false)')
         conn.execute_async('SELECT pl_profiler_set_enabled_pid(0)')
         conn.execute_async('RESET search_path')
+
+    # At this point we have the data in shared memory and need to create a report from it
+    report_data = generate_report(conn, 'shared', name='global', opt_top=10, func_oids={})
+    save_report(report_data, 'global', namespace)
 
 
     return make_json_response(
@@ -726,7 +734,7 @@ def start_execution(trans_id):
     conn.execute_async('SELECT pl_profiler_set_collect_interval(0)')
     status, result = conn.execute_async_list(sql)
     conn.execute_async('SELECT pl_profiler_set_enabled_local(false)')
-    report_data = generate__report(conn, report_name, opt_top=10, func_oids={}, 'local') # TODO: Add support for K top
+    report_data = generate_report(conn, 'local', report_name, opt_top=10, func_oids={}) # TODO: Add support for K top
     report_id = save_report(report_data, report_name, pfl_inst.function_data['schema'])
     conn.execute_async('RESET search_path')
 
@@ -794,7 +802,7 @@ def get_src(trans_id):
         }
     )
 
-def generate_report(conn, name, opt_top, func_oids = None, data_location):
+def generate_report(conn, data_location, name, opt_top, func_oids = None):
     """
     generate_report(trans_id)
 
@@ -812,6 +820,9 @@ def generate_report(conn, name, opt_top, func_oids = None, data_location):
         data_location
     """
 
+    # Set the template path required to read the sql files
+    template_path = 'profiler/sql'
+
     # ----
     # If not specified, find the top N functions by self time.
     # ----
@@ -819,13 +830,16 @@ def generate_report(conn, name, opt_top, func_oids = None, data_location):
     if func_oids is None or len(func_oids) == 0:
         func_oids_by_user = False
         func_oids = []
-        status, result = \
-            conn.execute_async_list("""SELECT stack[array_upper(stack, 1)] as func_oid,
-                                           sum(us_self) as us_self
-                                       FROM pl_profiler_callgraph_local() C
-                                       GROUP BY func_oid
-                                       ORDER BY us_self DESC
-                                       LIMIT %s""", (opt_top + 1, ))
+
+
+        sql = render_template(
+            "/".join([template_path,
+                      'get_func_oids.sql']),
+            data_location=data_location,
+            opt_top = opt_top
+        )
+
+        status, result = conn.execute_async_list(sql)
         for row in result:
             func_oids.append(int(row['func_oid']))
         if len(func_oids) > opt_top:
@@ -844,13 +858,12 @@ def generate_report(conn, name, opt_top, func_oids = None, data_location):
     # ----
     # Get an alphabetically sorted list of the selected functions.
     # ----
-    status, result = \
-        conn.execute_async_list("""SELECT P.oid, N.nspname, P.proname
-                                   FROM pg_catalog.pg_proc P
-                                   JOIN pg_catalog.pg_namespace N ON N.oid = P.pronamespace
-                                   WHERE P.oid IN (SELECT * FROM unnest(%s))
-                                   ORDER BY upper(nspname), nspname,
-                                            upper(proname), proname""", (func_oids, ))
+    sql = render_template(
+        "/".join([template_path,
+                  'sort_func_oids.sql']),
+        func_oids=func_oids
+    )
+    status, result = conn.execute_async_list(sql);
     func_list = []
     for row in result:
         func_list.append({
@@ -863,19 +876,14 @@ def generate_report(conn, name, opt_top, func_oids = None, data_location):
     # The view for linestats is extremely inefficient. We select
     # all of it once and cache it in a hash table.
     # ----
+    sql = render_template(
+        "/".join([template_path,
+                  'get_linestats.sql']),
+        data_location=data_location
+    )
+
     linestats = {}
-    status, result = \
-        conn.execute_async_list("""SELECT L.func_oid, L.line_number,
-                                   sum(L.exec_count)::bigint AS exec_count,
-                                   sum(L.total_time)::bigint AS total_time,
-                                   max(L.longest_time)::bigint AS longest_time,
-                                   S.source
-                               FROM pl_profiler_linestats_local() L
-                               JOIN pl_profiler_funcs_source(pl_profiler_func_oids_local()) S
-                                   ON S.func_oid = L.func_oid
-                                   AND S.line_number = L.line_number
-                               GROUP BY L.func_oid, L.line_number, S.source
-                               ORDER BY L.func_oid, L.line_number""")
+    status, result = conn.execute_async_list(sql);
     for row in result:
         if row['func_oid'] not in linestats:
             linestats[row['func_oid']] = []
@@ -894,23 +902,17 @@ def generate_report(conn, name, opt_top, func_oids = None, data_location):
     # ----
     func_defs = []
     for func_oid in func_oids:
+        sql = render_template(
+            "/".join([template_path,
+                      'get_func_defs.sql']),
+            data_location=data_location,
+            func_oid=func_oid
+        )
+
         # ----
         # First get the function definition and overall stats.
         # ----
-        status, result = \
-            conn.execute_async_list("""WITH SELF AS (SELECT
-                                               stack[array_upper(stack, 1)] as func_oid,
-                                                   sum(us_self) as us_self
-                                               FROM pl_profiler_callgraph_local()
-                                               GROUP BY func_oid)
-                                       SELECT P.oid, N.nspname, P.proname,
-                                           pg_catalog.pg_get_function_result(P.oid),
-                                           pg_catalog.pg_get_function_arguments(P.oid),
-                                           coalesce(SELF.us_self, 0) as self_time
-                                           FROM pg_catalog.pg_proc P
-                                           JOIN pg_catalog.pg_namespace N ON N.oid = P.pronamespace
-                                           LEFT JOIN SELF ON SELF.func_oid = P.oid
-                                           WHERE P.oid = %s""", (func_oid, ))
+        status, result = conn.execute_async_list(sql)
         row = result[0]
         if row is None:
             raise Exception("function with Oid %d not found\n" %func_oid)
@@ -949,15 +951,13 @@ def generate_report(conn, name, opt_top, func_oids = None, data_location):
     # ----
     # Get the callgraph data.
     # ----
-    status, result = \
-        conn.execute_async_list("""SELECT
-                                           array_to_string(pl_profiler_get_stack(stack), ';'),
-                                           stack,
-                                           call_count,
-                                           us_total,
-                                           us_children,
-                                           us_self
-                        FROM pl_profiler_callgraph_local()""")
+    sql = render_template(
+        "/".join([template_path,
+                  'get_callgraph_data.sql']),
+        data_location=data_location
+    )
+    status, result = conn.execute_async_list(sql)
+
     flamedata = ""
     callgraph = []
     for row in result:
@@ -967,6 +967,16 @@ def generate_report(conn, name, opt_top, func_oids = None, data_location):
                           int(row['us_total']),
                           int(row['us_children']),
                           int(row['us_self'])))
+
+    if data_location == 'shared':
+        sql = render_template(
+            "/".join([template_path,
+                  'get_overflow_flags.sql'])
+        )
+        status, result = conn.execute_async_list(sql)
+        overflow_flags = result[0]
+        print(overflow_flags)
+
     return {
             'config': {
                        'name': name,
@@ -977,9 +987,12 @@ def generate_report(conn, name, opt_top, func_oids = None, data_location):
                        'desc': '<h1>PL Profiler Report for %s</h1>\n' %(name, ) +
                                '<p>\n<!-- description here -->\n</p>'
                       },
-            'callgraph_overflow': False,
-            'functions_overflow': False,
-            'lines_overflow': False,
+            'callgraph_overflow':
+                False if data_location == 'local' else overflow_flags['pl_profiler_callgraph_overflow'],
+            'functions_overflow':
+                False if data_location == 'local' else overflow_flags[['pl_profiler_functions_overflow'],
+            'lines_overflow':
+                False if data_location == 'local' else overflow_flags['pl_profiler_lines_overflow'],
             'func_list': func_list,
             'func_defs': func_defs,
             'flamedata': flamedata,
@@ -1215,7 +1228,7 @@ def get_reports():
     reports = []
     for report in saved_reports:
         reports.append({'name' : report.name,
-                        'database' : report.dbname,
+                        'schema' : report.dbname,
                         'time' : report.time,
                         'profile_type' : report.direct,
                         'report_id' : report.rid})
