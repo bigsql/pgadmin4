@@ -1,0 +1,286 @@
+/////////////////////////////////////////////////////////////
+//
+//
+// TODO: support for restart_profile
+//
+//
+//
+/////////////////////////////////////////////////////////////
+
+define([
+  'sources/gettext', 'sources/url_for', 'jquery', 'underscore', 'backbone',
+  'pgadmin.alertifyjs', 'sources/pgadmin', 'pgadmin.browser',
+  'pgadmin.backgrid', 'wcdocker',
+], function(
+  gettext, url_for, $, _, Backbone, Alertify, pgAdmin, pgBrowser, Backgrid
+) {
+
+  var wcDocker = window.wcDocker;
+
+  var ProfilerReportOptionsModel = Backbone.Model.extend({
+    defaults: {
+      option: undefined,
+      value: undefined,
+    },
+    validate: function() {
+      if (_.isUndefined(this.get('value')) ||
+        _.isNull(this.get('value')) ||
+        String(this.get('value')).replace(/^\s+|\s+$/g, '') == '') {
+        var msg = gettext('Please enter a value for the parameter.');
+        this.errorModel.set('value', msg);
+        return msg;
+      } else {
+        this.errorModel.unset('value');
+      }
+      return null;
+    },
+  });
+
+  // Collection which contains the model for function informations.
+  var ProfilerReportOptionsCollections = Backbone.Collection.extend({
+    model: ProfilerReportOptionsModel,
+  });
+
+  var res = function(trans_id, function_name_with_arguments) {
+    if (!Alertify.profilerReportOptionsDialog) {
+      Alertify.dialog('profilerReportOptionsDialog', function factory() {
+        return {
+          main: function(title, trans_id, function_name_with_arguments) {
+            this.preferences = window.top.pgAdmin.Browser.get_preferences_for_module('profiler');
+            this.set('title', title);
+
+            // setting value in alertify settings allows us to access it from
+            // other functions other than main function.
+            this.set('trans_id', trans_id);
+            this.set('function_name_with_arguments', function_name_with_arguments);
+            // console.warn(function_name_with_arguments)
+
+            var my_obj = [];
+            my_obj.push({
+              'option' : 'Name',
+              'value'  : function_name_with_arguments,
+            }, {
+              'option' : 'Title',
+              'value'  : 'Pl/Profiler Report for ' + function_name_with_arguments,
+            },
+            {
+              'option' : 'Description',
+              'value'  : '',
+            },);
+
+            var option_header = Backgrid.HeaderCell.extend({
+              // Add fixed width to the "option" column
+              className: 'width_percent_15',
+            });
+
+
+            var gridCols = [{
+              name: 'option',
+              label: gettext('Option'),
+              type: 'text',
+              editable: false,
+              cell: 'string',
+              headerCell: option_header,
+            },
+            {
+              name: 'value',
+              label: gettext('Value'),
+              type: 'text',
+              cell: 'string',
+            },
+            ];
+
+            this.ProfilerReportOptionsColl =
+                new ProfilerReportOptionsCollections(my_obj);
+
+            // Initialize a new Grid instance
+            if (this.grid) {
+              this.grid.remove();
+              this.grid = null;
+            }
+            var grid = this.grid = new Backgrid.Grid({
+              columns: gridCols,
+              collection: this.ProfilerReportOptionsColl,
+              className: 'backgrid table table-bordered table-noouter-border table-bottom-border',
+            });
+
+            grid.render();
+            $(this.elements.content).html(grid.el);
+
+            // For keyboard navigation in the grid
+            // we'll set focus on checkbox from the first row if any
+            var grid_checkbox = $(grid.el).find('input:checkbox').first();
+            if (grid_checkbox.length) {
+              setTimeout(function() {
+                grid_checkbox.trigger('click');
+              }, 250);
+            }
+
+          },
+          settings: {
+            trans_id: undefined,
+          },
+          setup: function() {
+            return {
+              buttons: [{
+                text: gettext('Cancel'),
+                key: 27,
+                className: 'btn btn-secondary fa fa-times pg-alertify-button',
+              },{
+                text: gettext('Submit'),
+                key: 13,
+                className: 'btn btn-primary fa fa-bullseye pg-alertify-button', // TODO: replace icon
+              }],
+              // Set options for dialog
+              options: {
+                //disable both padding and overflow control.
+                padding: !1,
+                overflow: !1,
+                model: 0,
+                resizable: true,
+                maximizable: true,
+                pinnable: false,
+                closableByDimmer: false,
+                modal: false,
+              },
+            };
+          },
+          // Callback functions when click on the buttons of the Alertify dialogs
+          callback: function(e) {
+            if (e.button.text === gettext('Submit')) {
+              // Initialize the target once the debug button is clicked and
+              // create asynchronous connection and unique transaction ID
+              var self = this;
+
+              var options_value_list = [];
+              // TODO
+              // var sqlite_options_list = this.sqlite_options_list = [];
+
+              this.grid.collection.each(function(m) {
+                options_value_list.push({
+                  'option': m.get('option'),
+                  'value': m.get('value'),
+                });
+              });
+
+              var baseUrl = url_for('profiler.input_report_options', {
+                'trans_id' : self.setting('trans_id'),
+              });
+
+              $.ajax({
+                url: baseUrl,
+                method: 'POST',
+                data: {
+                  'data': JSON.stringify(options_value_list),
+                },
+              })
+                .done(function(res) {
+                  var url = url_for(
+                    'profiler.profile', {
+                      'trans_id' : res.data.profilerTransId,
+                    }
+                  );
+
+                  if (self.preferences.profiler_new_browser_tab) {
+                    window.open(url, '_blank');
+                  } else {
+                    pgBrowser.Events.once(
+                      'pgadmin-browser:fram:urlload:frm_profiler',
+                      function(frame) {
+                        frame.openURL(url);
+                      });
+
+                    var dashboardPanel = pgBrowser.docker.findPanels('properties'),
+                      panel = pgBrowser.docker.addPanel(
+                        'frm_profiler', wcDocker.DOCK.STACKED, dashboardPanel[0]
+                      );
+
+                    panel.focus();
+
+                    // Panel Closed event
+                    panel.on(wcDocker.EVENT.CLOSED, function() {
+                      var closeUrl = url_for('profiler.close', {
+                        'trans_id': res.data.profilerTransId,
+                      });
+                      $.ajax({
+                        url: closeUrl,
+                        method: 'DELETE',
+                      });
+                    });
+                  }
+
+                })
+                .fail(function(e) {
+                  Alertify.alert(
+                    gettext('Profiler Initialization Error'),
+                    e.responseJSON.errormsg
+                  );
+                });
+
+              return true;
+            }
+
+
+            if (e.button.text === gettext('Cancel')) {
+              /* Clear the trans id */
+              $.ajax({
+                method: 'DELETE',
+                url: url_for('profiler.close', {'trans_id': this.setting('trans_id')}),
+              });
+
+              return false;
+            }
+          },
+          build: function() {
+            Alertify.pgDialogBuild.apply(this);
+          },
+          prepare: function() {
+            // Add our class to alertify
+            $(this.elements.body.childNodes[0]).addClass(
+              'alertify_tools_dialog_properties obj_properties'
+            );
+
+            /*
+             Listen to the grid change event so that if any value changed by user then we can enable/disable the
+             profile button.
+            */
+            this.grid.listenTo(this.profilerReportOptionsColl, 'backgrid:edited',
+              (function(obj) {
+
+                return function() {
+
+                  var enable_btn = false;
+
+                  for (var i = 0; i < this.collection.length; i++) {
+
+                    if (this.collection.models[i].get('is_null')) {
+                      obj.__internal.buttons[1].element.disabled = false;
+                      enable_btn = true;
+                      continue;
+                    }
+                  }
+                  if (!enable_btn)
+                    obj.__internal.buttons[1].element.disabled = false;
+                };
+              })(this)
+            );
+
+            this.grid.listenTo(this.profilerReportOptionsColl, 'backgrid:error',
+              (function(obj) {
+                return function() {
+                  obj.__internal.buttons[1].element.disabled = true;
+                };
+              })(this)
+            );
+          },
+        };
+      });
+    }
+
+    Alertify.profilerReportOptionsDialog(
+      gettext('Profiler'), trans_id, function_name_with_arguments
+    ).resizeTo(pgBrowser.stdW.md,pgBrowser.stdH.md);
+  };
+
+  return res;
+});

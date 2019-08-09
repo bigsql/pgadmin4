@@ -578,7 +578,6 @@ def initialize_target(profile_type, trans_id, sid, did,
         'function_id': func_id,
         'function_name': pfl_inst.function_data['name'],
         'profile_type': profile_type,
-        'profiler_version': 1.0, # Placeholder
         'restart_profile': 0
     }
 
@@ -712,9 +711,6 @@ def start_execution(trans_id):
     if not status:
         return internal_server_error(errormsg=str(msg))
 
-    # find the debugger version and execute the query accordingly
-    pfl_version = 1.0 # TODO: determine profiler version, there is plprofiler function for this
-
     # Render the sql to run the function/procedure here
     func_name = pfl_inst.function_data['name']
     func_args = pfl_inst.function_data['args_value']
@@ -728,16 +724,25 @@ def start_execution(trans_id):
 
     report_name = func_name
 
-    conn.execute_async('SET search_path to ' + pfl_inst.function_data['schema'] + ';')
-    conn.execute_async('SELECT pl_profiler_set_enabled_local(true)')
-    conn.execute_async('SELECT pl_profiler_reset_local()')
-    conn.execute_async('SELECT pl_profiler_set_collect_interval(0)')
-    status, result = conn.execute_async_list(sql)
-    report_data = generate_report(conn, 'local', report_name, opt_top=10, func_oids={}) # TODO: Add support for K top
-    report_id = save_report(report_data, report_name, conn.as_dict()['database'], pfl_inst.profiler_data['profile_type'])
-    conn.execute_async('SELECT pl_profiler_set_enabled_local(false)')
-    conn.execute_async('RESET search_path')
+    try:
+        conn.execute_async('SET search_path to ' + pfl_inst.function_data['schema'] + ';')
+        conn.execute_async('SELECT pl_profiler_set_enabled_local(true)')
+        conn.execute_async('SELECT pl_profiler_reset_local()')
+        conn.execute_async('SELECT pl_profiler_set_collect_interval(0)')
+        status, result = conn.execute_async_list(sql)
+        report_data = generate_report(conn, 'local', report_name, opt_top=10, func_oids={}) # TODO: Add support for K top
+        report_id = save_report(report_data, report_name, conn.as_dict()['database'], pfl_inst.profiler_data['profile_type'])
+        conn.execute_async('SELECT pl_profiler_set_enabled_local(false)')
+        conn.execute_async('RESET search_path')
+    except Exception as e:
+        return make_json_response(
+            data={
+                'status': 'ERROR',
+                'result': str(e),
+            }
+        )
 
+    # Format the result to display the result to client
     columns = {}
 
     # TODO: Test functionality for multiple return values
@@ -806,16 +811,14 @@ def show_report(report_id):
     report_data = ProfilerSavedReports.query.filter_by(rid=report_id).first()
     path = str(current_app.root_path) + '/instance/direct/' + report_data.time + '.html'
     if report_data is None:
-        pass
-        # The report is not found in the sqlite internal database
-        # TODO: throw error
+        raise Exception('PgAdmin4 could not find the specified report')
 
-    #TODO: Throw error if report not found
+    if not os.path.exists(path):
+        raise Exception('The selected report could not be found by PgAdmin4')
 
     with open(path, 'r') as f:
         report_data = f.read()
 
-        # TODO: Put error checking in js when this method returns
         return Response(report_data, mimetype="text/html")
 
 @blueprint.route(
@@ -1020,8 +1023,7 @@ def generate_report(conn, data_location, name, opt_top, func_oids = None):
         )
         status, result = conn.execute_async_list(sql)
         overflow_flags = result[0]
-        print(overflow_flags)
-
+        
     return {
             'config': {
                        'name': name,

@@ -11,11 +11,12 @@ define([
   'sources/gettext', 'sources/url_for', 'jquery', 'underscore',
   'pgadmin.alertifyjs', 'sources/pgadmin', 'pgadmin.browser', 'backbone',
   'pgadmin.backgrid', 'pgadmin.backform', 'sources/../bundle/codemirror',
-  'pgadmin.tools.profiler.ui', 'sources/keyboard_shortcuts',
-  'pgadmin.tools.profiler.utils', 'wcdocker',
+  'pgadmin.tools.profiler.ui', 'pgadmin.tools.profiler.report',
+  'sources/keyboard_shortcuts', 'pgadmin.tools.profiler.utils',  'wcdocker',
 ], function(
   gettext, url_for, $, _, Alertify, pgAdmin, pgBrowser, Backbone, Backgrid,
-  Backform, codemirror, profile_function_again, keyboardShortcuts, profilerUtils
+  Backform, codemirror, profile_function_again, input_report_options,
+  keyboardShortcuts, profilerUtils
 ) {
 
   var CodeMirror = codemirror.default,
@@ -495,6 +496,8 @@ define([
       }
     },
     on_start: function() {
+      input_report_options(pgTools.Profile.trans_id, pgTools.Profile.function_name_with_arguments);
+
       if (pgTools.Profile.profile_type == 1) {
         controller.start_execution(pgTools.Profile.trans_id);
       } else {
