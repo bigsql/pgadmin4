@@ -297,7 +297,7 @@ define([
     }
 
     Alertify.profilerInputOptionsDialog(
-      gettext('Profiler'), profile_info, restart_profile, trans_id
+      gettext('Monitoring Options'), profile_info, restart_profile, trans_id
     ).resizeTo(pgBrowser.stdW.md,pgBrowser.stdH.md);
   };
 

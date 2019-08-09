@@ -467,10 +467,12 @@ define([
     initialize: function() {
       controller.on('pgProfiler:button:state:start', this.enable_start, this);
       controller.on('pgProfiler:button:state:save' , this.enable_save, this);
+      controller.on('pgProfiler:button:state:report-options' , this.enable_report_options, this);
     },
     events: {
       'click .btn-start': 'on_start',
       'click .btn-save' : 'on_save',
+      'click .btn-report-options': 'on_report_options',
       'keydown': 'keyAction',
     },
     enable_start: function(enable) {
@@ -495,14 +497,29 @@ define([
         $btn.attr('disabled', 'disabled');
       }
     },
-    on_start: function() {
-      input_report_options(pgTools.Profile.trans_id, pgTools.Profile.function_name_with_arguments);
+    enable_report_options: function(enable) {
+      var $btn = this.$el.find('.btn-report-options');
 
+      if (enable) {
+        $btn.prop('disabled', false);
+        $btn.removeAttr('disabled');
+      } else {
+        $btn.prop('disabled', true);
+        $btn.attr('disabled', 'disabled');
+      }
+    },
+    on_start: function() {
       if (pgTools.Profile.profile_type == 1) {
         controller.start_execution(pgTools.Profile.trans_id);
       } else {
         controller.start_monitor(pgTools.Profile.trans_id);
       }
+
+    },
+    on_report_options: function() {
+      input_report_options(pgTools.Profile.trans_id,
+        pgTools.Profile.function_name_with_arguments,
+        pgTools.Profile.preferences.profiler_new_browser_tab);
     },
     on_save: function() {
       controller.save(pgTools.Profile.trans_id);

@@ -1,7 +1,6 @@
 /////////////////////////////////////////////////////////////
 //
 //
-// TODO: support for restart_profile
 //
 //
 //
@@ -10,12 +9,10 @@
 define([
   'sources/gettext', 'sources/url_for', 'jquery', 'underscore', 'backbone',
   'pgadmin.alertifyjs', 'sources/pgadmin', 'pgadmin.browser',
-  'pgadmin.backgrid', 'wcdocker',
+  'pgadmin.backgrid', 
 ], function(
   gettext, url_for, $, _, Backbone, Alertify, pgAdmin, pgBrowser, Backgrid
 ) {
-
-  var wcDocker = window.wcDocker;
 
   var ProfilerReportOptionsModel = Backbone.Model.extend({
     defaults: {
@@ -41,19 +38,19 @@ define([
     model: ProfilerReportOptionsModel,
   });
 
-  var res = function(trans_id, function_name_with_arguments) {
+  var res = function(trans_id, function_name_with_arguments, profiler_new_browser_tab) {
     if (!Alertify.profilerReportOptionsDialog) {
       Alertify.dialog('profilerReportOptionsDialog', function factory() {
         return {
-          main: function(title, trans_id, function_name_with_arguments) {
-            this.preferences = window.top.pgAdmin.Browser.get_preferences_for_module('profiler');
+          main: function(title, trans_id, function_name_with_arguments, profiler_new_browser_tab) {
+            this.preferences = pgBrowser.get_preferences_for_module('profiler');
             this.set('title', title);
 
             // setting value in alertify settings allows us to access it from
             // other functions other than main function.
             this.set('trans_id', trans_id);
+            this.set('profiler_new_browser_tab', profiler_new_browser_tab);
             this.set('function_name_with_arguments', function_name_with_arguments);
-            // console.warn(function_name_with_arguments)
 
             var my_obj = [];
             my_obj.push({
@@ -62,11 +59,19 @@ define([
             }, {
               'option' : 'Title',
               'value'  : 'Pl/Profiler Report for ' + function_name_with_arguments,
-            },
-            {
+            }, {
+              'option' : 'Tabstop',
+              'value'  : '8',
+            }, {
+              'option' : 'svg_width',
+              'value'  : '1200',
+            }, {
+              'option' : 'table_width',
+              'value'  : '80%',
+            }, {
               'option' : 'Description',
               'value'  : '',
-            },);
+            }, );
 
             var option_header = Backgrid.HeaderCell.extend({
               // Add fixed width to the "option" column
@@ -153,8 +158,6 @@ define([
               var self = this;
 
               var options_value_list = [];
-              // TODO
-              // var sqlite_options_list = this.sqlite_options_list = [];
 
               this.grid.collection.each(function(m) {
                 options_value_list.push({
@@ -175,47 +178,18 @@ define([
                 },
               })
                 .done(function(res) {
-                  var url = url_for(
-                    'profiler.profile', {
-                      'trans_id' : res.data.profilerTransId,
-                    }
-                  );
-
-                  if (self.preferences.profiler_new_browser_tab) {
-                    window.open(url, '_blank');
-                  } else {
-                    pgBrowser.Events.once(
-                      'pgadmin-browser:fram:urlload:frm_profiler',
-                      function(frame) {
-                        frame.openURL(url);
-                      });
-
-                    var dashboardPanel = pgBrowser.docker.findPanels('properties'),
-                      panel = pgBrowser.docker.addPanel(
-                        'frm_profiler', wcDocker.DOCK.STACKED, dashboardPanel[0]
-                      );
-
-                    panel.focus();
-
-                    // Panel Closed event
-                    panel.on(wcDocker.EVENT.CLOSED, function() {
-                      var closeUrl = url_for('profiler.close', {
-                        'trans_id': res.data.profilerTransId,
-                      });
-                      $.ajax({
-                        url: closeUrl,
-                        method: 'DELETE',
-                      });
-                    });
+                  if (res.data.status == 'ERROR') {
+                    Alertify.alert(gettext(res.data.result));
                   }
 
                 })
-                .fail(function(e) {
+                .fail(function() {
                   Alertify.alert(
-                    gettext('Profiler Initialization Error'),
-                    e.responseJSON.errormsg
+                    gettext('Profiler Error'),
+                    gettext('Error while fetching reports.')
                   );
                 });
+
 
               return true;
             }
@@ -278,7 +252,7 @@ define([
     }
 
     Alertify.profilerReportOptionsDialog(
-      gettext('Profiler'), trans_id, function_name_with_arguments
+      gettext('Report Options'), trans_id, function_name_with_arguments, profiler_new_browser_tab
     ).resizeTo(pgBrowser.stdW.md,pgBrowser.stdH.md);
   };
 

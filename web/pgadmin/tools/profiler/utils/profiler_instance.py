@@ -22,6 +22,7 @@ class ProfilerInstance:
 
         self._function_data = None
         self._profiler_data = None
+        self._config = None
         self.load_from_session()
 
     @property
@@ -49,6 +50,15 @@ class ProfilerInstance:
         self._profiler_data = data
         self.update_session()
 
+    @property
+    def config(self):
+        return self._config
+
+    @config.setter
+    def config(self, data):
+        self._config = data
+        self.update_session()
+
     @staticmethod
     def get_trans_ids():
         if '__profiler_sessions' in session:
@@ -62,6 +72,7 @@ class ProfilerInstance:
                 trans_data = session['__profiler_sessions'][str(self.trans_id)]
                 self.function_data = trans_data.get('function_data', None)
                 self.profiler_data = trans_data.get('profiler_data', None)
+                self.config = trans_data.get('config', None)
 
     def update_session(self):
         with profiler_sessions_lock:
@@ -70,7 +81,8 @@ class ProfilerInstance:
 
             session['__profiler_sessions'][str(self.trans_id)] = dict(
                 function_data=self.function_data,
-                profiler_data=self.profiler_data
+                profiler_data=self.profiler_data,
+                config=self.config
             )
 
     def clear(self):

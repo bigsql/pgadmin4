@@ -96,7 +96,7 @@ class ProfilerModule(PgAdminModule):
                 'profiler.initialize_target_for_function',
                 'profiler.initialize_target_for_trigger',
                 'profiler.initialize_target_indirect',
-                'profiler.get_parameters',
+                'profiler.get_parameters', 'profiler.input_report_options',
                 'profiler.start_monitor', 'profiler.start_execution',
                 'profiler.show_report', 'profiler.delete_report',
                 'profiler.get_src', 'profiler.get_reports',
@@ -214,11 +214,6 @@ def init_function(node_type, sid, did, scid=None, fid=None, trid=None):
     server_type = manager.server_type
     user = manager.user_info
 
-    # Set the template path required to read the sql files
-    template_path = 'profiler/sql'
-
-    sql = ''
-
     if profile_type is 'indirect':
         pfl_inst = ProfilerInstance()
 
@@ -237,6 +232,11 @@ def init_function(node_type, sid, did, scid=None, fid=None, trid=None):
         )
 
     else:
+        # Set the template path required to read the sql files
+        template_path = 'profiler/sql'
+
+        sql = ''
+
         if node_type == 'trigger':
             # Find trigger function id from trigger id
             sql = render_template(
@@ -653,7 +653,7 @@ def start_monitor(trans_id):
 
     # At this point we have the data in shared memory and need to create a report from it
     report_data = generate_report(conn, 'shared', name='global', opt_top=10, func_oids={})
-    save_report(report_data, 'global', conn.as_dict()['database'], pfl_inst.profiler_data['profile_type'])
+    save_report(report_data, pfl_inst.config, conn.as_dict()['database'], pfl_inst.profiler_data['profile_type'])
 
 
     return make_json_response(
@@ -722,8 +722,6 @@ def start_execution(trans_id):
             sql += ', '
     sql += ');'
 
-    report_name = func_name
-
     try:
         conn.execute_async('SET search_path to ' + pfl_inst.function_data['schema'] + ';')
         conn.execute_async('SELECT pl_profiler_set_enabled_local(true)')
@@ -731,7 +729,7 @@ def start_execution(trans_id):
         conn.execute_async('SELECT pl_profiler_set_collect_interval(0)')
         status, result = conn.execute_async_list(sql)
         report_data = generate_report(conn, 'local', report_name, opt_top=10, func_oids={}) # TODO: Add support for K top
-        report_id = save_report(report_data, report_name, conn.as_dict()['database'], pfl_inst.profiler_data['profile_type'])
+        report_id = save_report(report_data, pfl_inst.config, conn.as_dict()['database'], pfl_inst.profiler_data['profile_type'])
         conn.execute_async('SELECT pl_profiler_set_enabled_local(false)')
         conn.execute_async('RESET search_path')
     except Exception as e:
@@ -759,74 +757,14 @@ def start_execution(trans_id):
         }
     )
 
-@blueprint.route(
-    '/delete_report/<int:report_id>', methods=['POST'],
-    endpoint='delete_report'
-)
-@login_required
-def delete_report(report_id):
-    """
-    delete_report(report_id)
-
-    Parameters:
-        report_id
-    """
-    report = ProfilerSavedReports.query.filter_by(rid=report_id).first()
-    path = str(current_app.root_path) + '/instance/direct/' + report.time + '.html'
-
-    if report is None:
-        raise Exception('No report with given report_id found')
-
-    try:
-        db.session.delete(report)
-        db.session.commit()
-
-        os.remove(path)
-        return make_json_response(
-            data={
-                'status' : 'Success'
-            }
-        )
-    except Exception as e:
-        return make_json_response(
-            data={
-                'status': 'ERROR',
-                'result': str(e)
-            }
-        )
 
 
 @blueprint.route(
-    '/show_report/<int:report_id>', methods=['GET'],
-    endpoint='show_report'
+    '/input_report_options/<int:trans_id>', methods=['POST'],
+    endpoint='input_report_options'
 )
 @login_required
-def show_report(report_id):
-    """
-    show_report(report_id)
-
-    Parameters:
-        report_id
-    """
-    report_data = ProfilerSavedReports.query.filter_by(rid=report_id).first()
-    path = str(current_app.root_path) + '/instance/direct/' + report_data.time + '.html'
-    if report_data is None:
-        raise Exception('PgAdmin4 could not find the specified report')
-
-    if not os.path.exists(path):
-        raise Exception('The selected report could not be found by PgAdmin4')
-
-    with open(path, 'r') as f:
-        report_data = f.read()
-
-        return Response(report_data, mimetype="text/html")
-
-@blueprint.route(
-    '/get_src/<int:trans_id>', methods=['GET'],
-    endpoint='get_src'
-)
-@login_required
-def get_src(trans_id):
+def input_report_options(trans_id):
     pfl_inst = ProfilerInstance(trans_id)
     if pfl_inst.profiler_data is None:
         return make_json_response(
@@ -836,15 +774,103 @@ def get_src(trans_id):
                     'Not connected to server or connection with the server '
                     'has been closed.'
                 )
-            })
+            }
+        )
 
-    return make_json_response(
-        data={
-            'status': 'Success',
-            'result': pfl_inst.function_data['src']
-        }
-    )
+    data = json.loads(request.values['data'], encoding='utf-8')
+    try:
+        pfl_inst.config = {
+                   'name': data[0]['value'],
+                   'title': data[1]['value'],
+                   'tabstop': data[2]['value'],
+                   'svg_width': data[3]['value'],
+                   'table_width': data[4]['value'],
+                   'desc': data[5]['value']
+                  },
 
+        return make_json_response(
+            data={
+                'status': 'Success',
+            }
+        )
+
+    except Exception as e:
+        return make_json_response(
+            data={
+                'status': 'ERROR',
+                'result': str(e)
+            }
+        )
+
+@blueprint.route(
+    '/close/<int:trans_id>', methods=["DELETE"], endpoint='close'
+)
+def close(trans_id):
+    """
+    close(trans_id)
+
+    This method is used to close the asynchronous connection
+    and remove the information of unique transaction id from
+    the session variable.
+
+    Parameters:
+        trans_id
+        - unique transaction id.
+    """
+
+    close_profiler_session(trans_id)
+    return make_json_response(data={'status': True})
+
+def close_profiler_session(_trans_id, close_all=False):
+    """
+    This function is used to cancel the profiler transaction and
+    release the connection.
+
+    :param trans_id: Transaction id
+    :return:
+    """
+
+    if close_all:
+        trans_ids = ProfilerInstance.get_trans_ids()
+    else:
+        trans_ids = [_trans_id]
+
+    for trans_id in trans_ids:
+        pfl_inst = ProfilerInstance(trans_id)
+        pfl_obj = pfl_inst.profiler_data
+
+        try:
+            if pfl_obj is not None:
+                manager = get_driver(PG_DEFAULT_DRIVER).\
+                    connection_manager(pfl_obj['server_id'])
+
+                if manager is not None:
+                    conn = manager.connection(
+                        did=pfl_obj['database_id'],
+                        conn_id=pfl_obj['conn_id'])
+                    if conn.connected():
+                        conn.cancel_transaction(
+                            pfl_obj['conn_id'],
+                            pfl_obj['database_id'])
+                    manager.release(conn_id=pfl_obj['conn_id'])
+
+                    if 'exe_conn_id' in pfl_obj:
+                        conn = manager.connection(
+                            did=pfl_obj['database_id'],
+                            conn_id=pfl_obj['exe_conn_id'])
+                        if conn.connected():
+                            conn.cancel_transaction(
+                                pfl_obj['exe_conn_id'],
+                                pfl_obj['database_id'])
+                        manager.release(conn_id=pfl_obj['exe_conn_id'])
+        except Exception as _:
+            raise
+        finally:
+            pfl_inst.clear()
+
+####################################################################################################
+### Functions interacting with report manipulation #################################################
+####################################################################################################
 def generate_report(conn, data_location, name, opt_top, func_oids = None):
     """
     generate_report(trans_id)
@@ -1023,17 +1049,8 @@ def generate_report(conn, data_location, name, opt_top, func_oids = None):
         )
         status, result = conn.execute_async_list(sql)
         overflow_flags = result[0]
-        
+
     return {
-            'config': {
-                       'name': name,
-                       'title': 'PL Profiler Report for %s' %(name, ),
-                       'tabstop': '8',
-                       'svg_width': '1200',
-                       'table_width': '80%',
-                       'desc': '<h1>PL Profiler Report for %s</h1>\n' %(name, ) +
-                               '<p>\n<!-- description here -->\n</p>'
-                      },
             'callgraph_overflow': False if data_location == 'local' else overflow_flags['pl_profiler_callgraph_overflow'],
             'functions_overflow': False if data_location == 'local' else overflow_flags['pl_profiler_functions_overflow'],
             'lines_overflow': False if data_location == 'local' else overflow_flags['pl_profiler_lines_overflow'],
@@ -1045,9 +1062,9 @@ def generate_report(conn, data_location, name, opt_top, func_oids = None):
             'found_more_funcs': found_more_funcs,
         }
 
-def save_report(report_data, name, dbname, profile_type):
+def save_report(report_data, config, dbname, profile_type):
     """
-    save_report(report_data, name, dbname, profile_type)
+    save_report(report_data, config, dbname, profile_type)
 
     Parameters:
         TODO
@@ -1062,7 +1079,7 @@ def save_report(report_data, name, dbname, profile_type):
         output_fd.close()
 
         profile_report = ProfilerSavedReports(
-            name = name,
+            name = config['name'],
             direct = False if profile_type == 'indirect' else True,
             dbname = dbname,
             time = now
@@ -1073,33 +1090,72 @@ def save_report(report_data, name, dbname, profile_type):
 
         return profile_report.rid
 
+
 @blueprint.route(
-    '/get_parameters/<int:trans_id>', methods=['GET'],
-    endpoint='get_parameters'
+    '/delete_report/<int:report_id>', methods=['POST'],
+    endpoint='delete_report'
 )
 @login_required
-def get_parameters(trans_id):
-    pfl_inst = ProfilerInstance(trans_id)
-    if pfl_inst.profiler_data is None:
+def delete_report(report_id):
+    """
+    delete_report(report_id)
+
+    Parameters:
+        report_id
+    """
+    report = ProfilerSavedReports.query.filter_by(rid=report_id).first()
+    path = str(current_app.root_path) + '/instance/direct/' + report.time + '.html'
+
+    if report is None:
+        raise Exception('No report with given report_id found')
+
+    try:
+        db.session.delete(report)
+        db.session.commit()
+
+        os.remove(path)
         return make_json_response(
             data={
-                'status': 'NotConnected',
-                'result': gettext(
-                    'Not connected to server or connection with the server '
-                    'has been closed.'
-                )
+                'status' : 'Success'
+            }
+        )
+    except Exception as e:
+        return make_json_response(
+            data={
+                'status': 'ERROR',
+                'result': str(e)
             }
         )
 
-    arg_values = pfl_inst.function_data['args_value']
 
-    return make_json_response(
-        data={
-            'status': 'Success',
-            'result': arg_values
-        }
-    )
+@blueprint.route(
+    '/show_report/<int:report_id>', methods=['GET'],
+    endpoint='show_report'
+)
+@login_required
+def show_report(report_id):
+    """
+    show_report(report_id)
 
+    Parameters:
+        report_id
+    """
+    report_data = ProfilerSavedReports.query.filter_by(rid=report_id).first()
+    path = str(current_app.root_path) + '/instance/direct/' + report_data.time + '.html'
+    if report_data is None:
+        raise Exception('PgAdmin4 could not find the specified report')
+
+    if not os.path.exists(path):
+        raise Exception('The selected report could not be found by PgAdmin4')
+
+    with open(path, 'r') as f:
+        report_data = f.read()
+
+        return Response(report_data, mimetype="text/html")
+
+####################################################################################################
+### Functions interacting with internal PgAdmin4 sqlite3 database ##################################
+####################################################################################################
 @blueprint.route(
     '/get_arguments/<int:sid>/<int:did>/<int:scid>/<int:func_id>',
     methods=['GET'], endpoint='get_arguments'
@@ -1260,45 +1316,39 @@ def set_arguments_sqlite(sid, did, scid, func_id):
 
     return make_json_response(data={'status': True, 'result': 'Success'})
 
+####################################################################################################
+### Functions that provide information for the client-side panels ##################################
+####################################################################################################
 @blueprint.route(
-    '/get_reports', methods=['GET'],
-    endpoint='get_reports'
+    '/get_src/<int:trans_id>', methods=['GET'],
+    endpoint='get_src'
 )
 @login_required
-def get_reports():
-    saved_reports = ProfilerSavedReports.query.all()
-
-    reports = []
-    for report in saved_reports:
-        reports.append({'name' : report.name,
-                        'database' : report.dbname,
-                        'time' : report.time,
-                        'profile_type' : report.direct,
-                        'report_id' : report.rid})
-
+def get_src(trans_id):
+    pfl_inst = ProfilerInstance(trans_id)
+    if pfl_inst.profiler_data is None:
+        return make_json_response(
+            data={
+                'status': 'NotConnected',
+                'result': gettext(
+                    'Not connected to server or connection with the server '
+                    'has been closed.'
+                )
+            })
 
     return make_json_response(
         data={
             'status': 'Success',
-            'result': reports
+            'result': pfl_inst.function_data['src']
         }
     )
 
 @blueprint.route(
-    '/poll_result/<int:trans_id>/', methods=["GET"], endpoint='poll_result'
+    '/get_parameters/<int:trans_id>', methods=['GET'],
+    endpoint='get_parameters'
 )
 @login_required
-def poll_result(trans_id):
-    """
-    poll_result(trans_id)
-
-    This method polls the result of the asynchronous query and returns the
-    result.
-
-    Parameters:
-        trans_id
-        - unique transaction id.
-    """
+def get_parameters(trans_id):
     pfl_inst = ProfilerInstance(trans_id)
     if pfl_inst.profiler_data is None:
         return make_json_response(
@@ -1311,99 +1361,37 @@ def poll_result(trans_id):
             }
         )
 
-    manager = driver.connection_manager(pfl_inst.profiler_data['server_id'])
-    conn = manager.connection(
-        did=pfl_inst.profiler_data['database_id'],
-        conn_id=pfl_inst.profiler_data['conn_id'])
-
-    if conn.connected():
-        status, result = conn.poll()
-        if not status:
-            status = 'ERROR'
-        elif status == ASYNC_OK and result is not None:
-            status = 'Success'
-            columns, result = convert_data_to_dict(conn, result)
-        else:
-            status = 'Busy'
-    else:
-        status = 'NotConnected'
-        result = gettext(
-            'Not connected to server or connection with the server '
-            'has been closed.'
-        )
+    arg_values = pfl_inst.function_data['args_value']
 
     return make_json_response(
         data={
-            'status': status,
-            'result': result
+            'status': 'Success',
+            'result': arg_values
         }
     )
 
-
-
-
 @blueprint.route(
-    '/close/<int:trans_id>', methods=["DELETE"], endpoint='close'
+    '/get_reports', methods=['GET'],
+    endpoint='get_reports'
 )
-def close(trans_id):
-    """
-    close(trans_id)
+@login_required
+def get_reports():
 
-    This method is used to close the asynchronous connection
-    and remove the information of unique transaction id from
-    the session variable.
+    # Retrieve the reports from the sqlite db
+    saved_reports = ProfilerSavedReports.query.all()
 
-    Parameters:
-        trans_id
-        - unique transaction id.
-    """
+    # Format the reports to send to the client
+    reports = []
+    for report in saved_reports:
+        reports.append({'name' : report.name,
+                        'database' : report.dbname,
+                        'time' : report.time,
+                        'profile_type' : report.direct,
+                        'report_id' : report.rid})
 
-    close_profiler_session(trans_id)
-    return make_json_response(data={'status': True})
-
-def close_profiler_session(_trans_id, close_all=False):
-    """
-    This function is used to cancel the profiler transaction and
-    release the connection.
-
-    :param trans_id: Transaction id
-    :return:
-    """
-
-    if close_all:
-        trans_ids = ProfilerInstance.get_trans_ids()
-    else:
-        trans_ids = [_trans_id]
-
-    for trans_id in trans_ids:
-        pfl_inst = ProfilerInstance(trans_id)
-        pfl_obj = pfl_inst.profiler_data
-
-        try:
-            if pfl_obj is not None:
-                manager = get_driver(PG_DEFAULT_DRIVER).\
-                    connection_manager(pfl_obj['server_id'])
-
-                if manager is not None:
-                    conn = manager.connection(
-                        did=pfl_obj['database_id'],
-                        conn_id=pfl_obj['conn_id'])
-                    if conn.connected():
-                        conn.cancel_transaction(
-                            pfl_obj['conn_id'],
-                            pfl_obj['database_id'])
-                    manager.release(conn_id=pfl_obj['conn_id'])
-
-                    if 'exe_conn_id' in pfl_obj:
-                        conn = manager.connection(
-                            did=pfl_obj['database_id'],
-                            conn_id=pfl_obj['exe_conn_id'])
-                        if conn.connected():
-                            conn.cancel_transaction(
-                                pfl_obj['exe_conn_id'],
-                                pfl_obj['database_id'])
-                        manager.release(conn_id=pfl_obj['exe_conn_id'])
-        except Exception as _:
-            raise
-        finally:
-            pfl_inst.clear()
+    return make_json_response(
+        data={
+            'status': 'Success',
+            'result': reports
+        }
+    )
