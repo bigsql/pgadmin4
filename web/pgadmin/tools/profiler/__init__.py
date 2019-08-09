@@ -14,9 +14,9 @@ MODULE_NAME = 'profiler'
 # Python imports
 import simplejson as json
 import random
-#import re # unnecessary?
 from datetime import datetime
 import time
+import os
 
 # Flask imports
 from flask import url_for, Response, render_template, request, session, \
@@ -766,16 +766,17 @@ def delete_report(report_id):
     Parameters:
         report_id
     """
-    report_data = ProfilerSavedReports.query.filter_by(rid=report_id).first()
-    path = str(current_app.root_path) + '/instance/direct/' + report_data.time + '.html'
-    if report_data is None:
-        pass
-        # The report is not found in the sqlite internal database
-        # TODO: throw error
+    report = ProfilerSavedReports.query.filter_by(rid=report_id).first()
+    path = str(current_app.root_path) + '/instance/direct/' + report.time + '.html'
+
+    if report is None:
+        raise Exception('No report with given report_id found')
 
     try:
+        db.session.delete(report)
+        db.session.commit()
+
         os.remove(path)
-        ProfilerSavedReports.query.filter_by(rid=report_id).first().delete()
         return make_json_response(
             data={
                 'status' : 'Success'
@@ -784,7 +785,7 @@ def delete_report(report_id):
     except Exception as e:
         return make_json_response(
             data={
-                'status': '',
+                'status': 'ERROR',
                 'result': str(e)
             }
         )
@@ -808,6 +809,8 @@ def show_report(report_id):
         pass
         # The report is not found in the sqlite internal database
         # TODO: throw error
+
+    #TODO: Throw error if report not found
 
     with open(path, 'r') as f:
         report_data = f.read()
@@ -1058,7 +1061,7 @@ def save_report(report_data, name, dbname, profile_type):
 
         profile_report = ProfilerSavedReports(
             name = name,
-            direct = profile_type,
+            direct = False if profile_type == 'indirect' else True,
             dbname = dbname,
             time = now
         )

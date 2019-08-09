@@ -64,8 +64,17 @@ define([
         $.ajax({
           url: baseUrl,
           method: 'GET',
+          beforeSend: function(xhr) {
+            xhr.setRequestHeader(
+              pgAdmin.csrf_token_header, pgAdmin.csrf_token
+            );
+
+            $('.profiler-container').addClass('show_progress');
+          },
         })
           .done(function(res) {
+            $('.profiler-container').removeClass('show_progress');
+
             if (res.data.status === 'Success') {
               self.AddResults(res.data.col_info, res.data.result);
               pgTools.Profile.results_panel.focus();
@@ -114,8 +123,16 @@ define([
         $.ajax({
           url: baseUrl,
           method: 'GET',
+          beforeSend: function(xhr) {
+            xhr.setRequestHeader(
+              pgAdmin.csrf_token_header, pgAdmin.csrf_token
+            );
+            $('.profiler-container').addClass('show_progress');
+          },
         })
           .done(function(res) {
+            $('.profiler-container').removeClass('show_progress');
+
             if (res.data.status === 'Success') {
               self.AddResults(res.data.col_info, res.data.result);
 
@@ -311,8 +328,6 @@ define([
 
         // Custom cell for delete button
         var deleteCell = Backgrid.Cell.extend({
-          className: 'w-10 text-center',
-
           events: {
             'click button' : 'deleteReport',
           },
@@ -327,7 +342,14 @@ define([
             $.ajax({
               url : reportUrl,
               method: 'POST',
-            });
+            })
+              .done(function(res) {
+                if (res.data.status == 'ERROR') {
+                  Alertify.alert(gettext(res.data.result));
+                }
+              });
+
+            this.model.collection.remove(this.model);
           },
 
           render: function() {
@@ -338,8 +360,6 @@ define([
 
         // Custom cell for show report button
         var reportCell = Backgrid.Cell.extend({
-          className: 'w-10 text-center',
-
           events: {
             'click button' : 'generateReport',
           },
@@ -579,6 +599,7 @@ define([
         // TODO: Fix formatting
         controller.AddSrc(['']);
       } else if (trans_id != undefined && profile_type) { // Direct profiling
+
         // Get parameters
         var paramUrl = url_for('profiler.get_parameters', {
           'trans_id': trans_id,
