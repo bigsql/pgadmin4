@@ -68,6 +68,7 @@ define([
           .done(function(res) {
             if (res.data.status === 'Success') {
               self.AddResults(res.data.col_info, res.data.result);
+              pgTools.Profile.results_panel.focus();
 
               // Update saved reports
               var reportsUrl = url_for('profiler.get_reports');
@@ -310,7 +311,7 @@ define([
 
         // Custom cell for delete button
         var deleteCell = Backgrid.Cell.extend({
-          className: 'width_percent_10',
+          className: 'w-10 text-center',
 
           events: {
             'click button' : 'deleteReport',
@@ -337,8 +338,8 @@ define([
 
         // Custom cell for show report button
         var reportCell = Backgrid.Cell.extend({
-          className: 'width_percent_10',
-          
+          className: 'w-10 text-center',
+
           events: {
             'click button' : 'generateReport',
           },
@@ -560,10 +561,7 @@ define([
         method: 'GET',
       })
         .done(function(res) {
-          console.warn(res.data.result);
           if (res.data.status === 'Success') {
-            setTimeout(function(){
-            }, 100);
 
             controller.AddReports(res.data.result);
           }

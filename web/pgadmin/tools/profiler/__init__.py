@@ -68,7 +68,7 @@ class ProfilerModule(PgAdminModule):
         for name, script in [
             ['pgadmin.tools.profiler.controller', 'js/profiler'],
             ['pgadmin.tools.profiler.ui', 'js/profiler_ui'],
-            ['pgadmin.tools.profiler.direct', 'js/direct']
+            ['pgadmin.tools.profiler.profile', 'js/profile']
         ]:
             scripts.append({
                 'name': name,
@@ -90,18 +90,18 @@ class ProfilerModule(PgAdminModule):
     # TODO: Keyboard shortcuts
 
     def get_exposed_url_endpoints(self):
-        return ['profiler.index', 'profiler.init_for_database',
-                'profiler.init_for_trigger', 'profiler.init_for_function',
-                'profiler.profile',
+        return ['profiler.index','profiler.profile',
+                'profiler.init_for_database', 'profiler.init_for_trigger',
+                'profiler.init_for_function',
                 'profiler.initialize_target_for_function',
-                'profiler.initialize_target_for_trigger', 'profiler.close',
-                'profiler.get_parameters',
+                'profiler.initialize_target_for_trigger',
                 'profiler.initialize_target_indirect',
-                'profiler.start_monitor',
-                'profiler.start_execution',
-                'profiler.show_report', 'profiler.get_src',
-                'profiler.get_reports',
-                'profiler.set_arguments', 'profiler.get_arguments'
+                'profiler.get_parameters',
+                'profiler.start_monitor', 'profiler.start_execution',
+                'profiler.show_report', 'profiler.delete_report',
+                'profiler.get_src', 'profiler.get_reports',
+                'profiler.set_arguments', 'profiler.get_arguments',
+                'profiler.close'
                 ]
 
 
@@ -145,7 +145,7 @@ def script_profiler_js():
     )
 
 
-@blueprint.route("/js/direct.js")
+@blueprint.route("/js/profile.js")
 @login_required
 def script_profiler_direct_js():
     """
@@ -153,7 +153,7 @@ def script_profiler_direct_js():
     from server for profiling
     """
     return Response(
-        response=render_template("profiler/js/direct.js", _=gettext),
+        response=render_template("profiler/js/profile.js", _=gettext),
         status=200,
         mimetype="application/javascript"
     )
@@ -654,7 +654,7 @@ def start_monitor(trans_id):
 
     # At this point we have the data in shared memory and need to create a report from it
     report_data = generate_report(conn, 'shared', name='global', opt_top=10, func_oids={})
-    save_report(report_data, 'global', conn.as_dict()['database'])
+    save_report(report_data, 'global', conn.as_dict()['database'], pfl_inst.profiler_data['profile_type'])
 
 
     return make_json_response(
@@ -734,7 +734,7 @@ def start_execution(trans_id):
     conn.execute_async('SELECT pl_profiler_set_collect_interval(0)')
     status, result = conn.execute_async_list(sql)
     report_data = generate_report(conn, 'local', report_name, opt_top=10, func_oids={}) # TODO: Add support for K top
-    report_id = save_report(report_data, report_name, conn.as_dict()['database'])
+    report_id = save_report(report_data, report_name, conn.as_dict()['database'], pfl_inst.profiler_data['profile_type'])
     conn.execute_async('SELECT pl_profiler_set_enabled_local(false)')
     conn.execute_async('RESET search_path')
 
@@ -755,6 +755,42 @@ def start_execution(trans_id):
     )
 
 @blueprint.route(
+    '/delete_report/<int:report_id>', methods=['POST'],
+    endpoint='delete_report'
+)
+@login_required
+def delete_report(report_id):
+    """
+    delete_report(report_id)
+
+    Parameters:
+        report_id
+    """
+    report_data = ProfilerSavedReports.query.filter_by(rid=report_id).first()
+    path = str(current_app.root_path) + '/instance/direct/' + report_data.time + '.html'
+    if report_data is None:
+        pass
+        # The report is not found in the sqlite internal database
+        # TODO: throw error
+
+    try:
+        os.remove(path)
+        ProfilerSavedReports.query.filter_by(rid=report_id).first().delete()
+        return make_json_response(
+            data={
+                'status' : 'Success'
+            }
+        )
+    except Exception as e:
+        return make_json_response(
+            data={
+                'status': '',
+                'result': str(e)
+            }
+        )
+
+
+@blueprint.route(
     '/show_report/<int:report_id>', methods=['GET'],
     endpoint='show_report'
 )
@@ -770,6 +806,7 @@ def show_report(report_id):
     path = str(current_app.root_path) + '/instance/direct/' + report_data.time + '.html'
     if report_data is None:
         pass
+        # The report is not found in the sqlite internal database
         # TODO: throw error
 
     with open(path, 'r') as f:
@@ -1003,9 +1040,9 @@ def generate_report(conn, data_location, name, opt_top, func_oids = None):
             'found_more_funcs': found_more_funcs,
         }
 
-def save_report(report_data, name, dbname):
+def save_report(report_data, name, dbname, profile_type):
     """
-    save_report(report_data, name, dbname)
+    save_report(report_data, name, dbname, profile_type)
 
     Parameters:
         TODO
@@ -1021,7 +1058,7 @@ def save_report(report_data, name, dbname):
 
         profile_report = ProfilerSavedReports(
             name = name,
-            direct = True,
+            direct = profile_type,
             dbname = dbname,
             time = now
         )
@@ -1229,7 +1266,7 @@ def get_reports():
     reports = []
     for report in saved_reports:
         reports.append({'name' : report.name,
-                        'schema' : report.dbname,
+                        'database' : report.dbname,
                         'time' : report.time,
                         'profile_type' : report.direct,
                         'report_id' : report.rid})
