@@ -730,12 +730,12 @@ def start_execution(trans_id):
 
     conn.execute_async('SET search_path to ' + pfl_inst.function_data['schema'] + ';')
     conn.execute_async('SELECT pl_profiler_set_enabled_local(true)')
-    conn.execute_async('SELECT pl_profiler_reset_local(true)')
+    conn.execute_async('SELECT pl_profiler_reset_local()')
     conn.execute_async('SELECT pl_profiler_set_collect_interval(0)')
     status, result = conn.execute_async_list(sql)
-    conn.execute_async('SELECT pl_profiler_set_enabled_local(false)')
     report_data = generate_report(conn, 'local', report_name, opt_top=10, func_oids={}) # TODO: Add support for K top
     report_id = save_report(report_data, report_name, pfl_inst.function_data['schema'])
+    conn.execute_async('SELECT pl_profiler_set_enabled_local(false)')
     conn.execute_async('RESET search_path')
 
     columns = {}
@@ -839,7 +839,13 @@ def generate_report(conn, data_location, name, opt_top, func_oids = None):
             opt_top = opt_top
         )
 
-        status, result = conn.execute_async_list(sql)
+        status, result = conn.execute_async_list(
+        """SELECT stack[array_upper(stack, 1)] as func_oid,
+                  sum(us_self) as us_self
+           FROM pl_profiler_callgraph_""" + data_location + """() C 
+           GROUP BY func_oid
+           ORDER BY us_self DESC
+           LIMIT %s""", (opt_top + 1, ))
         for row in result:
             func_oids.append(int(row['func_oid']))
         if len(func_oids) > opt_top:
@@ -854,7 +860,6 @@ def generate_report(conn, data_location, name, opt_top, func_oids = None):
         #   - No functions being profiled
         #   - Shared_preload_libraries contained the profiler
         raise Exception("No profiling data found")
-
     # ----
     # Get an alphabetically sorted list of the selected functions.
     # ----
@@ -987,12 +992,9 @@ def generate_report(conn, data_location, name, opt_top, func_oids = None):
                        'desc': '<h1>PL Profiler Report for %s</h1>\n' %(name, ) +
                                '<p>\n<!-- description here -->\n</p>'
                       },
-            'callgraph_overflow':
-                False if data_location == 'local' else overflow_flags['pl_profiler_callgraph_overflow'],
-            'functions_overflow':
-                False if data_location == 'local' else overflow_flags[['pl_profiler_functions_overflow'],
-            'lines_overflow':
-                False if data_location == 'local' else overflow_flags['pl_profiler_lines_overflow'],
+            'callgraph_overflow': False if data_location == 'local' else overflow_flags['pl_profiler_callgraph_overflow'],
+            'functions_overflow': False if data_location == 'local' else overflow_flags['pl_profiler_functions_overflow'],
+            'lines_overflow': False if data_location == 'local' else overflow_flags['pl_profiler_lines_overflow'],
             'func_list': func_list,
             'func_defs': func_defs,
             'flamedata': flamedata,
