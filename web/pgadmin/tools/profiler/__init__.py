@@ -465,11 +465,21 @@ def initialize_target_indirect(profile_type, trans_id, sid, did):
         'conn_id': conn_id,
         'server_id': sid,
         'database_id': did,
+        'function_name' : 'Indirect',
         'profile_type': profile_type,
         'restart_profile': 0,
         'duration' : data[0]['value'],
         'interval' : data[1]['value'],
         'pid'      : data[2]['value']
+    }
+
+    pfl_inst.config = {
+        'name': 'Indirect',
+        'title': 'Pl/Profiler Report for ' + conn.as_dict()['database'],
+        'tabstop': '8',
+        'svg_width': '1200',
+        'table_width': '80%',
+        'desc': ''
     }
 
     pfl_inst.update_session()
