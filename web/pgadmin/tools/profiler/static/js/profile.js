@@ -44,12 +44,14 @@ define([
         var self = this;
         self.enable('start', true);
         self.enable('save' , true);
+        self.enable('report-options', true);
       },
 
       disable_toolbar_buttons: function() {
         var self = this;
         self.enable('start', false);
         self.enable('save' , false);
+        self.disable('report-options', false);
       },
 
       // Function to profile for direct profiling
@@ -60,7 +62,7 @@ define([
         var baseUrl = url_for(
           'profiler.start_execution', {
             'trans_id': trans_id,
-            'port_num': 1000,
+            'port_num': 1000, //TODO
           });
         $.ajax({
           url: baseUrl,
@@ -74,6 +76,7 @@ define([
           },
         })
           .done(function(res) {
+            console.warn(res.data);
             $('.profiler-container').removeClass('show_progress');
 
             if (res.data.status === 'Success') {
@@ -509,6 +512,8 @@ define([
       }
     },
     on_start: function() {
+      console.warn('on_start');
+      console.warn(pgTools.Profile.profile_type);
       if (pgTools.Profile.profile_type == 1) {
         controller.start_execution(pgTools.Profile.trans_id);
       } else {

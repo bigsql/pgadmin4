@@ -652,7 +652,7 @@ def start_monitor(trans_id):
         conn.execute_async('RESET search_path')
 
     # At this point we have the data in shared memory and need to create a report from it
-    report_data = generate_report(conn, 'shared', name='global', opt_top=10, func_oids={})
+    report_data = generate_report(conn, 'shared', opt_top=10, func_oids={})
     save_report(report_data, pfl_inst.config, conn.as_dict()['database'], pfl_inst.profiler_data['profile_type'])
 
 
@@ -728,8 +728,11 @@ def start_execution(trans_id):
         conn.execute_async('SELECT pl_profiler_reset_local()')
         conn.execute_async('SELECT pl_profiler_set_collect_interval(0)')
         status, result = conn.execute_async_list(sql)
-        report_data = generate_report(conn, 'local', report_name, opt_top=10, func_oids={}) # TODO: Add support for K top
+        report_data = generate_report(conn, 'local', opt_top=10, func_oids={}) # TODO: Add support for K top
+        print(pfl_inst.config);
+        print(conn.as_dict()['database'])
         report_id = save_report(report_data, pfl_inst.config, conn.as_dict()['database'], pfl_inst.profiler_data['profile_type'])
+        print(pfl_inst.config);
         conn.execute_async('SELECT pl_profiler_set_enabled_local(false)')
         conn.execute_async('RESET search_path')
     except Exception as e:
@@ -786,7 +789,7 @@ def input_report_options(trans_id):
                    'svg_width': data[3]['value'],
                    'table_width': data[4]['value'],
                    'desc': data[5]['value']
-                  },
+                  }
 
         return make_json_response(
             data={
@@ -871,7 +874,7 @@ def close_profiler_session(_trans_id, close_all=False):
 ####################################################################################################
 ### Functions interacting with report manipulation #################################################
 ####################################################################################################
-def generate_report(conn, data_location, name, opt_top, func_oids = None):
+def generate_report(conn, data_location, opt_top, func_oids = None):
     """
     generate_report(trans_id)
 
@@ -879,8 +882,6 @@ def generate_report(conn, data_location, name, opt_top, func_oids = None):
 
     Parameters:
         conn
-
-        name
 
         opt_top
 
@@ -1071,6 +1072,10 @@ def save_report(report_data, config, dbname, profile_type):
     """
     now = datetime.now().strftime("%Y-%m-%d;%H:%M")
     path = '/instance/direct/' + now + '.html'
+
+    report_data['config'] = config
+    print('asdf')
+    print(config['name'])
 
     with open(str(current_app.root_path) + path, 'w') as output_fd:
         report = plprofiler_report.plprofiler_report()

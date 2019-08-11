@@ -145,7 +145,6 @@ define([
       return true;
     },
 
-    // generates the endpoint url that will correspond to the correct method for the server to perform
     generate_url: function(_url, treeInfo, node) {
       var url = '{BASEURL}{URL}/{OBJTYPE}{REF}',
         ref = '';
@@ -183,8 +182,6 @@ define([
         i = item || t.selected(),
         d = i && i.length == 1 ? t.itemData(i) : undefined,
         node = d && pgBrowser.Nodes[d._type];
-        //self = this,
-        //is_edb_proc = d._type == 'edbproc';
 
       if (!d)
         return;
