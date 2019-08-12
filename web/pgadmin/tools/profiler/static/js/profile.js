@@ -62,7 +62,6 @@ define([
         var baseUrl = url_for(
           'profiler.start_execution', {
             'trans_id': trans_id,
-            'port_num': 1000, //TODO
           });
         $.ajax({
           url: baseUrl,

@@ -204,13 +204,13 @@ define([
                   'func_id': treeInfo.function._id,
                 });
               } else if (d._type == 'procedure') {
-                //TODO
-                try {
-                  //something;
-                } catch (err) {
-                  //something;
-
-                }
+                // Get the existing function parameters available from sqlite database
+                _Url = url_for('profiler.get_arguments', {
+                  'sid': treeInfo.server._id,
+                  'did': treeInfo.database._id,
+                  'scid': treeInfo.schema._id,
+                  'func_id': treeInfo.procedure._id,
+                });
               }
             } else {
               _Url = url_for('profiler.get_arguments', {
@@ -334,7 +334,6 @@ define([
               argmode = profile_info['proargmodes'].split(',');
             }
 
-            // if there is more than 1 default arg value
             if (profile_info['pronargdefaults']) {
               default_args_count = profile_info['pronargdefaults'];
               default_args = profile_info['proargdefaults'].split(',');
@@ -344,7 +343,6 @@ define([
             var vals, values, index;
             var use_def_value, j;
 
-            // if the procedure has arguments
             if (profile_info['proargnames'] != null) {
               argname = profile_info['proargnames'].split(',');
 
@@ -368,17 +366,9 @@ define([
                 }
               }
 
-              // If there is more than 1 arg
-              // (comparing the length of the array containing the types of the arguments)
               if (argtype.length != 0) {
-
-                // for every arg
                 for (i = 0; i < argtype.length; i++) {
-
-                  // ??
                   if (profile_info['proargmodes'] != null) {
-
-                    // ??
                     if (argmode[i] == 'i' || argmode[i] == 'b' ||
                       (is_edb_proc && argmode[i] == 'o')) {
                       use_def_value = false;
@@ -662,10 +652,6 @@ define([
                     f_id = treeInfo.function._id;
                   } else if (d._type == 'procedure') {
                     f_id = treeInfo.procedure._id;
-                  } else if (d._type == 'edbfunc') {
-                    f_id = treeInfo.edbfunc._id;
-                  } else if (d._type == 'edbproc') {
-                    f_id = treeInfo.edbproc._id;
                   }
 
                   // Below will format the data to be stored in sqlite database
@@ -712,13 +698,14 @@ define([
                     'func_id': treeInfo.function._id,
                   });
                 } else if (d._type == 'procedure') {
-                  //TODO
-                  try {
-                    //something;
-                  } catch (err) {
-                    //something;
-
-                  }
+                  baseUrl = url_for('profiler.initialize_target_for_function', {
+                    'profile_type': 'direct',
+                    'trans_id': self.setting('trans_id'),
+                    'sid': treeInfo.server._id,
+                    'did': treeInfo.database._id,
+                    'scid': treeInfo.schema._id,
+                    'func_id': treeInfo.procedure._id,
+                  });
                 }
 
                 $.ajax({
@@ -774,13 +761,12 @@ define([
                         'func_id': treeInfo.function._id,
                       });
                     } else if (d._type == 'procedure') {
-                      //TODO
-                      try {
-                        //something;
-                      } catch (err) {
-                        //something;
-
-                      }
+                      _Url = url_for('profiler.set_arguments', {
+                        'sid': treeInfo.server._id,
+                        'did': treeInfo.database._id,
+                        'scid': treeInfo.schema._id,
+                        'func_id': treeInfo.procedure._id,
+                      });
                     }
 
                     $.ajax({

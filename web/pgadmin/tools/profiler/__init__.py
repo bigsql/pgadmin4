@@ -83,7 +83,7 @@ class ProfilerModule(PgAdminModule):
 
         self.top_k = self.preference.register(
             'Properties', 'profiler_top_k',
-            gettext("Number of functions to report for"), 'integer', True,
+            gettext("Number of functions to report for"), 'integer', 10,
             category_label=gettext('Properties'),
             help_str=gettext('The profiler will generate a report for the given number '
                              'of functions')

@@ -76,8 +76,6 @@ define([
         icon: 'fa fa-arrow-circle-right',
         enable: true,
       },
-
-        //TODO: more menus
       ]);
 
       // Create and load the new frame required for profiler panel
@@ -203,9 +201,6 @@ define([
       Get the function information for the direct profiling to display the functions arguments and  other informations
       in the user input dialog
     */
-    /*
-     * TODO: Does not support procedures, trigger functions
-    */
     get_function_information: function(args, item) {
       var t = pgBrowser.tree,
         i = item || t.selected(),
@@ -319,11 +314,18 @@ define([
                   e.responseJSON.errormsg
                 );
               });
-
           }
-
+        })
+        .fail(function(xhr) {
+          try {
+            var err = JSON.parse(xhr.responseText);
+            if (err.success == 0) {
+              Alertify.alert(gettext('Debugger Error'), err.errormsg);
+            }
+          } catch (e) {
+            console.warn(e.stack || e);
+          }
         });
-
     },
   };
 
