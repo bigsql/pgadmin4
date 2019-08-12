@@ -74,7 +74,7 @@ define([
           object: 'function',
         },
         icon: 'fa fa-arrow-circle-right',
-        enable: 'can_profile_global',
+        enable: true,
       },
 
         //TODO: more menus
@@ -137,11 +137,6 @@ define([
         return false;
       }
 
-      return true;
-    },
-
-    // TODO
-    can_profile_global: function() {
       return true;
     },
 
@@ -217,7 +212,7 @@ define([
         d = i && i.length == 1 ? t.itemData(i) : undefined,
         node = d && pgBrowser.Nodes[d._type],
         self = this,
-        is_edb_proc = d._type == 'edbproc';
+        is_edb_proc = false;
 
       if (!d)
         return;
@@ -263,7 +258,7 @@ define([
                   'func_id': profilerUtils.getFunctionId(treeInfo),
                 }
               );
-            } else if(d._type == 'procedure' || d._type == 'edbproc') {
+            } else if(d._type == 'procedure') {
               initTargetUrl = url_for(
                 'profiler.initialize_target_for_function', {
                   'profile_type': 'direct',

@@ -476,7 +476,6 @@ define([
       'click .btn-start': 'on_start',
       'click .btn-save' : 'on_save',
       'click .btn-report-options': 'on_report_options',
-      'keydown': 'keyAction',
     },
     enable_start: function(enable) {
       var $btn = this.$el.find('.btn-start');
@@ -512,8 +511,6 @@ define([
       }
     },
     on_start: function() {
-      console.warn('on_start');
-      console.warn(pgTools.Profile.profile_type);
       if (pgTools.Profile.profile_type == 1) {
         controller.start_execution(pgTools.Profile.trans_id);
       } else {
@@ -528,22 +525,6 @@ define([
     },
     on_save: function() {
       controller.save(pgTools.Profile.trans_id);
-    },
-    keyAction: function (event) {
-      console.warn(event);
-      /*
-      let panel_type='';
-
-      panel_type = keyboardShortcuts.processEventProfiler(
-        this.$el, event, this.preferences, pgTools.DirectProfile.docker
-      );
-
-
-      if(!_.isNull(panel_type) && !_.isUndefined(panel_type) && panel_type != '') {
-        setTimeout(function() {
-          pgBrowser.Events.trigger(`pgadmin:profiler:${panel_type}:focus`);
-        }, 100);
-      }*/
     },
   });
 

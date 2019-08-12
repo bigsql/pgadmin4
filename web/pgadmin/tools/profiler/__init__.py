@@ -1,7 +1,7 @@
 ####################################################################################################
 #
 #
-# Todo: implement support for edb funcs, ppas, trigger functions, procedures
+# Todo: implement support for procedures
 #
 #
 #
@@ -11,21 +11,18 @@
 
 MODULE_NAME = 'profiler'
 
-# Python imports
 import simplejson as json
 import random
 from datetime import datetime
 import time
 import os
 
-# Flask imports
 from flask import url_for, Response, render_template, request, session, \
     current_app
 from flask_babelex import gettext
 from flask_security import login_required
 from werkzeug.useragents import UserAgent
 
-# pgAdmin utils imports
 from pgadmin.utils import PgAdminModule, \
     SHORTCUT_FIELDS as shortcut_fields,  \
     ACCESSKEY_FIELDS as accesskey_fields
@@ -35,15 +32,12 @@ from pgadmin.utils.ajax import make_json_response, \
 from pgadmin.utils.driver import get_driver
 from pgadmin.settings import get_setting
 
-# other imports
 from config import PG_DEFAULT_DRIVER
 from pgadmin.model import db, ProfilerSavedReports, ProfilerFunctionArguments
 from pgadmin.tools.profiler.utils.profiler_instance import ProfilerInstance
 
-#
 from plprofiler import  plprofiler_report
 
-# Constants
 ASYNC_OK = 1
 
 ####################################################################################################
@@ -91,10 +85,9 @@ class ProfilerModule(PgAdminModule):
 
     def get_exposed_url_endpoints(self):
         return ['profiler.index','profiler.profile',
-                'profiler.init_for_database', 'profiler.init_for_trigger',
+                'profiler.init_for_database',
                 'profiler.init_for_function',
                 'profiler.initialize_target_for_function',
-                'profiler.initialize_target_for_trigger',
                 'profiler.initialize_target_indirect',
                 'profiler.get_parameters', 'profiler.input_report_options',
                 'profiler.start_monitor', 'profiler.start_execution',
@@ -168,23 +161,15 @@ def script_profiler_direct_js():
     '/init/<node_type>/<int:sid>/<int:did>/<int:scid>/<int:fid>',
     methods=['GET'], endpoint='init_for_function'
 )
-@blueprint.route(
-    '/init/<node_type>/<int:sid>/<int:did>/<int:scid>/<int:fid>/<int:trid>',
-    methods=['GET'], endpoint='init_for_trigger'
-)
 @login_required
-def init_function(node_type, sid, did, scid=None, fid=None, trid=None):
+def init_function(node_type, sid, did, scid=None, fid=None):
     """
-    init_function(node_type, sid, did, scid, fid, trid)
+    init_function(node_type, sid, did, scid, fid)
 
     This method is responsible to initialize the function required for
     profiling.
-    This method is also responsible for storing the all functions data to
+    This method is also responsible for storing the functions data to
     session variable.
-    This is only required for direct profiling. As Indirect profiling does
-    not require these data because user will
-    provide all the arguments and other functions information through another
-    session to invoke the target.
     It will also create a unique transaction id and store the information
     into session variable.
 
@@ -199,8 +184,9 @@ def init_function(node_type, sid, did, scid=None, fid=None, trid=None):
         - Schema Id
         fid
         - Function Id
-        trid
-        - Trigger Function Id
+    Returns:
+        JSON response for the client with information about profiling instance
+        and the transaction id
     """
     manager = get_driver(PG_DEFAULT_DRIVER).connection_manager(sid)
     conn = manager.connection(did=did)
@@ -237,27 +223,12 @@ def init_function(node_type, sid, did, scid=None, fid=None, trid=None):
 
         sql = ''
 
-        if node_type == 'trigger':
-            # Find trigger function id from trigger id
-            sql = render_template(
-                "/".join([template_path, 'get_trigger_function_info.sql']),
-                table_id=fid, trigger_id=trid
-            )
-
-            status, tr_set = conn.execute_dict(sql)
-            if not status:
-                current_app.logger.debug(
-                    "Error retrieving trigger function information from database")
-                return internal_server_error(errormsg=tr_set)
-
-            fid = tr_set['rows'][0]['tgfoid']
-
         sql = render_template(
             "/".join([template_path, 'get_function_profile_info.sql']),
-            is_ppas_database=False, # edb/other packages not supported fo rnow
+            is_ppas_database=False, # edb/other packages not supported currently
             hasFeatureFunctionDefaults=True,
             fid=fid,
-            is_proc_supported=False # procedures not supported for now
+            is_proc_supported=False # procedures not supported currently
         )
 
         status, r_set = conn.execute_dict(sql)
@@ -267,8 +238,6 @@ def init_function(node_type, sid, did, scid=None, fid=None, trid=None):
             return internal_server_error(errormsg=r_set)
 
         ret_status = status
-
-        # TODO: error checking (e.g. checking if extension is installed)
 
         # Return the response that function cannot be profiled...
         if not ret_status:
@@ -336,6 +305,16 @@ def init_function(node_type, sid, did, scid=None, fid=None, trid=None):
 @blueprint.route('/profile/<int:trans_id>', methods=['GET'], endpoint='profile')
 @login_required
 def profile_new(trans_id):
+    """
+    This method is responsible for creating an asynchronous connection
+    for direct profiling.
+
+    Parameters:
+        trans_id
+        - The unique transaction id that corresponds with the previously initialized
+          profiler instance
+    Returns: Generated html template with the new window to start profiling
+    """
     pfl_inst = ProfilerInstance(trans_id)
 
     # Return from the function if transaction id not found
@@ -370,7 +349,6 @@ def profile_new(trans_id):
         is_linux_platform = True
 
     # We need client OS information to render correct Keyboard shortcuts
-    # TODO: keyboard shortcuts
     user_agent = UserAgent(request.headers.get('User-Agent'))
 
     if profile_type == 1:
@@ -424,6 +402,25 @@ def profile_new(trans_id):
 )
 @login_required
 def initialize_target_indirect(profile_type, trans_id, sid, did):
+    """
+    This method is responsible for creating an asynchronous connection
+    for indirect profiling.
+
+    Parameters:
+        profile_type
+        - Type of profiling (Direct or Indirect)
+        trans_id
+        - The unique transaction id for a profiler instance
+        sid
+        - Server Id
+        did
+        - Database Id
+        scid
+        - Schema Id
+    Returns:
+        JSON response with the transaciton id
+    """
+
     # Create asynchronous connection using random connection id.
     conn_id = str(random.randint(1, 9999999))
     try:
@@ -493,19 +490,14 @@ def initialize_target_indirect(profile_type, trans_id, sid, did):
     methods=['GET', 'POST'],
     endpoint='initialize_target_for_function'
 )
-@blueprint.route(
-    '/initialize_target/<profile_type>/<int:trans_id>/<int:sid>/<int:did>/'
-    '<int:scid>/<int:func_id>/<int:tri_id>',
-    methods=['GET', 'POST'],
-    endpoint='initialize_target_for_trigger'
-)
 @login_required
 def initialize_target(profile_type, trans_id, sid, did,
-                      scid, func_id, tri_id=None):
+                      scid, func_id):
     """
-    initialize_target(profile_type, sid, did, scid, func_id, tri_id)
+    initialize_target(profile_type, sid, did, scid, func_id)
 
-    This method is responsible for creating an asynchronous connection.
+    This method is responsible for creating an asynchronous connection
+    for direct profiling.
 
     Parameters:
         profile_type
@@ -518,8 +510,7 @@ def initialize_target(profile_type, trans_id, sid, did,
         - Schema Id
         func_id
         - Function Id
-        tri_id
-        - Trigger Function Id
+
     """
 
     # Create asynchronous connection using random connection id.
@@ -559,21 +550,6 @@ def initialize_target(profile_type, trans_id, sid, did,
     # Set the template path required to read the sql files
     template_path = 'profiler/sql'
 
-    if tri_id is not None:
-        # Find trigger function id from trigger id
-        sql = render_template(
-            "/".join([template_path, 'get_trigger_function_info.sql']),
-            table_id=func_id, trigger_id=tri_id
-        )
-
-        status, tr_set = conn.execute_dict(sql)
-        if not status:
-            current_app.logger.debug(
-                "Error retrieving trigger function information from database")
-            return internal_server_error(errormsg=tr_set)
-
-        func_id = tr_set['rows'][0]['tgfoid']
-
     pfl_inst = ProfilerInstance(trans_id)
     if request.method == 'POST':
         data = json.loads(request.values['data'], encoding='utf-8')
@@ -589,6 +565,15 @@ def initialize_target(profile_type, trans_id, sid, did,
         'function_name': pfl_inst.function_data['name'],
         'profile_type': profile_type,
         'restart_profile': 0
+    }
+
+    pfl_inst.config = {
+        'name': pfl_inst.function_data['name'],
+        'title': 'Pl/Profiler Report for ' + pfl_inst.function_data['name'],
+        'tabstop': '8',
+        'svg_width': '1200',
+        'table_width': '80%',
+        'desc': ''
     }
 
     pfl_inst.update_session()
@@ -672,9 +657,6 @@ def start_monitor(trans_id):
         }
     )
 
-
-
-
 @blueprint.route(
     '/start_execution/<int:trans_id>', methods=['GET'],
     endpoint='start_execution'
@@ -739,10 +721,7 @@ def start_execution(trans_id):
         conn.execute_async('SELECT pl_profiler_set_collect_interval(0)')
         status, result = conn.execute_async_list(sql)
         report_data = generate_report(conn, 'local', opt_top=10, func_oids={}) # TODO: Add support for K top
-        print(pfl_inst.config);
-        print(conn.as_dict()['database'])
         report_id = save_report(report_data, pfl_inst.config, conn.as_dict()['database'], pfl_inst.profiler_data['profile_type'])
-        print(pfl_inst.config);
         conn.execute_async('SELECT pl_profiler_set_enabled_local(false)')
         conn.execute_async('RESET search_path')
     except Exception as e:
@@ -892,12 +871,15 @@ def generate_report(conn, data_location, opt_top, func_oids = None):
 
     Parameters:
         conn
-
+        - psycopg2 connection object to run queries on the server
         opt_top
-
+        - The constant for which we will find the opt_top functions by time
         func_oids
-
+        - Specific func_oids to profile for
         data_location
+        - Either 'local' or 'shared', which is determined by the type of profiling
+    Returns:
+        dictionary containing information about the performance profile
     """
 
     # Set the template path required to read the sql files
@@ -940,6 +922,7 @@ def generate_report(conn, data_location, opt_top, func_oids = None):
         #   - No functions being profiled
         #   - Shared_preload_libraries contained the profiler
         raise Exception("No profiling data found")
+
     # ----
     # Get an alphabetically sorted list of the selected functions.
     # ----
@@ -1062,9 +1045,15 @@ def generate_report(conn, data_location, opt_top, func_oids = None):
         overflow_flags = result[0]
 
     return {
-            'callgraph_overflow': False if data_location == 'local' else overflow_flags['pl_profiler_callgraph_overflow'],
-            'functions_overflow': False if data_location == 'local' else overflow_flags['pl_profiler_functions_overflow'],
-            'lines_overflow': False if data_location == 'local' else overflow_flags['pl_profiler_lines_overflow'],
+            'callgraph_overflow': False \
+                if data_location == 'local' \
+                else overflow_flags['pl_profiler_callgraph_overflow'],
+            'functions_overflow': False \
+                if data_location == 'local' \
+                else overflow_flags['pl_profiler_functions_overflow'],
+            'lines_overflow': False \
+                if data_location == 'local' \
+                else overflow_flags['pl_profiler_lines_overflow'],
             'func_list': func_list,
             'func_defs': func_defs,
             'flamedata': flamedata,
@@ -1078,14 +1067,16 @@ def save_report(report_data, config, dbname, profile_type):
     save_report(report_data, config, dbname, profile_type)
 
     Parameters:
-        TODO
+        report_data
+        config
+        dbname
+        profile_type
+    Returns
     """
     now = datetime.now().strftime("%Y-%m-%d;%H:%M")
     path = '/instance/direct/' + now + '.html'
 
     report_data['config'] = config
-    print('asdf')
-    print(config['name'])
 
     with open(str(current_app.root_path) + path, 'w') as output_fd:
         report = plprofiler_report.plprofiler_report()
@@ -1117,6 +1108,7 @@ def delete_report(report_id):
 
     Parameters:
         report_id
+    Returns:
     """
     report = ProfilerSavedReports.query.filter_by(rid=report_id).first()
     path = str(current_app.root_path) + '/instance/direct/' + report.time + '.html'
@@ -1154,6 +1146,7 @@ def show_report(report_id):
 
     Parameters:
         report_id
+    Returns:
     """
     report_data = ProfilerSavedReports.query.filter_by(rid=report_id).first()
     path = str(current_app.root_path) + '/instance/direct/' + report_data.time + '.html'
@@ -1192,6 +1185,7 @@ def get_arguments_sqlite(sid, did, scid, func_id):
         - Schema Id
         func_id
         - Function Id
+    Returns:
     """
     PflFuncArgsCount = ProfilerFunctionArguments.query.filter_by(
         server_id=sid,

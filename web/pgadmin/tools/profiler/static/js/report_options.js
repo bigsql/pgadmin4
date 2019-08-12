@@ -9,7 +9,7 @@
 define([
   'sources/gettext', 'sources/url_for', 'jquery', 'underscore', 'backbone',
   'pgadmin.alertifyjs', 'sources/pgadmin', 'pgadmin.browser',
-  'pgadmin.backgrid', 
+  'pgadmin.backgrid',
 ], function(
   gettext, url_for, $, _, Backbone, Alertify, pgAdmin, pgBrowser, Backgrid
 ) {
@@ -63,10 +63,10 @@ define([
               'option' : 'Tabstop',
               'value'  : '8',
             }, {
-              'option' : 'svg_width',
+              'option' : 'SVG Width',
               'value'  : '1200',
             }, {
-              'option' : 'table_width',
+              'option' : 'Table Width',
               'value'  : '80%',
             }, {
               'option' : 'Description',
