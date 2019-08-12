@@ -52,27 +52,6 @@ define([
             this.set('profiler_new_browser_tab', profiler_new_browser_tab);
             this.set('function_name_with_arguments', function_name_with_arguments);
 
-            var my_obj = [];
-            my_obj.push({
-              'option' : 'Name',
-              'value'  : function_name_with_arguments,
-            }, {
-              'option' : 'Title',
-              'value'  : 'Pl/Profiler Report for ' + function_name_with_arguments,
-            }, {
-              'option' : 'Tabstop',
-              'value'  : '8',
-            }, {
-              'option' : 'SVG Width',
-              'value'  : '1200',
-            }, {
-              'option' : 'Table Width',
-              'value'  : '80%',
-            }, {
-              'option' : 'Description',
-              'value'  : '',
-            }, );
-
             var option_header = Backgrid.HeaderCell.extend({
               // Add fixed width to the "option" column
               className: 'width_percent_15',
@@ -95,8 +74,50 @@ define([
             },
             ];
 
+            var report_opts = [];
+            var configURL = url_for(
+              'profiler.get_config', {
+                'trans_id': trans_id,
+              }
+            );
+
+            $.ajax({
+              url: configURL,
+              method: 'GET',
+            })
+              .done(function(res) {
+                if (res.data.status === 'Success') {
+                  report_opts.push({
+                    'option' : 'Name',
+                    'value'  : res.data.result['name'],
+                  }, {
+                    'option' : 'Title',
+                    'value'  : res.data.result['title'],
+                  }, {
+                    'option' : 'Tabstop',
+                    'value'  : res.data.result['tabstop'],
+                  }, {
+                    'option' : 'SVG Width',
+                    'value'  : res.data.result['svg_width'],
+                  }, {
+                    'option' : 'Table Width',
+                    'value'  : res.data.result['table_width'],
+                  }, {
+                    'option' : 'Description',
+                    'value'  : res.data.result['desc'],
+                  }, );
+                } else {
+                  Alertify.alert(
+                    'Profiler Error',
+                    'Could not retrieve default options from server'
+                  );
+                }
+              });
+
+            console.warn(report_opts);
+
             this.ProfilerReportOptionsColl =
-                new ProfilerReportOptionsCollections(my_obj);
+                new ProfilerReportOptionsCollections(report_opts);
 
             // Initialize a new Grid instance
             if (this.grid) {
@@ -108,6 +129,8 @@ define([
               collection: this.ProfilerReportOptionsColl,
               className: 'backgrid table table-bordered table-noouter-border table-bottom-border',
             });
+
+            console.warn(grid);
 
             grid.render();
             $(this.elements.content).html(grid.el);
@@ -124,6 +147,8 @@ define([
           },
           settings: {
             trans_id: undefined,
+            profiler_new_browser_tab: undefined,
+            function_name_with_arguments: undefined,
           },
           setup: function() {
             return {
@@ -166,7 +191,7 @@ define([
                 });
               });
 
-              var baseUrl = url_for('profiler.input_report_options', {
+              var baseUrl = url_for('profiler.set_config', {
                 'trans_id' : self.setting('trans_id'),
               });
 
@@ -194,14 +219,7 @@ define([
               return true;
             }
 
-
             if (e.button.text === gettext('Cancel')) {
-              /* Clear the trans id */
-              $.ajax({
-                method: 'DELETE',
-                url: url_for('profiler.close', {'trans_id': this.setting('trans_id')}),
-              });
-
               return false;
             }
           },

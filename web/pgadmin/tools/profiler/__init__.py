@@ -81,19 +81,25 @@ class ProfilerModule(PgAdminModule):
                              'will be opened in a new browser tab.')
         )
 
+        self.top_k = self.preference.register(
+            'Properties', 'profiler_top_k',
+            gettext("Number of functions to report for"), 'integer', True,
+            category_label=gettext('Properties'),
+            help_str=gettext('The profiler will generate a report for the given number '
+                             'of functions')
+        )
+
     # TODO: Keyboard shortcuts
 
     def get_exposed_url_endpoints(self):
         return ['profiler.index','profiler.profile',
-                'profiler.init_for_database',
-                'profiler.init_for_function',
-                'profiler.initialize_target_for_function',
-                'profiler.initialize_target_indirect',
-                'profiler.get_parameters', 'profiler.input_report_options',
+                'profiler.init_for_database', 'profiler.init_for_function',
+                'profiler.initialize_target_for_function', 'profiler.initialize_target_indirect',
                 'profiler.start_monitor', 'profiler.start_execution',
                 'profiler.show_report', 'profiler.delete_report',
-                'profiler.get_src', 'profiler.get_reports',
+                'profiler.get_src', 'profiler.get_parameters', 'profiler.get_reports',
                 'profiler.set_arguments', 'profiler.get_arguments',
+                'profiler.set_config', 'profiler.get_config',
                 'profiler.close'
                 ]
 
@@ -749,51 +755,6 @@ def start_execution(trans_id):
         }
     )
 
-
-
-@blueprint.route(
-    '/input_report_options/<int:trans_id>', methods=['POST'],
-    endpoint='input_report_options'
-)
-@login_required
-def input_report_options(trans_id):
-    pfl_inst = ProfilerInstance(trans_id)
-    if pfl_inst.profiler_data is None:
-        return make_json_response(
-            data={
-                'status': 'NotConnected',
-                'result': gettext(
-                    'Not connected to server or connection with the server '
-                    'has been closed.'
-                )
-            }
-        )
-
-    data = json.loads(request.values['data'], encoding='utf-8')
-    try:
-        pfl_inst.config = {
-                   'name': data[0]['value'],
-                   'title': data[1]['value'],
-                   'tabstop': data[2]['value'],
-                   'svg_width': data[3]['value'],
-                   'table_width': data[4]['value'],
-                   'desc': data[5]['value']
-                  }
-
-        return make_json_response(
-            data={
-                'status': 'Success',
-            }
-        )
-
-    except Exception as e:
-        return make_json_response(
-            data={
-                'status': 'ERROR',
-                'result': str(e)
-            }
-        )
-
 @blueprint.route(
     '/close/<int:trans_id>', methods=["DELETE"], endpoint='close'
 )
@@ -1174,7 +1135,7 @@ def get_arguments_sqlite(sid, did, scid, func_id):
     get_arguments_sqlite(sid, did, scid, func_id)
 
     This method is responsible to get the function arguments saved to sqlite
-    database during first debugging.
+    database during profiling
 
     Parameters:
         sid
@@ -1220,13 +1181,17 @@ def get_arguments_sqlite(sid, did, scid, func_id):
         # As we do have entry available for that function so we need to add
         # that entry
         return make_json_response(
-            data={'result': args_data, 'args_count': PflFuncArgsCount}
+            data={
+                'result': args_data,
+                'args_count': PflFuncArgsCount}
         )
     else:
         # As we do not have any entry available for that function so we need
         # to add that entry
         return make_json_response(
-            data={'result': 'result', 'args_count': PflFuncArgsCount}
+            data={
+                'result': 'result',
+                'args_count': PflFuncArgsCount}
         )
 
 @blueprint.route(
@@ -1250,6 +1215,8 @@ def set_arguments_sqlite(sid, did, scid, func_id):
         - Schema Id
         func_id
         - Function Id
+    Returns:
+
     """
 
     if request.values['data']:
@@ -1334,6 +1301,9 @@ def set_arguments_sqlite(sid, did, scid, func_id):
 )
 @login_required
 def get_src(trans_id):
+    """
+
+    """
     pfl_inst = ProfilerInstance(trans_id)
     if pfl_inst.profiler_data is None:
         return make_json_response(
@@ -1358,6 +1328,8 @@ def get_src(trans_id):
 )
 @login_required
 def get_parameters(trans_id):
+    """
+    """
     pfl_inst = ProfilerInstance(trans_id)
     if pfl_inst.profiler_data is None:
         return make_json_response(
@@ -1385,6 +1357,8 @@ def get_parameters(trans_id):
 )
 @login_required
 def get_reports():
+    """
+    """
 
     # Retrieve the reports from the sqlite db
     saved_reports = ProfilerSavedReports.query.all()
@@ -1404,3 +1378,82 @@ def get_reports():
             'result': reports
         }
     )
+
+@blueprint.route(
+    '/get_config/<int:trans_id>', methods=['GET'],
+    endpoint='get_config'
+)
+@login_required
+def get_config(trans_id):
+    pfl_inst = ProfilerInstance(trans_id)
+    if pfl_inst.profiler_data is None:
+        return make_json_response(
+            data={
+                'status': 'NotConnected',
+                'result': gettext(
+                    'Not connected to server or connection with the server '
+                    'has been closed'
+                )
+            })
+
+    if pfl_inst.config is None:
+        return make_json_response(
+            data={
+                'status': 'Error',
+                'result': gettext(
+                    'Config not found'
+                )
+            }
+        )
+
+    print(pfl_inst.config)
+
+    return make_json_response(
+        data={
+            'status': 'Success',
+            'result': pfl_inst.config
+        }
+    )
+
+@blueprint.route(
+    '/set_config/<int:trans_id>', methods=['POST'],
+    endpoint='set_config'
+)
+@login_required
+def set_config(trans_id):
+    pfl_inst = ProfilerInstance(trans_id)
+    if pfl_inst.profiler_data is None:
+        return make_json_response(
+            data={
+                'status': 'NotConnected',
+                'result': gettext(
+                    'Not connected to server or connection with the server '
+                    'has been closed.'
+                )
+            }
+        )
+
+    data = json.loads(request.values['data'], encoding='utf-8')
+    try:
+        pfl_inst.config = {
+                   'name': data[0]['value'],
+                   'title': data[1]['value'],
+                   'tabstop': data[2]['value'],
+                   'svg_width': data[3]['value'],
+                   'table_width': data[4]['value'],
+                   'desc': data[5]['value']
+                  }
+
+        return make_json_response(
+            data={
+                'status': 'Success',
+            }
+        )
+
+    except Exception as e:
+        return make_json_response(
+            data={
+                'status': 'ERROR',
+                'result': str(e)
+            }
+        )

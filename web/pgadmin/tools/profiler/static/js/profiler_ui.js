@@ -544,7 +544,7 @@ define([
             // then we should use the existing arguments
             if (func_args_data.length == 0) {
               this.profilerInputArgsColl =
-              new ProfilerInputArgCollections(my_obj);
+                new ProfilerInputArgCollections(my_obj);
             } else {
               this.profilerInputArgsColl =
                 new ProfilerInputArgCollections(func_obj);
