@@ -74,50 +74,29 @@ define([
             },
             ];
 
-            var report_opts = [];
-            var configURL = url_for(
-              'profiler.get_config', {
-                'trans_id': trans_id,
-              }
-            );
-
-            $.ajax({
-              url: configURL,
-              method: 'GET',
-            })
-              .done(function(res) {
-                if (res.data.status === 'Success') {
-                  report_opts.push({
-                    'option' : 'Name',
-                    'value'  : res.data.result['name'],
-                  }, {
-                    'option' : 'Title',
-                    'value'  : res.data.result['title'],
-                  }, {
-                    'option' : 'Tabstop',
-                    'value'  : res.data.result['tabstop'],
-                  }, {
-                    'option' : 'SVG Width',
-                    'value'  : res.data.result['svg_width'],
-                  }, {
-                    'option' : 'Table Width',
-                    'value'  : res.data.result['table_width'],
-                  }, {
-                    'option' : 'Description',
-                    'value'  : res.data.result['desc'],
-                  }, );
-                } else {
-                  Alertify.alert(
-                    'Profiler Error',
-                    'Could not retrieve default options from server'
-                  );
-                }
-              });
-
-            console.warn(report_opts);
+            var my_obj = [];
+            my_obj.push({
+              'option' : 'Name',
+              'value'  : function_name_with_arguments,
+            }, {
+              'option' : 'Title',
+              'value'  : 'Pl/Profiler Report for ' + function_name_with_arguments,
+            }, {
+              'option' : 'Tabstop',
+              'value'  : '8',
+            }, {
+              'option' : 'SVG Width',
+              'value'  : '1200',
+            }, {
+              'option' : 'Table Width',
+              'value'  : '80%',
+            }, {
+              'option' : 'Description',
+              'value'  : '',
+            }, );
 
             this.ProfilerReportOptionsColl =
-                new ProfilerReportOptionsCollections(report_opts);
+                new ProfilerReportOptionsCollections(my_obj);
 
             // Initialize a new Grid instance
             if (this.grid) {
@@ -129,8 +108,6 @@ define([
               collection: this.ProfilerReportOptionsColl,
               className: 'backgrid table table-bordered table-noouter-border table-bottom-border',
             });
-
-            console.warn(grid);
 
             grid.render();
             $(this.elements.content).html(grid.el);
