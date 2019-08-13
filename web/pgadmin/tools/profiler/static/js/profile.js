@@ -102,14 +102,15 @@ define([
             } else if (res.data.status === 'NotConnected') {
               Alertify.alert(
                 gettext('Profiler Error'),
-                gettext('Error while starting profiling session.')
+                gettext('Error while starting profiling.')
               );
             }
           })
           .fail(function() {
+            $('.profiler-container').removeClass('show_progress');
             Alertify.alert(
               gettext('Profiler Error'),
-              gettext('Error while starting profiling session.')
+              gettext('Error while starting profiling.')
             );
           });
       },
@@ -159,14 +160,16 @@ define([
             } else if (res.data.status === 'NotConnected') {
               Alertify.alert(
                 gettext('Profiler Error'),
-                gettext('Error while starting profiling session.')
+                gettext('Error while starting monitoring.')
               );
             }
           })
           .fail(function() {
+            $('.profiler-container').removeClass('show_progress');
+
             Alertify.alert(
               gettext('Profiler Error'),
-              gettext('Error while starting profiling session.')
+              gettext('Error while starting monitoring.')
             );
           });
 

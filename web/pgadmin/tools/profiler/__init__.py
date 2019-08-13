@@ -35,8 +35,7 @@ from pgadmin.settings import get_setting
 from config import PG_DEFAULT_DRIVER
 from pgadmin.model import db, ProfilerSavedReports, ProfilerFunctionArguments
 from pgadmin.tools.profiler.utils.profiler_instance import ProfilerInstance
-
-from plprofiler import  plprofiler_report
+from pgadmin.tools.profiler.utils.profiler_report import plprofiler_report
 
 ASYNC_OK = 1
 
@@ -297,7 +296,8 @@ def init_function(node_type, sid, did, scid=None, fid=None):
             'pkgname': r_set['rows'][0]['pkgname'],
             'pkg': r_set['rows'][0]['pkg'],
             'require_input': data['require_input'],
-            'args_value': ''
+            'args_value': '',
+            'node_type': node_type
         }
 
         return make_json_response(
@@ -469,7 +469,7 @@ def initialize_target_indirect(profile_type, trans_id, sid, did):
         'server_id': sid,
         'database_id': did,
         'function_name' : 'Indirect',
-        'profile_type': profile_type,
+        'profile_type' : 'indirect',
         'restart_profile': 0,
         'duration' : data[0]['value'],
         'interval' : data[1]['value'],
@@ -567,6 +567,7 @@ def initialize_target(profile_type, trans_id, sid, did,
         'server_id': sid,
         'database_id': did,
         'schema_id': scid,
+        'profile_type': 'direct',
         'function_id': func_id,
         'function_name': pfl_inst.function_data['name'],
         'profile_type': profile_type,
@@ -712,7 +713,8 @@ def start_execution(trans_id):
     # Render the sql to run the function/procedure here
     func_name = pfl_inst.function_data['name']
     func_args = pfl_inst.function_data['args_value']
-    sql = 'SELECT * FROM ' + func_name + '('
+    sql = 'SELECT ' if pfl_inst.function_data['node_type'] == 'function' else 'CALL '
+    sql = sql + func_name + '('
     for arg_idx in range(len(func_args)):
         sql += str(func_args[arg_idx]['type']) + ' '
         sql += '\'' + str(func_args[arg_idx]['value']) + '\''
@@ -731,6 +733,7 @@ def start_execution(trans_id):
         conn.execute_async('SELECT pl_profiler_set_enabled_local(false)')
         conn.execute_async('RESET search_path')
     except Exception as e:
+        current_app.logger.exception(e)
         return make_json_response(
             data={
                 'status': 'ERROR',
@@ -1035,27 +1038,32 @@ def save_report(report_data, config, dbname, profile_type):
     Returns
     """
     now = datetime.now().strftime("%Y-%m-%d;%H:%M")
-    path = '/instance/direct/' + now + '.html'
+    path = os.path.dirname(os.path.abspath(current_app.root_path))
+    path = os.path.join(path, 'pgadmin', 'instance', now + '.html')
 
     report_data['config'] = config
 
-    with open(str(current_app.root_path) + path, 'w') as output_fd:
-        report = plprofiler_report.plprofiler_report()
-        report.generate(report_data, output_fd)
+    try:
+        with open(path, 'w') as output_fd:
+            report = plprofiler_report()
+            report.generate(report_data, output_fd)
 
-        output_fd.close()
+            output_fd.close()
 
-        profile_report = ProfilerSavedReports(
-            name = config['name'],
-            direct = False if profile_type == 'indirect' else True,
-            dbname = dbname,
-            time = now
-        )
+            profile_report = ProfilerSavedReports(
+                name = config['name'],
+                direct = False if profile_type == 'indirect' else True,
+                dbname = dbname,
+                time = now
+            )
 
-        db.session.add(profile_report)
-        db.session.commit()
+            db.session.add(profile_report)
+            db.session.commit()
 
-        return profile_report.rid
+            return profile_report.rid
+    except Exception as e:
+        current_app.logger.exception(e)
+        os.remove(path)
 
 
 @blueprint.route(
@@ -1072,7 +1080,9 @@ def delete_report(report_id):
     Returns:
     """
     report = ProfilerSavedReports.query.filter_by(rid=report_id).first()
-    path = str(current_app.root_path) + '/instance/direct/' + report.time + '.html'
+
+    path = os.path.dirname(os.path.abspath(current_app.root_path))
+    path = os.path.join(path, 'pgadmin', 'instance', report.time + '.html')
 
     if report is None:
         raise Exception('No report with given report_id found')
@@ -1088,6 +1098,7 @@ def delete_report(report_id):
             }
         )
     except Exception as e:
+        current_app.logger.exception(e)
         return make_json_response(
             data={
                 'status': 'ERROR',
@@ -1109,9 +1120,12 @@ def show_report(report_id):
         report_id
     Returns:
     """
-    report_data = ProfilerSavedReports.query.filter_by(rid=report_id).first()
-    path = str(current_app.root_path) + '/instance/direct/' + report_data.time + '.html'
-    if report_data is None:
+    report = ProfilerSavedReports.query.filter_by(rid=report_id).first()
+
+    path = os.path.dirname(os.path.abspath(current_app.root_path))
+    path = os.path.join(path, 'pgadmin', 'instance', report.time + '.html')
+
+    if report is None:
         raise Exception('PgAdmin4 could not find the specified report')
 
     if not os.path.exists(path):
@@ -1406,8 +1420,6 @@ def get_config(trans_id):
             }
         )
 
-    print(pfl_inst.config)
-
     return make_json_response(
         data={
             'status': 'Success',
@@ -1451,6 +1463,7 @@ def set_config(trans_id):
         )
 
     except Exception as e:
+        current_app.logger.exception(e)
         return make_json_response(
             data={
                 'status': 'ERROR',

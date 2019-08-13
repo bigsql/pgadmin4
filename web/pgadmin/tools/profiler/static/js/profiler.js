@@ -272,7 +272,7 @@ define([
             })
               .done(function() {
 
-                var url = url_for('profiler.direct', {
+                var url = url_for('profiler.profile', {
                   'trans_id': trans_id,
                 });
 
