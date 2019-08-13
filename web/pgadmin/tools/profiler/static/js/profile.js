@@ -16,7 +16,6 @@ define([
 ], function(
   gettext, url_for, $, _, Alertify, pgAdmin, pgBrowser, Backbone, Backgrid,
   Backform, codemirror, profile_function_again, input_report_options,
-  keyboardShortcuts, profilerUtils
 ) {
 
   var CodeMirror = codemirror.default,
@@ -54,11 +53,17 @@ define([
         self.disable('report-options', false);
       },
 
-      // Function to profile for direct profiling
+      /**
+       * Sends a message to the server to start direct profiling, then if successful, updates the
+       * results, updates the reports, and opens the newly created report in a new tab
+       *
+       * @param {int} trans_id - The unique transaction id for the already initialize profiling
+       *  instance
+       */
       start_execution: function(trans_id) {
         var self = this;
 
-        // Make ajax call to listen the database message
+        // Make ajax call to run profiler
         var baseUrl = url_for(
           'profiler.start_execution', {
             'trans_id': trans_id,
@@ -75,12 +80,20 @@ define([
           },
         })
           .done(function(res) {
-            console.warn(res.data);
             $('.profiler-container').removeClass('show_progress');
 
             if (res.data.status === 'Success') {
+
+              // Update the results
               self.AddResults(res.data.col_info, res.data.result);
               pgTools.Profile.results_panel.focus();
+
+              var reportUrl = url_for(
+                'profiler.show_report', {
+                  'report_id': res.data.report_id,
+                });
+
+              window.open(reportUrl, '_blank');
 
               // Update saved reports
               var reportsUrl = url_for('profiler.get_reports');
@@ -115,66 +128,117 @@ define([
           });
       },
 
-      // function to start indirect profiling (global monitoring)
-      start_monitor: function(trans_id) {
+      update_monitor_load: function(duration) {
+        var time_remaining = duration * 1000;
+        var intervalId = setInterval(function() {
+          $('.wcLoadingLabel').html(gettext('Monitoring for ' + time_remaining/1000 + ' seconds'));
+          time_remaining -= 1000;
+          if (time_remaining < 0) {
+            clearInterval(intervalId);
+          }
+        }, 1000);
+      },
+
+      /**
+       * Sends a message to the server to start indirect profiling, then if successful,
+       * updates the reports, and opens the newly created report in a new tab
+       *
+       * @param {int} trans_id - The unique transaction id for the already initialize profiling
+       *  instance
+       */
+      start_monitor: function(trans_id, duration) {
         var self = this;
 
-        // Make ajax call to listen the database message
-        var baseUrl = url_for(
-          'profiler.start_monitor', {
+        // Get duration through AJAX call to display to user
+        var getDurationUrl = url_for(
+          'profiler.get_duration', {
             'trans_id': trans_id,
           });
         $.ajax({
-          url: baseUrl,
+          url: getDurationUrl,
           method: 'GET',
-          beforeSend: function(xhr) {
-            xhr.setRequestHeader(
-              pgAdmin.csrf_token_header, pgAdmin.csrf_token
-            );
-            $('.profiler-container').addClass('show_progress');
-          },
         })
           .done(function(res) {
-            $('.profiler-container').removeClass('show_progress');
-
             if (res.data.status === 'Success') {
-              self.AddResults(res.data.col_info, res.data.result);
+              duration = parseInt(res.data.duration, 10);
 
-              // Update saved reports
-              var reportsUrl = url_for('profiler.get_reports');
+              // Make ajax call to start monitoring
+              var baseUrl = url_for(
+                'profiler.start_monitor', {
+                  'trans_id': trans_id,
+                });
               $.ajax({
-                url: reportsUrl,
+                url: baseUrl,
                 method: 'GET',
+                beforeSend: function(xhr) {
+                  xhr.setRequestHeader(
+                    pgAdmin.csrf_token_header, pgAdmin.csrf_token
+                  );
+                  pgTools.Profile.docker.startLoading(gettext('Monitoring for ' + duration + ' seconds'));
+                  self.update_monitor_load(duration);
+
+                  $('.profiler-container').addClass('show_progress');
+                },
               })
                 .done(function(res) {
+                  pgTools.Profile.docker.finishLoading();
+                  $('.profiler-container').removeClass('show_progress');
+
                   if (res.data.status === 'Success') {
-                    controller.AddReports(res.data.result);
+                    self.AddResults(res.data.col_info, res.data.result);
+
+                    // Update saved reports
+                    var reportsUrl = url_for('profiler.get_reports');
+                    $.ajax({
+                      url: reportsUrl,
+                      method: 'GET',
+                    })
+                      .done(function(res) {
+                        if (res.data.status === 'Success') {
+                          controller.AddReports(res.data.result);
+                        }
+                      })
+                      .fail(function() {
+                        Alertify.alert(
+                          gettext('Profiler Error'),
+                          gettext('Error while fetching reports.')
+                        );
+                      });
+                  } else if (res.data.status === 'NotConnected') {
+                    Alertify.alert(
+                      gettext('Profiler Error'),
+                      gettext('Error when starting monitoring.')
+                    );
                   }
                 })
                 .fail(function() {
+                  pgTools.Profile.docker.finishLoading();
+                  $('.profiler-container').removeClass('show_progress');
+
                   Alertify.alert(
                     gettext('Profiler Error'),
-                    gettext('Error while fetching reports.')
+                    gettext('Error while monitoring.')
                   );
                 });
-            } else if (res.data.status === 'NotConnected') {
-              Alertify.alert(
-                gettext('Profiler Error'),
-                gettext('Error while starting monitoring.')
-              );
+            } else if (res.data.status == 'Not Connected') {
+              // TODO;
             }
+
           })
           .fail(function() {
-            $('.profiler-container').removeClass('show_progress');
-
             Alertify.alert(
               gettext('Profiler Error'),
-              gettext('Error while starting monitoring.')
+              gettext('Error while getting duration.')
             );
           });
-
       },
 
+      /**
+       * Updates the results panel for the profiling window
+       *
+       * @param {Array} columns - Contains the names of the columns for the results panel
+       * @param {Array} result - Contains the values of the columns for the results panel
+       */
       AddResults: function(columns, result) {
         var self = this;
 
@@ -288,14 +352,6 @@ define([
           collection: new ParametersCollection(param_obj),
           className: 'backgrid table table-bordered table-noouter-border table-bottom-border',
         });
-
-        param_grid.collection.on(
-          'backgrid:edited', (ch1, ch2, command) => {
-            profilerUtils.setFocusToProfilerEditor(
-              pgTools.Profile.editor, command
-            );
-          }
-        );
 
         param_grid.render();
 

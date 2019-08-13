@@ -99,7 +99,7 @@ class ProfilerModule(PgAdminModule):
                 'profiler.get_src', 'profiler.get_parameters', 'profiler.get_reports',
                 'profiler.set_arguments', 'profiler.get_arguments',
                 'profiler.set_config', 'profiler.get_config',
-                'profiler.close'
+                'profiler.close', 'profiler.get_duration'
                 ]
 
 
@@ -1392,6 +1392,40 @@ def get_reports():
             'result': reports
         }
     )
+
+@blueprint.route(
+    '/get_duration/<int:trans_id>', methods=['GET'],
+    endpoint='get_duration'
+)
+def get_duration(trans_id):
+    pfl_inst = ProfilerInstance(trans_id)
+    if pfl_inst.profiler_data is None:
+        return make_json_response(
+            data={
+                'status': 'NotConnected',
+                'result': gettext(
+                    'Not connected to server or connection with the server '
+                    'has been closed'
+                )
+            })
+
+    if pfl_inst.profiler_data['duration'] is None:
+        return make_json_response(
+            data={
+                'status': 'Error',
+                'result': gettext(
+                    'Duration not found, was this an indirect profiling instance?'
+                )
+            }
+        )
+
+    return make_json_response(
+        data={
+            'status': 'Success',
+            'duration' : pfl_inst.profiler_data['duration']
+        }
+    )
+
 
 @blueprint.route(
     '/get_config/<int:trans_id>', methods=['GET'],
