@@ -175,7 +175,7 @@ define([
                     pgAdmin.csrf_token_header, pgAdmin.csrf_token
                   );
                   pgTools.Profile.docker.startLoading(gettext('Monitoring for ' + duration + ' seconds'));
-                  self.update_monitor_load(duration);
+                  self.update_monitor_load(duration - 1);
 
                   $('.profiler-container').addClass('show_progress');
                 },
@@ -375,7 +375,6 @@ define([
 
         var ProfilerReportsModel = Backbone.Model.extend({
           defaults: {
-            name: undefined,
             profile_type: undefined,
             database: undefined,
             time: undefined,
@@ -390,28 +389,46 @@ define([
 
         // Custom cell for delete button
         var deleteCell = Backgrid.Cell.extend({
+          className: 'delete-cell',
+
           events: {
             'click button' : 'deleteReport',
           },
 
           deleteReport: function(e) {
+
+            // need to save this because of Alertify call handler/scope
+            var temp = this;
+
             e.preventDefault();
-            var reportUrl = url_for(
-              'profiler.delete_report', {
-                'report_id' : this.model.get('report_id'),
-              });
 
-            $.ajax({
-              url : reportUrl,
-              method: 'POST',
-            })
-              .done(function(res) {
-                if (res.data.status == 'ERROR') {
-                  Alertify.alert(gettext(res.data.result));
-                }
-              });
+            // Create a confirm alert
+            Alertify.confirm(
+              'Delete',
+              'Would you like to delete the selected report?',
 
-            this.model.collection.remove(this.model);
+              // On confirmation send AJAX request to server to delete
+              // and delete from client interface
+              function() {
+                var reportUrl = url_for(
+                  'profiler.delete_report', {
+                    'report_id' : temp.model.get('report_id'),
+                  });
+
+                $.ajax({
+                  url : reportUrl,
+                  method: 'POST',
+                })
+                  .done(function(res) {
+                    if (res.data.status == 'ERROR') {
+                      Alertify.alert(gettext(res.data.result));
+                    }
+                  });
+
+                temp.model.collection.remove(temp.model);},
+
+              // On cancel do nothing
+              function() {});
           },
 
           render: function() {
@@ -422,6 +439,8 @@ define([
 
         // Custom cell for show report button
         var reportCell = Backgrid.Cell.extend({
+          className: 'report-cell',
+
           events: {
             'click button' : 'generateReport',
           },
@@ -443,62 +462,56 @@ define([
 
         });
 
-        var reportsGridCols = [{
-          name: 'name',
-          label: gettext('Name'),
-          type: 'text',
-          editable: false,
-          cell: 'string',
-        },
-        {
-          name: 'profile_type',
-          label: gettext('Profile Type'),
-          type: 'text',
-          editable: false,
-          cell: 'string',
-        },
-        {
-          name: 'database',
-          label: gettext('Database'),
-          type: 'text',
-          editable: false,
-          cell: 'string',
-        },
-        {
-          name: 'time',
-          label: gettext('Date/Time'),
-          type: 'text',
-          editable: false,
-          cell: 'string',
-        },
-        {
-          name: 'report_id',
-          label: gettext('Show Report'),
-          type: 'text',
-          editable: false,
-          cell: reportCell,
-        },
-        {
-          name: 'delete',
-          label: gettext('Delete Report'),
-          type: 'text',
-          editable: false,
-          cell: deleteCell,
-        },
+        var reportsGridCols = [
+          {
+            name: 'profile_type',
+            label: gettext('Profile Type'),
+            type: 'text',
+            editable: false,
+            cell: 'string',
+          },
+          {
+            name: 'database',
+            label: gettext('Database'),
+            type: 'text',
+            editable: false,
+            cell: 'string',
+          },
+          {
+            name: 'start_date',
+            label: gettext('Start Date'),
+            type: 'text',
+            editable: false,
+            cell: 'string',
+          },
+          {
+            name: 'report_id',
+            label: gettext('Show Report'),
+            type: 'text',
+            editable: false,
+            cell: reportCell,
+          },
+          {
+            name: 'delete',
+            label: gettext('Delete Report'),
+            type: 'text',
+            editable: false,
+            cell: deleteCell,
+          },
         ];
 
         var reports_obj = [];
         if (result.length != 0) {
           for (var i = 0; i < result.length; i++) {
             reports_obj.push({
-              'name': result[i].name,
-              'profile_type': (result[i].profile_type === true ? 'Direct' : 'Indirect'),
+              'profile_type': (result[i].profile_type === true ? result[i].name : 'Global'),
               'database': result[i].database,
-              'time': result[i].time,
+              'start_date': result[i].time,
               'report_id': result[i].report_id,
             });
           }
         }
+        console.warn(reports_obj);
 
         // Initialize a new Grid instance
         var reports_grid = this.reports_grid = new Backgrid.Grid({
@@ -508,7 +521,7 @@ define([
           className: 'backgrid table table-bordered table-noouter-border table-bottom-border',
         });
 
-        reports_grid.render();
+        reports_grid.render().sort('start_date', 'descending');
 
         // Render the result grid into result panel
         pgTools.Profile.reports_panel
@@ -657,11 +670,8 @@ define([
           );
         });
 
-      // Below code will be executed for indirect profiling
-      // indirect profiling - 0  and for direct profiling - 1
-      if (trans_id != undefined && !profile_type) {
-        controller.AddSrc(['']);
-      } else if (trans_id != undefined && profile_type) { // Direct profiling
+      // Direct profiling requires fetching the parameteters and sql source code
+      if (trans_id != undefined && profile_type) {
 
         // Get parameters
         var paramUrl = url_for('profiler.get_parameters', {

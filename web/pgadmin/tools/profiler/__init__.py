@@ -389,7 +389,7 @@ def profile_new(trans_id):
     layout = get_setting('Profiler/Layout')
 
     return render_template(
-        "profiler/direct.html",
+        "profiler/profiler_window.html",
         _=gettext,
         function_name=function_name,
         uniqueId=trans_id,
@@ -1081,11 +1081,12 @@ def delete_report(report_id):
     """
     report = ProfilerSavedReports.query.filter_by(rid=report_id).first()
 
+    if report is None:
+        raise Exception('No report with given report_id found')
+
     path = os.path.dirname(os.path.abspath(current_app.root_path))
     path = os.path.join(path, 'pgadmin', 'instance', report.time + '.html')
 
-    if report is None:
-        raise Exception('No report with given report_id found')
 
     try:
         db.session.delete(report)
@@ -1453,6 +1454,9 @@ def get_config(trans_id):
                 )
             }
         )
+
+
+    print(pfl_inst.config)
 
     return make_json_response(
         data={

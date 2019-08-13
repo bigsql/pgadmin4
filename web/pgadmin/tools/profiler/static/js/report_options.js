@@ -46,6 +46,12 @@ define([
             this.preferences = pgBrowser.get_preferences_for_module('profiler');
             this.set('title', title);
 
+            if (this.initialized){
+              return;
+            }
+
+            this.initialized = true;
+
             // setting value in alertify settings allows us to access it from
             // other functions other than main function.
             this.set('trans_id', trans_id);
@@ -75,6 +81,33 @@ define([
             ];
 
             var my_obj = [];
+
+            /*var configUrl = url_for(
+              'profiler.get_config', {
+                'trans_id': trans_id,
+              });
+
+            
+            $.ajax({
+              url: configUrl,
+              method: 'GET',
+            })
+              .done(function(res) {
+                var result = res.data.result;
+                console.warn(res);
+                console.warn(result);
+                if (result.length != 0) {
+                  //var param_obj = [];
+                  for (var i = 0; i < result.length; i++) {
+                    my_obj.push({
+                      'option': result[i].option,
+                      'value': result[i].value,
+                    });
+                  }
+                }
+              });
+            */
+
             my_obj.push({
               'option' : 'Name',
               'value'  : function_name_with_arguments,

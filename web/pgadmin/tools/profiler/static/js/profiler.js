@@ -69,7 +69,7 @@ define([
         callback: 'get_options',
         category: gettext('Profiling'),
         priority: 11,
-        label:gettext('Monitor'),
+        label:gettext('Global Profiling'),
         data: {
           object: 'function',
         },

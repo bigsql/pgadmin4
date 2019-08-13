@@ -32,10 +32,13 @@
   width: 8%;
 }
 
-.report_id > .button {
+.delete-cell {
   text-align: center;
+  background-color: #f3f5f9;
 }
 
-.delete > .button {
-  text-align:center;
+.report-cell.sortable.renderable{
+  text-align: center;
+  background-color: #f3f5f9;
+  overflow: hidden !important;
 }
