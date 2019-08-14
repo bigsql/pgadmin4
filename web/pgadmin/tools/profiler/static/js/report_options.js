@@ -82,12 +82,11 @@ define([
 
             var my_obj = [];
 
-            /*var configUrl = url_for(
+            var configUrl = url_for(
               'profiler.get_config', {
                 'trans_id': trans_id,
               });
 
-            
             $.ajax({
               url: configUrl,
               method: 'GET',
@@ -106,8 +105,7 @@ define([
                   }
                 }
               });
-            */
-
+            /*
             my_obj.push({
               'option' : 'Name',
               'value'  : function_name_with_arguments,
@@ -127,6 +125,7 @@ define([
               'option' : 'Description',
               'value'  : '',
             }, );
+            */
 
             this.ProfilerReportOptionsColl =
                 new ProfilerReportOptionsCollections(my_obj);

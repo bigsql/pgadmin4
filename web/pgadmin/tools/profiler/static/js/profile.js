@@ -670,36 +670,35 @@ define([
           );
         });
 
-      // Direct profiling requires fetching the parameteters and sql source code
-      if (trans_id != undefined && profile_type) {
+      // Get parameters
+      var paramUrl = url_for('profiler.get_parameters', {
+        'trans_id': trans_id,
+      });
+      $.ajax({
+        url: paramUrl,
+        method: 'GET',
+      })
+        .done(function(res) {
+          if (res.data.status === 'Success') {
+            controller.AddParameters(res.data.result);
+          }
 
-        // Get parameters
-        var paramUrl = url_for('profiler.get_parameters', {
-          'trans_id': trans_id,
-        });
-        $.ajax({
-          url: paramUrl,
-          method: 'GET',
-        })
-          .done(function(res) {
-            if (res.data.status === 'Success') {
-              controller.AddParameters(res.data.result);
-            }
-
-            else if (res.data.status === 'NotConnected') {
-              Alertify.alert(
-                gettext('Profiler Error'),
-                gettext('Error while fetching parameters.')
-              );
-            }
-          })
-          .fail(function() {
+          else if (res.data.status === 'NotConnected') {
             Alertify.alert(
               gettext('Profiler Error'),
               gettext('Error while fetching parameters.')
             );
-          });
+          }
+        })
+        .fail(function() {
+          Alertify.alert(
+            gettext('Profiler Error'),
+            gettext('Error while fetching parameters.')
+          );
+        });
 
+      // Direct profiling requires fetching the parameteters and sql source code
+      if (trans_id != undefined && profile_type) {
         // Get source code
         var srcUrl = url_for('profiler.get_src', {
           'trans_id' : trans_id,

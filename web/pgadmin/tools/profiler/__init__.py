@@ -608,7 +608,7 @@ def start_monitor(trans_id):
 
     duration = pfl_inst.profiler_data['duration']
     interval = pfl_inst.profiler_data['interval']
-    pid = pfl_inst.profiler_data['pid']
+    pid      = pfl_inst.profiler_data['pid']
 
     # Create asynchronous connection using random connection id.
     exe_conn_id = str(random.randint(1, 9999999))
@@ -711,6 +711,7 @@ def start_execution(trans_id):
         return internal_server_error(errormsg=str(msg))
 
     # Render the sql to run the function/procedure here
+    # TODO: convert into sql template
     func_name = pfl_inst.function_data['name']
     func_args = pfl_inst.function_data['args_value']
     sql = 'SELECT ' if pfl_inst.function_data['node_type'] == 'function' else 'CALL '
@@ -1357,14 +1358,33 @@ def get_parameters(trans_id):
             }
         )
 
-    arg_values = pfl_inst.function_data['args_value']
+    if pfl_inst.profiler_data['profile_type'] == 'direct':
+        return make_json_response(
+            data={
+                'status': 'Success',
+                'result': pfl_inst.function_data['args_value']
+            }
+        )
 
-    return make_json_response(
-        data={
-            'status': 'Success',
-            'result': arg_values
-        }
-    )
+    else: # profile type is indirect
+        return make_json_response(
+            data={
+                'status': 'Success',
+                'result': [
+                    {'name': 'Duration',
+                     'type': 'Monitoring Parameter',
+                      'value': pfl_inst.profiler_data['duration']},
+                    {'name': 'Interval',
+                     'type': 'Monitoring Parameter',
+                     'value': pfl_inst.profiler_data['interval']},
+                    {'name': 'PID',
+                     'type': 'Monitoring Parameter',
+                     'value': pfl_inst.profiler_data['pid'] \
+                             if pfl_inst.profiler_data['pid'] != 'No PID specified' \
+                             else pfl_inst.profiler_data['pid']}
+                ]
+            }
+        )
 
 @blueprint.route(
     '/get_reports', methods=['GET'],
@@ -1457,11 +1477,17 @@ def get_config(trans_id):
 
 
     print(pfl_inst.config)
+    result = []
+    for option in pfl_inst.config:
+        result.append({
+            'option': option,
+            'value' : pfl_inst.config[option]
+        })
 
     return make_json_response(
         data={
             'status': 'Success',
-            'result': pfl_inst.config
+            'result': result
         }
     )
 

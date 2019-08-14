@@ -64,7 +64,7 @@ define([
               'value'  : '',
             },
             {
-              'option' : 'PID',
+              'option' : 'PID(Optional)',
               'value'  : '',
             },);
 
@@ -297,7 +297,7 @@ define([
     }
 
     Alertify.profilerInputOptionsDialog(
-      gettext('Monitoring Options'), profile_info, restart_profile, trans_id
+      gettext('Global Profiling Options'), profile_info, restart_profile, trans_id
     ).resizeTo(pgBrowser.stdW.md,pgBrowser.stdH.md);
   };
 
