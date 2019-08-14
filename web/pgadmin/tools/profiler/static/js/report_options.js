@@ -80,6 +80,8 @@ define([
             },
             ];
 
+            /*
+            TODO: Sync server defaults config and hard-coded config here
             var my_obj = [];
 
             var configUrl = url_for(
@@ -93,8 +95,6 @@ define([
             })
               .done(function(res) {
                 var result = res.data.result;
-                console.warn(res);
-                console.warn(result);
                 if (result.length != 0) {
                   //var param_obj = [];
                   for (var i = 0; i < result.length; i++) {
@@ -105,8 +105,10 @@ define([
                   }
                 }
               });
-            /*
-            my_obj.push({
+            */
+
+            var obj = [];
+            obj.push({
               'option' : 'Name',
               'value'  : function_name_with_arguments,
             }, {
@@ -125,10 +127,9 @@ define([
               'option' : 'Description',
               'value'  : '',
             }, );
-            */
 
             this.ProfilerReportOptionsColl =
-                new ProfilerReportOptionsCollections(my_obj);
+                new ProfilerReportOptionsCollections(obj);
 
             // Initialize a new Grid instance
             if (this.grid) {

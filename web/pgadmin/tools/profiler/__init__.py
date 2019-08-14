@@ -1475,8 +1475,7 @@ def get_config(trans_id):
             }
         )
 
-
-    print(pfl_inst.config)
+    # Formatting the config for column view for client
     result = []
     for option in pfl_inst.config:
         result.append({

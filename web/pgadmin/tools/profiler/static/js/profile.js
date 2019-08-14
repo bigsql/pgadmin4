@@ -382,6 +382,18 @@ define([
           },
         });
 
+        var ClickableRow = Backgrid.Row.extend({
+          events: {
+            'click': 'onClick',
+          },
+
+          onClick: function (e) {
+            Alertify.alert('asdf');
+            e.stopPropagation();
+          },
+
+        });
+
         // Collection which contains the model for report informations.
         var ReportsCollection = self.ReportsCollection = Backbone.Collection.extend({
           model: ProfilerReportsModel,
@@ -511,12 +523,12 @@ define([
             });
           }
         }
-        console.warn(reports_obj);
 
         // Initialize a new Grid instance
         var reports_grid = this.reports_grid = new Backgrid.Grid({
           emptyText: 'No data found',
           columns: reportsGridCols,
+          row: ClickableRow,
           collection: new ReportsCollection(reports_obj),
           className: 'backgrid table table-bordered table-noouter-border table-bottom-border',
         });
@@ -733,6 +745,9 @@ define([
 
     buildDefaultLayout: function(docker) {
       let code_editor_panel = docker.addPanel('code', wcDocker.DOCK.TOP);
+      docker.addPanel('current_report', wcDocker.DOCK.STACKED, code_editor_panel, {
+        tabOrientation: wcDocker.TAB.TOP,
+      });
 
       let parameters_panel = docker.addPanel('parameters', wcDocker.DOCK.BOTTOM, code_editor_panel);
       docker.addPanel('results',wcDocker.DOCK.STACKED, parameters_panel, {
