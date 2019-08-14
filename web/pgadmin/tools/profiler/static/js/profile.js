@@ -388,8 +388,33 @@ define([
           },
 
           onClick: function (e) {
-            Alertify.alert('asdf');
             e.stopPropagation();
+
+            var reportUrl = url_for(
+              'profiler.show_report', {
+                'report_id': this.model.get('report_id'),
+              });
+
+            $.ajax({
+              url: reportUrl,
+              method: 'GET',
+              data: this.model.get('report_id'),
+            })
+              .done(function(res) {
+                pgTools.Profile.current_report_panel
+                  .$container
+                  .find('.current_report')
+                  .html(res);
+
+                pgTools.Profile.current_report_panel.focus();
+              })
+              .fail(function() {
+                Alertify.alert(
+                  gettext('Profiler error'),
+                  gettext('Error while getting report data.')
+                )
+              });
+
           },
 
         });
@@ -628,8 +653,6 @@ define([
       if (this.initialized)
         return;
 
-      //var baseUrl;
-
       this.initialized = true;
       this.trans_id = trans_id;
       this.profile_type = profile_type;
@@ -727,7 +750,7 @@ define([
             else if (res.data.status === 'NotConnected') {
               Alertify.alert(
                 gettext('Profiler Error'),
-                gettext('Error whiel fetching parameters.')
+                gettext('Error while fetching parameters.')
               );
             }
           })
@@ -737,23 +760,20 @@ define([
               gettext('Error while fetching sql source code.')
             );
           });
-      } else {
-        this.initializePanels();
       }
     },
 
-
     buildDefaultLayout: function(docker) {
       let code_editor_panel = docker.addPanel('code', wcDocker.DOCK.TOP);
-      docker.addPanel('current_report', wcDocker.DOCK.STACKED, code_editor_panel, {
-        tabOrientation: wcDocker.TAB.TOP,
-      });
 
       let parameters_panel = docker.addPanel('parameters', wcDocker.DOCK.BOTTOM, code_editor_panel);
       docker.addPanel('results',wcDocker.DOCK.STACKED, parameters_panel, {
         tabOrientation: wcDocker.TAB.TOP,
       });
       docker.addPanel('reports', wcDocker.DOCK.STACKED, parameters_panel);
+      docker.addPanel('current_report', wcDocker.DOCK.STACKED, code_editor_panel, {
+        tabOrientation: wcDocker.TAB.TOP,
+      });
     },
 
     // Create the profiler layout with splitter and display the appropriate data received from server.
@@ -796,10 +816,21 @@ define([
             content: '<div id ="reports" class="reports" tabindex="0"></div>',
           });
 
+          var current_report = new pgAdmin.Browser.Panel({
+            name: 'current_report',
+            title: gettext('Current Report'),
+            width: '100%',
+            height: '100%',
+            isCloseable: false,
+            isPrivate: true,
+            content: '<div id ="current_report" class="current_report" tabindex="0"></div>',
+          });
+
           // Load all the created panels
           parameters.load(self.docker);
           results.load(self.docker);
           reports.load(self.docker);
+          current_report.load(self.docker);
         });
 
       // restore the layout if present else fallback to buildDefaultLayout
@@ -810,9 +841,11 @@ define([
       });
 
       self.code_editor_panel = self.docker.findPanels('code')[0];
+
       self.parameters_panel = self.docker.findPanels('parameters')[0];
       self.results_panel = self.docker.findPanels('results')[0];
       self.reports_panel = self.docker.findPanels('reports')[0];
+      self.current_report_panel = self.docker.findPanels('current_report')[0];
 
       var editor_pane = $('<div id="stack_editor_pane" ' +
         'class="pg-panel-content info"></div>');
