@@ -64,7 +64,7 @@ define([
               'value'  : '',
             },
             {
-              'option' : 'PID(Optional)',
+              'option' : 'PID (Optional)',
               'value'  : '',
             },);
 

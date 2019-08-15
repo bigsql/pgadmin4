@@ -42,3 +42,11 @@
   background-color: #f3f5f9;
   overflow: hidden !important;
 }
+
+.sortable.renderable.profile_type>button, .sortable.renderable.database>button,
+.sortable.renderable.start_date>button, .sortable.renderableduration>button,
+.sortable.renderable.report_id>button, .sortable.renderable.delete>button,
+.sortable.renderable, tr>th {
+  text-align:center !important;
+  overflow:hidden !important;
+}

@@ -324,3 +324,5 @@ class ProfilerSavedReports(db.Model):
     direct = db.Column(db.Boolean(), nullable=False)
     dbname = db.Column(db.String(), nullable=False)
     time = db.Column(db.String(), nullable=False)
+    duration = db.Column(db.Integer(), nullable=False)
+    path = db.Column(db.String(), nullable=False)

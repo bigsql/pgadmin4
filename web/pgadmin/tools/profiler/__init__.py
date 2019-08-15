@@ -655,7 +655,11 @@ def start_monitor(trans_id):
 
     # At this point we have the data in shared memory and need to create a report from it
     report_data = generate_report(conn, 'shared', opt_top=10, func_oids={})
-    save_report(report_data, pfl_inst.config, conn.as_dict()['database'], pfl_inst.profiler_data['profile_type'])
+    save_report(report_data,
+                pfl_inst.config,
+                conn.as_dict()['database'],
+                pfl_inst.profiler_data['profile_type'],
+                pfl_inst.profiler_data['duration'])
 
 
     return make_json_response(
@@ -730,7 +734,11 @@ def start_execution(trans_id):
         conn.execute_async('SELECT pl_profiler_set_collect_interval(0)')
         status, result = conn.execute_async_list(sql)
         report_data = generate_report(conn, 'local', opt_top=10, func_oids={}) # TODO: Add support for K top
-        report_id = save_report(report_data, pfl_inst.config, conn.as_dict()['database'], pfl_inst.profiler_data['profile_type'])
+        report_id = save_report(report_data,
+                                pfl_inst.config,
+                                conn.as_dict()['database'],
+                                pfl_inst.profiler_data['profile_type'],
+                                -1)
         conn.execute_async('SELECT pl_profiler_set_enabled_local(false)')
         conn.execute_async('RESET search_path')
     except Exception as e:
@@ -954,14 +962,14 @@ def generate_report(conn, data_location, opt_top, func_oids = None):
         # With that we can start the definition.
         # ----
         func_def = {
-                'funcoid': func_oid,
-                'schema': row['nspname'],
-                'funcname': row['proname'],
-                'funcresult': row['pg_get_function_result'],
-                'funcargs': row['pg_get_function_arguments'],
-                'total_time': linestats[func_oid][0][3],
-                'self_time': int(row['self_time']),
-                'source': [],
+                'funcoid'    : func_oid,
+                'schema'     : row['nspname'],
+                'funcname'   : row['proname'],
+                'funcresult' : row['pg_get_function_result'],
+                'funcargs'   : row['pg_get_function_arguments'],
+                'total_time' : linestats[func_oid][0][3],
+                'self_time'  : int(row['self_time']),
+                'source'     : [],
             }
 
         # ----
@@ -969,11 +977,11 @@ def generate_report(conn, data_location, opt_top, func_oids = None):
         # ----
         for row in linestats[func_oid]:
             func_def['source'].append({
-                    'line_number': int(row[1]),
-                    'source': row[5],
-                    'exec_count': int(row[2]),
-                    'total_time': int(row[3]),
-                    'longest_time': int(row[4]),
+                    'line_number'  : int(row[1]),
+                    'source'       : row[5],
+                    'exec_count'   : int(row[2]),
+                    'total_time'   : int(row[3]),
+                    'longest_time' : int(row[4]),
                 })
 
         # ----
@@ -1010,24 +1018,24 @@ def generate_report(conn, data_location, opt_top, func_oids = None):
         overflow_flags = result[0]
 
     return {
-            'callgraph_overflow': False \
+            'callgraph_overflow' : False \
                 if data_location == 'local' \
                 else overflow_flags['pl_profiler_callgraph_overflow'],
-            'functions_overflow': False \
+            'functions_overflow' : False \
                 if data_location == 'local' \
                 else overflow_flags['pl_profiler_functions_overflow'],
-            'lines_overflow': False \
+            'lines_overflow' : False \
                 if data_location == 'local' \
                 else overflow_flags['pl_profiler_lines_overflow'],
-            'func_list': func_list,
-            'func_defs': func_defs,
-            'flamedata': flamedata,
-            'callgraph': callgraph,
+            'func_list' : func_list,
+            'func_defs' : func_defs,
+            'flamedata' : flamedata,
+            'callgraph' : callgraph,
             'func_oids_by_user': func_oids_by_user,
-            'found_more_funcs': found_more_funcs,
+            'found_more_funcs' : found_more_funcs,
         }
 
-def save_report(report_data, config, dbname, profile_type):
+def save_report(report_data, config, dbname, profile_type, duration):
     """
     save_report(report_data, config, dbname, profile_type)
 
@@ -1052,10 +1060,12 @@ def save_report(report_data, config, dbname, profile_type):
             output_fd.close()
 
             profile_report = ProfilerSavedReports(
-                name = config['name'],
-                direct = False if profile_type == 'indirect' else True,
-                dbname = dbname,
-                time = now
+                name     = config['name'],
+                direct   = False if profile_type == 'indirect' else True,
+                dbname   = dbname,
+                time     = now,
+                duration = duration,
+                path     = path
             )
 
             db.session.add(profile_report)
@@ -1085,10 +1095,7 @@ def delete_report(report_id):
     if report is None:
         raise Exception('No report with given report_id found')
 
-    path = os.path.dirname(os.path.abspath(current_app.root_path))
-    path = os.path.join(path, 'pgadmin', 'instance', report.time + '.html')
-
-
+    path = report.path
     try:
         db.session.delete(report)
         db.session.commit()
@@ -1124,12 +1131,10 @@ def show_report(report_id):
     """
     report = ProfilerSavedReports.query.filter_by(rid=report_id).first()
 
-    path = os.path.dirname(os.path.abspath(current_app.root_path))
-    path = os.path.join(path, 'pgadmin', 'instance', report.time + '.html')
+    path = report.path
 
     if report is None:
         raise Exception('PgAdmin4 could not find the specified report')
-
     if not os.path.exists(path):
         raise Exception('The selected report could not be found by PgAdmin4')
 
@@ -1371,17 +1376,17 @@ def get_parameters(trans_id):
             data={
                 'status': 'Success',
                 'result': [
-                    {'name': 'Duration',
-                     'type': 'Monitoring Parameter',
-                      'value': pfl_inst.profiler_data['duration']},
-                    {'name': 'Interval',
-                     'type': 'Monitoring Parameter',
-                     'value': pfl_inst.profiler_data['interval']},
-                    {'name': 'PID',
-                     'type': 'Monitoring Parameter',
-                     'value': pfl_inst.profiler_data['pid'] \
-                             if pfl_inst.profiler_data['pid'] != 'No PID specified' \
-                             else pfl_inst.profiler_data['pid']}
+                    {'name'  : 'Duration',
+                     'type'  : 'Monitoring Parameter',
+                     'value' : pfl_inst.profiler_data['duration']},
+                    {'name'  : 'Interval',
+                     'type'  : 'Monitoring Parameter',
+                     'value' : pfl_inst.profiler_data['interval']},
+                    {'name'  : 'PID',
+                     'type'  : 'Monitoring Parameter',
+                     'value' : pfl_inst.profiler_data['pid'] \
+                               if pfl_inst.profiler_data['pid'] != 'No PID specified' \
+                               else pfl_inst.profiler_data['pid']}
                 ]
             }
         )
@@ -1401,11 +1406,12 @@ def get_reports():
     # Format the reports to send to the client
     reports = []
     for report in saved_reports:
-        reports.append({'name' : report.name,
-                        'database' : report.dbname,
-                        'time' : report.time,
+        reports.append({'name'         : report.name,
+                        'database'     : report.dbname,
+                        'time'         : report.time,
                         'profile_type' : report.direct,
-                        'report_id' : report.rid})
+                        'duration'     : report.duration,
+                        'report_id'    : report.rid})
 
     return make_json_response(
         data={
@@ -1511,12 +1517,12 @@ def set_config(trans_id):
     data = json.loads(request.values['data'], encoding='utf-8')
     try:
         pfl_inst.config = {
-                   'name': data[0]['value'],
-                   'title': data[1]['value'],
-                   'tabstop': data[2]['value'],
-                   'svg_width': data[3]['value'],
+                   'name'       : data[0]['value'],
+                   'title'      : data[1]['value'],
+                   'tabstop'    : data[2]['value'],
+                   'svg_width'  : data[3]['value'],
                    'table_width': data[4]['value'],
-                   'desc': data[5]['value']
+                   'desc'       : data[5]['value']
                   }
 
         return make_json_response(

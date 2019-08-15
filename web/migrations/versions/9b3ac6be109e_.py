@@ -37,6 +37,8 @@ def upgrade():
     sa.Column('direct', sa.Boolean(), nullable=False),
     sa.Column('dbname', sa.String(), nullable=False),
     sa.Column('time', sa.String(), nullable=False),
+    sa.Column('duration', sa.Integer(), nullable=False),
+    sa.Column('path', sa.String(), nullable=False),
     sa.PrimaryKeyConstraint('rid')
     )
     # ### end Alembic commands ###

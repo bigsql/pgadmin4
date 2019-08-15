@@ -375,27 +375,12 @@ define([
           self.reports_grid = null;
         }
 
-        var selectableRow = Backgrid.Row.extend({
-          className: 'selectable-row',
-          highlightColor: 'lightYellow',
-
-          events: {
-            'click': 'onClick',
-          },
-
-          onClick: function (e) {
-            e.stopPropagation();
-
-            Backbone.trigger('rowClicked', this);
-          },
-
-        });
-
         var ProfilerReportsModel = Backbone.Model.extend({
           defaults: {
             profile_type: undefined,
             database: undefined,
             time: undefined,
+            duration: undefined,
             report_id: undefined,
           },
         });
@@ -405,133 +390,128 @@ define([
           model: ProfilerReportsModel,
         });
 
-        // Custom cell for delete button
-        var deleteCell = Backgrid.Cell.extend({
-          className: 'delete-cell',
-
-          events: {
-            'click button' : 'deleteReport',
-          },
-
-          deleteReport: function(e) {
-
-            // need to save this because of Alertify call handler/scope
-            var temp = this;
-
-            e.preventDefault();
-
-            // Create a confirm alert
-            Alertify.confirm(
-              'Delete',
-              'Would you like to delete the selected report?',
-
-              // On confirmation send AJAX request to server to delete
-              // and delete from client interface
-              function() {
-                var reportUrl = url_for(
-                  'profiler.delete_report', {
-                    'report_id' : temp.model.get('report_id'),
-                  });
-
-                $.ajax({
-                  url : reportUrl,
-                  method: 'POST',
-                })
-                  .done(function(res) {
-                    if (res.data.status == 'ERROR') {
-                      Alertify.alert(gettext(res.data.result));
-                    }
-                  });
-
-                  // Update reports
-                  var reportsUrl = url_for('profiler.get_reports');
-                  $.ajax({
-                    url: reportsUrl,
-                    method: 'GET',
-                  })
-                    .done(function(res) {
-                      if (res.data.status === 'Success') {
-
-                        controller.AddReports(res.data.result);
-                      }
-                    })
-                    .fail(function() {
-                      Alertify.alert(
-                        gettext('Profiler Error'),
-                        gettext('Error while fetching reports.')
-                      );
-                    });
-
-              // On cancel do nothing
-              function() {});
-          },
-
-          render: function() {
-            this.$el.html('<button> Delete </button>');
-            return this;
-          },
-        });
-
-        // Custom cell for show report button
-        var reportCell = Backgrid.Cell.extend({
-          className: 'report-cell',
-
-          events: {
-            'click button' : 'generateReport',
-          },
-
-          generateReport: function(e) {
-            e.preventDefault();
-            var reportUrl = url_for(
-              'profiler.show_report', {
-                'report_id': this.model.get('report_id'),
-              });
-
-            window.open(reportUrl, '_blank');
-          },
-
-          render: function() {
-            this.$el.html('<button> Show </button>');
-            return this;
-          },
-
-        });
-
         var reportsGridCols = [
           {
             name: 'profile_type',
-            label: gettext('Profile Type'),
+            label: gettext('Profile Type / Function Name'),
             type: 'text',
             editable: false,
             cell: 'string',
           },
           {
             name: 'database',
-            label: gettext('Database'),
+            label: gettext('Database Name'),
             type: 'text',
             editable: false,
             cell: 'string',
           },
           {
             name: 'start_date',
-            label: gettext('Start Date'),
+            label: gettext('Start Date/Time'),
             type: 'text',
             editable: false,
             cell: 'string',
+          },
+          {
+            name: 'duration',
+            label: gettext('Duration'),
+            type: 'text',
+            editable: false,
+            cell: 'integer',
           },
           {
             name: 'report_id',
             label: gettext('Show Report'),
             type: 'text',
             editable: false,
-            cell: reportCell,
+            cell: Backgrid.Cell.extend({
+              className: 'report-cell',
+              events: {
+                'click button' : 'generateReport',
+              },
+              generateReport: function(e) {
+                e.preventDefault();
+                var reportUrl = url_for(
+                  'profiler.show_report', {
+                    'report_id': this.model.get('report_id'),
+                  });
+                window.open(reportUrl, '_blank');
+              },
+              render: function() {
+                this.$el.html('<button> Show </button>');
+                return this;
+              },
+            }),
           },
           {
             name: 'delete',
             label: gettext('Delete Report'),
             type: 'text',
             editable: false,
-            cell: deleteCell,
+            cell: Backgrid.Cell.extend({
+              className: 'delete-cell',
+              events: {
+                'click button' : 'deleteReport',
+              },
+
+              deleteReport: function(e) {
+                // need to save this because of Alertify call handler/scope
+                var temp = this;
+
+                e.preventDefault();
+
+                // Create a confirm alert
+                Alertify.confirm(
+                  'Delete',
+                  'Would you like to delete the selected report?',
+
+                  // On confirmation send AJAX request to server to delete
+                  // and delete from client interface
+                  function() {
+                    var reportUrl = url_for(
+                      'profiler.delete_report', {
+                        'report_id' : temp.model.get('report_id'),
+                      });
+
+                    $.ajax({
+                      url : reportUrl,
+                      method: 'POST',
+                    })
+                      .done(function(res) {
+                        if (res.data.status == 'ERROR') {
+                          Alertify.alert(gettext(res.data.result));
+                        }
+                      });
+
+                    // Update reports
+                    var reportsUrl = url_for('profiler.get_reports');
+                    $.ajax({
+                      url: reportsUrl,
+                      method: 'GET',
+                    })
+                      .done(function(res) {
+                        if (res.data.status === 'Success') {
+                          controller.AddReports(res.data.result);
+                        }
+                      })
+                      .fail(function() {
+                        Alertify.alert(
+                          gettext('Profiler Error'),
+                          gettext('Error while fetching reports.')
+                        );
+                      });
+                  },
+
+                  // On cancel do nothing
+                  function() {}
+                );
+              },
+
+              render: function() {
+                this.$el.html('<button> Delete </button>');
+                return this;
+              },
+            }),
           },
         ];
 
@@ -540,10 +520,11 @@ define([
           pgTools.Profile.numReports = result.length;
           for (var i = 0; i < result.length; i++) {
             reports_obj.push({
-              'profile_type': (result[i].profile_type === true ? result[i].name : 'Global'),
-              'database': result[i].database,
-              'start_date': result[i].time,
-              'report_id': result[i].report_id,
+              'profile_type': result[i].profile_type === true ? result[i].name : 'Global',
+              'database'    : result[i].database,
+              'start_date'  : result[i].time,
+              'duration'    : result[i].duration,
+              'report_id'   : result[i].report_id,
             });
           }
         }
@@ -554,14 +535,25 @@ define([
         var reports_grid = this.reports_grid = new Backgrid.Grid({
           emptyText: 'No data found',
           columns: reportsGridCols,
-          row: selectableRow,
+          row: Backgrid.Row.extend({
+            highlightColor: 'lightYellow',
+
+            className: 'selectable-row',
+            events: {
+              'click': 'onClick',
+            },
+            onClick: function (e) {
+              e.stopPropagation();
+              Backbone.trigger('rowClicked', this);
+            },
+          }),
           collection: self.reportsCollection,
           className: 'backgrid table table-bordered table-noouter-border table-bottom-border',
         });
 
         reports_grid.render().sort('start_date', 'descending');
 
-        // What happens when a row is clicked
+        // Event handler for rowclick Event
         Backbone.on('rowClicked',
           function(m){
             self.reports_grid.$el.find('td').css(
@@ -625,6 +617,7 @@ define([
             }
           });
 
+          // Finally, load the first report
           Backbone.trigger('rowClicked', e);
         }
       },
