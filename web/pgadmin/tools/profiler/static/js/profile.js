@@ -373,16 +373,7 @@ define([
           self.reports_grid = null;
         }
 
-        var ProfilerReportsModel = Backbone.Model.extend({
-          defaults: {
-            profile_type: undefined,
-            database: undefined,
-            time: undefined,
-            report_id: undefined,
-          },
-        });
-
-        var FocusableRow = Backgrid.Row.extend({
+        var focusableRow = Backgrid.Row.extend({
           className: 'focusable-row',
           highlightColor: 'lightYellow',
 
@@ -392,42 +383,19 @@ define([
 
           onClick: function (e) {
             e.stopPropagation();
-            console.warn(this);
 
-            if (pgTools.Profile.lastRow != undefined) {
-              pgTools.Profile.lastRow.$el.find('td').css('background-color', '');
-            }
-            pgTools.Profile.lastRow = this;
-
-            this.$el.find('td').css('background-color', this.highlightColor);
-
-            var reportUrl = url_for(
-              'profiler.show_report', {
-                'report_id': this.model.get('report_id'),
-              });
-
-            $.ajax({
-              url: reportUrl,
-              method: 'GET',
-              data: this.model.get('report_id'),
-            })
-              .done(function(res) {
-                pgTools.Profile.current_report_panel
-                  .$container
-                  .find('.current_report')
-                  .html(res);
-
-                pgTools.Profile.current_report_panel.focus();
-              })
-              .fail(function() {
-                Alertify.alert(
-                  gettext('Profiler error'),
-                  gettext('Error while getting report data.')
-                );
-              });
-
+            Backbone.trigger('rowClicked', this);
           },
 
+        });
+
+        var ProfilerReportsModel = Backbone.Model.extend({
+          defaults: {
+            profile_type: undefined,
+            database: undefined,
+            time: undefined,
+            report_id: undefined,
+          },
         });
 
         // Collection which contains the model for report informations.
@@ -550,7 +518,7 @@ define([
 
         var reports_obj = [];
         if (result.length != 0) {
-          pgTools.Profile.numResult = result.length;
+          pgTools.Profile.numReports = result.length;
           for (var i = 0; i < result.length; i++) {
             reports_obj.push({
               'profile_type': (result[i].profile_type === true ? result[i].name : 'Global'),
@@ -566,12 +534,45 @@ define([
         var reports_grid = this.reports_grid = new Backgrid.Grid({
           emptyText: 'No data found',
           columns: reportsGridCols,
-          row: FocusableRow,
+          row: focusableRow,
           collection: self.reportsCollection,
           className: 'backgrid table table-bordered table-noouter-border table-bottom-border',
         });
 
         reports_grid.render().sort('start_date', 'descending');
+
+        Backbone.on('rowClicked',
+          function(m){
+            self.reports_grid.$el.find('td').css(
+              'background-color', ''
+            );
+            m.$el.find('td').css('background-color', m.highlightColor);
+
+            var reportUrl = url_for(
+              'profiler.show_report', {
+                'report_id': m.model.get('report_id'),
+              });
+
+            $.ajax({
+              url: reportUrl,
+              method: 'GET',
+            })
+              .done(function(res) {
+                pgTools.Profile.current_report_panel
+                  .$container
+                  .find('.current_report')
+                  .html(res);
+
+                pgTools.Profile.current_report_panel.focus();
+              })
+              .fail(function() {
+                Alertify.alert(
+                  gettext('Profiler error'),
+                  gettext('Error while getting report data.')
+                );
+              });
+          }
+        );
 
         // Render the result grid into result panel
         pgTools.Profile.reports_panel
@@ -579,8 +580,7 @@ define([
           .find('.reports')
           .append(reports_grid.el);
 
-        console.warn(self.reportsCollection);
-        self.reportsCollection.trigger('FocusableRow:click', self.reportsCollection.models[0]);
+        pgTools.Profile.reports_grid = reports_grid;
       },
     }
   );
@@ -653,14 +653,40 @@ define([
     },
     keyAction: function(event) {
       event.stopPropagation();
-      console.warn(`${event.code}`);
 
       var key = `${event.code}`;
-      if (key === 'ArrowUp') {
-        //pass;
-        //
-      } else if (key === 'ArrowDown') {
-        //pass;
+
+      if (key === 'ArrowUp' || key === 'ArrowDown') {
+        if (key === 'ArrowUp') {
+          if (pgTools.Profile.currentReportIndex > 0) {
+            pgTools.Profile.currentReportIndex -= 1;
+          }
+        } else if (key === 'ArrowDown') {
+          if (pgTools.Profile.currentReportIndex < pgTools.Profile.numReports - 1) {
+            pgTools.Profile.currentReportIndex += 1;
+          }
+        }
+
+        if (pgTools.Profile.currentReportIndex >= 0 &&
+            pgTools.Profile.currentReportIndex < pgTools.Profile.numReports) {
+          var e, current_report_id;
+
+          // find the report id of the row we want to trigger
+          current_report_id =
+            pgTools.Profile.reportsColl.models[pgTools.Profile.currentReportIndex].get('report_id');
+
+          // get the correct event to pass into backgrid trigger
+          $.each(pgTools.Profile.reports_grid.columns._listeners, function(k, v) {
+
+            if (v.listener.model) {
+              if (current_report_id == v.listener.model.get('report_id')) {
+                e = v.listener;
+              }
+            }
+          });
+
+          Backbone.trigger('rowClicked', e);
+        }
       }
     },
   });
@@ -689,9 +715,15 @@ define([
       this.function_name_with_arguments = function_name_with_arguments;
       this.layout = layout;
 
-      self.lastRow = undefined;
-      self.reportsColl = false;
-      this.numResult = 0;
+      // variables to save to support keyboard navigation
+      this.reportsColl = false;
+      this.reports_grid = false;
+
+      // number of reports to prevent out of bounds keyboard navigation
+      this.numReports = 0;
+
+      // index of currently selected report in the reports grid
+      this.currentReportIndex = 0;
 
       let browser = window.opener ?
         window.opener.pgAdmin.Browser : window.top.pgAdmin.Browser;
@@ -999,6 +1031,7 @@ define([
         .attr('accesskey', keyboardShortcuts.shortcut_key(self.preferences.save));*/
 
     },
+
     // Register the panel with new profiler docker instance.
     registerPanel: function(name, title, width, height, onInit) {
       var self = this;
