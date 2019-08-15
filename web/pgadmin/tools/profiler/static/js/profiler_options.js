@@ -107,15 +107,6 @@ define([
             grid.render();
             $(this.elements.content).html(grid.el);
 
-            // For keyboard navigation in the grid
-            // we'll set focus on checkbox from the first row if any
-            var grid_checkbox = $(grid.el).find('input:checkbox').first();
-            if (grid_checkbox.length) {
-              setTimeout(function() {
-                grid_checkbox.trigger('click');
-              }, 250);
-            }
-
           },
           settings: {
             profile_info: undefined,

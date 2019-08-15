@@ -382,13 +382,24 @@ define([
           },
         });
 
-        var ClickableRow = Backgrid.Row.extend({
+        var FocusableRow = Backgrid.Row.extend({
+          className: 'focusable-row',
+          highlightColor: 'lightYellow',
+
           events: {
             'click': 'onClick',
           },
 
           onClick: function (e) {
             e.stopPropagation();
+            console.warn(this);
+
+            if (pgTools.Profile.lastRow != undefined) {
+              pgTools.Profile.lastRow.$el.find('td').css('background-color', '');
+            }
+            pgTools.Profile.lastRow = this;
+
+            this.$el.find('td').css('background-color', this.highlightColor);
 
             var reportUrl = url_for(
               'profiler.show_report', {
@@ -412,7 +423,7 @@ define([
                 Alertify.alert(
                   gettext('Profiler error'),
                   gettext('Error while getting report data.')
-                )
+                );
               });
 
           },
@@ -539,6 +550,7 @@ define([
 
         var reports_obj = [];
         if (result.length != 0) {
+          pgTools.Profile.numResult = result.length;
           for (var i = 0; i < result.length; i++) {
             reports_obj.push({
               'profile_type': (result[i].profile_type === true ? result[i].name : 'Global'),
@@ -548,13 +560,14 @@ define([
             });
           }
         }
+        pgTools.Profile.reportsColl = self.reportsCollection = new ReportsCollection(reports_obj);
 
         // Initialize a new Grid instance
         var reports_grid = this.reports_grid = new Backgrid.Grid({
           emptyText: 'No data found',
           columns: reportsGridCols,
-          row: ClickableRow,
-          collection: new ReportsCollection(reports_obj),
+          row: FocusableRow,
+          collection: self.reportsCollection,
           className: 'backgrid table table-bordered table-noouter-border table-bottom-border',
         });
 
@@ -565,6 +578,9 @@ define([
           .$container
           .find('.reports')
           .append(reports_grid.el);
+
+        console.warn(self.reportsCollection);
+        self.reportsCollection.trigger('FocusableRow:click', self.reportsCollection.models[0]);
       },
     }
   );
@@ -584,6 +600,7 @@ define([
       'click .btn-start': 'on_start',
       'click .btn-save' : 'on_save',
       'click .btn-report-options': 'on_report_options',
+      'keydown': 'keyAction',
     },
     enable_start: function(enable) {
       var $btn = this.$el.find('.btn-start');
@@ -634,6 +651,18 @@ define([
     on_save: function() {
       controller.save(pgTools.Profile.trans_id);
     },
+    keyAction: function(event) {
+      event.stopPropagation();
+      console.warn(`${event.code}`);
+
+      var key = `${event.code}`;
+      if (key === 'ArrowUp') {
+        //pass;
+        //
+      } else if (key === 'ArrowDown') {
+        //pass;
+      }
+    },
   });
 
 
@@ -656,14 +685,13 @@ define([
       this.initialized = true;
       this.trans_id = trans_id;
       this.profile_type = profile_type;
-      this.first_time_indirect_profile = false;
-      this.direct_execution_completed = false;
-      this.polling_timeout_idle = false;
       this.profile_restarted = false;
-      this.is_user_aborted_profiling = false;
-      this.is_polling_required = true; // Flag to stop unwanted ajax calls
       this.function_name_with_arguments = function_name_with_arguments;
       this.layout = layout;
+
+      self.lastRow = undefined;
+      self.reportsColl = false;
+      this.numResult = 0;
 
       let browser = window.opener ?
         window.opener.pgAdmin.Browser : window.top.pgAdmin.Browser;
@@ -883,14 +911,6 @@ define([
           matchBrackets: pgAdmin.Browser.editor_options.brace_matching,
         });
 
-      // Useful for keyboard navigation, when user presses escape key we will
-      // defocus from the codemirror editor allow user to navigate further
-      CodeMirror.on(self.editor, 'keydown', function(cm,event) {
-        if(event.keyCode==27){
-          document.activeElement.blur();
-        }
-      });
-
       pgBrowser.Events.on('pgadmin:profiler:code:focus', ()=>{
         self.editor.focus();
       });
@@ -952,11 +972,6 @@ define([
           self.toolbarView.keyAction(e);
         }
       });
-
-      /* Cache may take time to load for the first time
-       * Keep trying till available
-       */
-
 
       /* Register for preference changed event broadcasted in parent
        * to reload the shorcuts.
