@@ -86,7 +86,6 @@ define([
 
               // Update the results
               self.AddResults(res.data.col_info, res.data.result);
-              pgTools.Profile.results_panel.focus();
 
               var reportUrl = url_for(
                 'profiler.show_report', {
@@ -221,7 +220,10 @@ define([
                   );
                 });
             } else if (res.data.status == 'Not Connected') {
-              // TODO;
+              Alertify.alert(
+                gettext('Profiler Error'),
+                gettext('Could not connect to the server.')
+              );
             }
 
           })
@@ -373,8 +375,8 @@ define([
           self.reports_grid = null;
         }
 
-        var focusableRow = Backgrid.Row.extend({
-          className: 'focusable-row',
+        var selectableRow = Backgrid.Row.extend({
+          className: 'selectable-row',
           highlightColor: 'lightYellow',
 
           events: {
@@ -441,7 +443,24 @@ define([
                     }
                   });
 
-                temp.model.collection.remove(temp.model);},
+                  // Update reports
+                  var reportsUrl = url_for('profiler.get_reports');
+                  $.ajax({
+                    url: reportsUrl,
+                    method: 'GET',
+                  })
+                    .done(function(res) {
+                      if (res.data.status === 'Success') {
+
+                        controller.AddReports(res.data.result);
+                      }
+                    })
+                    .fail(function() {
+                      Alertify.alert(
+                        gettext('Profiler Error'),
+                        gettext('Error while fetching reports.')
+                      );
+                    });
 
               // On cancel do nothing
               function() {});
@@ -528,19 +547,21 @@ define([
             });
           }
         }
-        pgTools.Profile.reportsColl = self.reportsCollection = new ReportsCollection(reports_obj);
+
+        self.reportsCollection = new ReportsCollection(reports_obj);
 
         // Initialize a new Grid instance
         var reports_grid = this.reports_grid = new Backgrid.Grid({
           emptyText: 'No data found',
           columns: reportsGridCols,
-          row: focusableRow,
+          row: selectableRow,
           collection: self.reportsCollection,
           className: 'backgrid table table-bordered table-noouter-border table-bottom-border',
         });
 
         reports_grid.render().sort('start_date', 'descending');
 
+        // What happens when a row is clicked
         Backbone.on('rowClicked',
           function(m){
             self.reports_grid.$el.find('td').css(
@@ -580,7 +601,32 @@ define([
           .find('.reports')
           .append(reports_grid.el);
 
+        // Save the reports collection, so we can use it for keyboard navigation
+        pgTools.Profile.reportsColl = self.reportsCollection;
         pgTools.Profile.reports_grid = reports_grid;
+
+        // Default the currently showed report to the first report in the grid
+        pgTools.Profile.currentReportIndex = 0;
+
+        // Show the first report by default
+        // Make sure that there is a report to show
+        if (pgTools.Profile.reportsColl.models.length > 0) {
+
+          var e, current_report_id =
+            pgTools.Profile.reportsColl.models[0].get('report_id');
+
+          // get the correct event to pass into backgrid trigger
+          $.each(pgTools.Profile.reports_grid.columns._listeners, function(k, v) {
+
+            if (v.listener.model) {
+              if (current_report_id == v.listener.model.get('report_id')) {
+                e = v.listener;
+              }
+            }
+          });
+
+          Backbone.trigger('rowClicked', e);
+        }
       },
     }
   );
@@ -950,6 +996,7 @@ define([
       // On loading the docker, register the callbacks
       var onLoad = function() {
         self.docker.finishLoading(100);
+        self.editor.focus();
         self.docker.off(wcDocker.EVENT.LOADED);
         /* Set focus to the profiler container
          * Focus does not work in firefox without tabindex attr
