@@ -24,14 +24,6 @@
   top: 0; bottom: 0; right: 0; left: 0;
 }
 
-.report_id {
-  width: 8%;
-}
-
-.delete {
-  width: 8%;
-}
-
 .delete-cell {
   text-align: center;
   background-color: #f3f5f9;
@@ -44,9 +36,34 @@
 }
 
 .sortable.renderable.profile_type>button, .sortable.renderable.database>button,
-.sortable.renderable.start_date>button, .sortable.renderableduration>button,
+.sortable.renderable.start_date>button, .sortable.renderable.duration>button,
 .sortable.renderable.report_id>button, .sortable.renderable.delete>button,
-.sortable.renderable, tr>th {
+.sortable.renderable.name>button, .sortable.renderable.type>button,
+.sortable.renderable.value>button, .sortable.renderable, tr>th {
   text-align:center !important;
   overflow:hidden !important;
+}
+
+.current_report {
+  all:unset;
+}
+
+.current_report ul {
+  padding: default;
+}
+
+.current_report>ul>li {
+  list-style: bullet;
+}
+
+.current_report>table>tbody>tr>td>b>code {
+  color: inherit;
+}
+
+.linestats>tbody>tr {
+  border: 5px black;
+}
+
+.linestats>tbody>tr>td>code{
+  color: black;
 }

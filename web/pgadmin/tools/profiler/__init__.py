@@ -464,17 +464,27 @@ def initialize_target_indirect(profile_type, trans_id, sid, did):
             current_app.logger.debug(msg)
             return internal_server_error(msg)
 
-    pfl_inst.profiler_data = {
-        'conn_id': conn_id,
-        'server_id': sid,
-        'database_id': did,
-        'function_name' : 'Indirect',
-        'profile_type' : 'indirect',
-        'restart_profile': 0,
-        'duration' : data[0]['value'],
-        'interval' : data[1]['value'],
-        'pid'      : data[2]['value']
-    }
+    # Input checking
+    try:
+        pfl_inst.profiler_data = {
+            'duration' : data[0]['value'],
+            'interval' : data[1]['value'],
+            'pid'      : data[2]['value']
+        }
+    except Exception as e:
+        return make_json_response(
+            data={
+                'status' : 'ERROR',
+                'result' : 'Invalid input type'
+            }
+        )
+
+    pfl_inst.profiler_data['conn_id'] = conn_id
+    pfl_inst.profiler_data['sid'] = sid
+    pfl_inst.profiler_data['did'] = did
+    pfl_inst.profiler_data['function_name'] = 'Indirect'
+    pfl_inst.profiler_data['profile_type'] = 'indirect'
+    pfl_inst.profiler_data['restart_profile'] = 0
 
     pfl_inst.config = {
         'name': 'Indirect',
@@ -659,7 +669,7 @@ def start_monitor(trans_id):
                 pfl_inst.config,
                 conn.as_dict()['database'],
                 pfl_inst.profiler_data['profile_type'],
-                pfl_inst.profiler_data['duration'])
+                int(pfl_inst.profiler_data['duration']))
 
 
     return make_json_response(
@@ -1046,11 +1056,26 @@ def save_report(report_data, config, dbname, profile_type, duration):
         profile_type
     Returns
     """
+    report_data['config'] = config
+
+
     now = datetime.now().strftime("%Y-%m-%d;%H:%M")
     path = os.path.dirname(os.path.abspath(current_app.root_path))
-    path = os.path.join(path, 'pgadmin', 'instance', now + '.html')
+    path = os.path.join(path, 'pgadmin', 'instance', config['name'] + '@' + now + '.html')
 
-    report_data['config'] = config
+    report = ProfilerSavedReports.query.filter_by(path=path).first()
+
+    # To prevent duplicate reports with the same filename
+    # This would happen if the same profile was run multiple times in a minute
+    version = ''
+    while report is not None:
+        if version == '':
+            version = 'a'
+        else:
+            version = chr(ord(path[-5][-1]) + 1)
+
+        path = path[-5] + version + '.html'
+        report = ProfilerSavedReports.query.filter_by(path=path).first()
 
     try:
         with open(path, 'w') as output_fd:

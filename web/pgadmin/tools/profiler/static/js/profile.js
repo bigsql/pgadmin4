@@ -396,6 +396,9 @@ define([
             label: gettext('Profile Type / Function Name'),
             type: 'text',
             editable: false,
+            headerCell: Backgrid.HeaderCell.extend({
+              className: 'width_percent_30',
+            }),
             cell: 'string',
           },
           {
@@ -403,6 +406,9 @@ define([
             label: gettext('Database Name'),
             type: 'text',
             editable: false,
+            headerCell: Backgrid.HeaderCell.extend({
+              className: 'width_percent_20',
+            }),
             cell: 'string',
           },
           {
@@ -410,20 +416,29 @@ define([
             label: gettext('Start Date/Time'),
             type: 'text',
             editable: false,
+            headerCell: Backgrid.HeaderCell.extend({
+              className: 'width_percent_15',
+            }),
             cell: 'string',
           },
           {
             name: 'duration',
             label: gettext('Duration'),
             type: 'text',
+            headerCell: Backgrid.HeaderCell.extend({
+              className: 'width_percent_15',
+            }),
             editable: false,
-            cell: 'integer',
+            cell: 'string',
           },
           {
             name: 'report_id',
             label: gettext('Show Report'),
             type: 'text',
             editable: false,
+            headerCell: Backgrid.HeaderCell.extend({
+              className: 'width_percent_10',
+            }),
             cell: Backgrid.Cell.extend({
               className: 'report-cell',
               events: {
@@ -448,6 +463,9 @@ define([
             label: gettext('Delete Report'),
             type: 'text',
             editable: false,
+            headerCell: Backgrid.HeaderCell.extend({
+              className: 'width_percent_10',
+            }),
             cell: Backgrid.Cell.extend({
               className: 'delete-cell',
               events: {
@@ -481,6 +499,7 @@ define([
                         if (res.data.status == 'ERROR') {
                           Alertify.alert(gettext(res.data.result));
                         }
+                        this.model.collection.remove(this.model);
                       });
 
                     // Update reports
@@ -523,7 +542,7 @@ define([
               'profile_type': result[i].profile_type === true ? result[i].name : 'Global',
               'database'    : result[i].database,
               'start_date'  : result[i].time,
-              'duration'    : result[i].duration,
+              'duration'    : result[i].duration === -1 ? 'n/a' : result[i].duration + 'seconds',
               'report_id'   : result[i].report_id,
             });
           }
@@ -586,6 +605,10 @@ define([
               });
           }
         );
+
+        reports_grid.on('sorted', function() {
+          Alertify.alert('hello');
+        });
 
         // Render the result grid into result panel
         pgTools.Profile.reports_panel
@@ -989,7 +1012,6 @@ define([
       // On loading the docker, register the callbacks
       var onLoad = function() {
         self.docker.finishLoading(100);
-        self.editor.focus();
         self.docker.off(wcDocker.EVENT.LOADED);
         /* Set focus to the profiler container
          * Focus does not work in firefox without tabindex attr
@@ -1051,6 +1073,8 @@ define([
       pgBrowser.onPreferencesChange('profiler', function() {
         self.reflectPreferences();
       });
+
+      self.editor.focus();
     },
     reflectPreferences: function() {
       let self = this,
