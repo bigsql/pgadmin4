@@ -608,13 +608,9 @@ define([
 
             // Update the current_report_index
             for (var i = 0; i < pgTools.Profile.reportsColl.models.length; i++) {
-              var current = pgTools.Profile.reportsColl.models[0];
-
-              console.warn(current.cid);
-              console.warn(m.model.cid);
+              var current = pgTools.Profile.reportsColl.models[i];
 
               if (current.cid === m.model.cid){
-                Alertify.alert('hello');
                 pgTools.Profile.currentReportIndex = i;
 
                 // we have found the desired index so no need to continue
@@ -625,6 +621,7 @@ define([
           }
         );
 
+        // TODO: Fix keyboard navigation after sorting
         reports_grid.on('sorted', function() {
           Alertify.alert('hello');
         });
