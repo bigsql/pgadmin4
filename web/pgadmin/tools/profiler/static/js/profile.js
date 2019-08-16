@@ -61,7 +61,6 @@ define([
        *  instance
        */
       start_execution: function(trans_id) {
-        var self = this;
 
         // Make ajax call to run profiler
         var baseUrl = url_for(
@@ -83,13 +82,8 @@ define([
             $('.profiler-container').removeClass('show_progress');
 
             if (res.data.status === 'Success') {
-
-              // Update the results
-              self.AddResults(res.data.col_info, res.data.result);
-
-              // Update the saved reports
+              controller.addResults(res.data.col_info, res.data.result);
               controller.fetchAndAddReports();
-
             } else if (res.data.status === 'NotConnected') {
               Alertify.alert(
                 gettext('Profiler Error'),
@@ -172,7 +166,7 @@ define([
                   pgTools.Profile.docker.finishLoading();
 
                   if (res.data.status === 'Success') {
-                    self.AddResults(res.data.col_info, res.data.result);
+                    self.addResults(res.data.col_info, res.data.result);
 
                     // Update saved reports
                     controller.fetchAndAddReports();
@@ -208,13 +202,14 @@ define([
             );
           });
       },
+
       /**
        * Updates the results panel for the profiling window
        *
        * @param {Array} columns - Contains the names of the columns for the results panel
        * @param {Array} result - Contains the values of the columns for the results panel
        */
-      AddResults: function(columns, result) {
+      addResults: function(columns, result) {
         var self = this;
 
         // Remove the existing created grid and update the result values
@@ -278,7 +273,7 @@ define([
             if (res.data.status === 'Success') {
 
               // Add the parameters to the panel
-              controller.AddParameters(res.data.result);
+              controller.addParameters(res.data.result);
             }
 
             else if (res.data.status === 'NotConnected') {
@@ -297,11 +292,12 @@ define([
       },
 
       /**
-       * Adds the retrieved parameters from the server to the panel
+       * Adds the retrieved parameters from the server to the panel. Also initializes the grid
+       * that contains the parameters
        *
        * @param {Array} result - The JSON containing information about the parameters
        */
-      AddParameters: function(result) {
+      addParameters: function(result) {
         var self = this;
 
         // Remove the existing created grid and update the parameter values
@@ -372,9 +368,19 @@ define([
           .append(param_grid.el);
       },
 
-      AddSrc: function(result) {
+      /**
+       * Adds the source code for the function to be profiled into the code editor panel
+       *
+       * @param {Array} result - The JSON containing information about the source code
+       */
+      addSrc: function(result) {
         pgTools.Profile.editor.setValue(result);
       },
+
+      /**
+       * Retrieves the saved reports from the server then adds them to the saved reports panel
+       *
+       */
       fetchAndAddReports: function() {
         var reportsUrl = url_for('profiler.get_reports');
         $.ajax({
@@ -393,6 +399,13 @@ define([
             );
           });
       },
+
+      /**
+       * Adds the retrieved reports from the server to the panel by initializing the reports grid.
+       * Also defines functionality for the buttons on the grid and logic for keyboard navigation
+       *
+       * @param {Array} result - The JSON containing information about the reports
+       */
       addReports: function(result) {
         var self = this;
 
@@ -532,11 +545,14 @@ define([
                           Alertify.alert(gettext(res.data.result));
                         }
 
-                        pgTools.Profile.numReports -= 1;
+                        // Remove the selected row from the collection and therefore the grid
+                        console.warn(temp);
+                        pgTools.Profile.reportsColl.remove(temp.model);
 
                         // TODO: Automatically move up the currentReportIndex after deletion
                         // and show the next report instead of just resetting to 0
                         pgTools.Profile.currentReportIndex = 0;
+                        pgTools.Profile.numReports -= 1;
 
                         // Note that since the selected report is deleted, we need to choose
                         // another report to show
@@ -560,8 +576,8 @@ define([
                           // Finally, load the first report
                           Backbone.trigger('rowClicked', e);
                         }
-
-                        pgTools.Profile.reportsColl.remove(this.model);
+                        console.warn(pgTools.Profile.reportsColl);
+                        console.warn(pgTools.Profile.reports_grid);
                       });
 
                   },
@@ -622,8 +638,8 @@ define([
         reports_grid.render().sort('start_date', 'descending');
 
         // Event handler for rowclick Event
-        Backbone.on('rowClicked',
-          function(m){
+        this.listenTo(Backbone,'rowClicked',
+          function(m) {
             // Highlight the selected report
             self.reports_grid.$el.find('td').css(
               'background-color', ''
@@ -671,23 +687,42 @@ define([
           }
         );
 
+        // TODO: When the grid is sorted, we should keep the index of the report we have already selected
+        this.listenTo(self.reportsCollection, 'backgrid:sorted', function() {
+          // Default the currently showed report to the first report in the grid
+          pgTools.Profile.currentReportIndex = 0;
+
+          controller.loadReport(pgTools.Profile.currentReportIndex);
+        });
+
         // Render the result grid into result panel
         pgTools.Profile.reports_panel
           .$container
           .find('.reports')
           .append(reports_grid.el);
 
-        // Save the reports collection, so we can use it for keyboard navigation
+        // Save the reports collection and reports grid, so we can use it for keyboard navigation
         pgTools.Profile.reportsColl = self.reportsCollection;
         pgTools.Profile.reports_grid = reports_grid;
 
-        // Default the currently showed report to the first report in the grid
+        // Default the currently showed report to the first report in the grid and show it
         pgTools.Profile.currentReportIndex = 0;
+        controller.loadReport(pgTools.Profile.currentReportIndex);
+      },
+
+      /**
+       * Helper function that finds the rowClick event that corersponds to the row we want to show
+       * then the function will trigger the event and load the report
+       *
+       * @param {int} reportIndex - The index of the row containing the report we want to show
+       */
+      loadReport : function(reportIndex) {
 
         // Make sure that there is a report to show
         if (pgTools.Profile.reportsColl.models.length > 0) {
+
           var e, currentReportId =
-            pgTools.Profile.reportsColl.models[0].get('report_id');
+            pgTools.Profile.reportsColl.models[reportIndex].get('report_id');
 
           // get the correct event to pass into backgrid trigger
           $.each(pgTools.Profile.reports_grid.columns._listeners, function(k, v) {
@@ -703,7 +738,7 @@ define([
           Backbone.trigger('rowClicked', e);
         }
       },
-    }
+    },
   );
 
   /*
@@ -798,23 +833,8 @@ define([
         // Bounds checking
         if (pgTools.Profile.currentReportIndex >= 0 &&
             pgTools.Profile.currentReportIndex < pgTools.Profile.numReports) {
-          var listenEvent;
 
-          // find the report id of the row we want to trigger
-          var currentReportId =
-            pgTools.Profile.reportsColl.models[pgTools.Profile.currentReportIndex].get('report_id');
-
-          // get the correct event to pass into backgrid trigger
-          $.each(pgTools.Profile.reports_grid.columns._listeners, function(k, v) {
-            if (v.listener.model) {
-              if (currentReportId == v.listener.model.get('report_id')) {
-                listenEvent = v.listener;
-              }
-            }
-          });
-
-          // now finally trigger the event
-          Backbone.trigger('rowClicked', listenEvent);
+          controller.loadReport(pgTools.Profile.currentReportIndex);
         }
       }
     },
@@ -843,7 +863,6 @@ define([
       this.profile_restarted = false;
       this.function_name_with_arguments = function_name_with_arguments;
 
-
       this.layout = layout;
 
       // variables to save to support keyboard navigation
@@ -855,6 +874,10 @@ define([
 
       // index of currently selected report in the reports grid
       this.currentReportIndex = 0;
+
+      // report_id of previously shown report in the current_reports_grid
+      // we save this so when the grid is sorted, we show the same report and update the index
+      // this.previous = 0;
 
       let browser = window.opener ?
         window.opener.pgAdmin.Browser : window.top.pgAdmin.Browser;
@@ -897,7 +920,7 @@ define([
         })
           .done(function(res) {
             if (res.data.status === 'Success') {
-              controller.AddSrc(res.data.result);
+              controller.addSrc(res.data.result);
             }
 
             else if (res.data.status === 'NotConnected') {
