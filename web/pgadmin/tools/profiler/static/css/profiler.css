@@ -39,7 +39,8 @@
 .sortable.renderable.start_date>button, .sortable.renderable.duration>button,
 .sortable.renderable.report_id>button, .sortable.renderable.delete>button,
 .sortable.renderable.name>button, .sortable.renderable.type>button,
-.sortable.renderable.value>button, .sortable.renderable, tr>th {
+.sortable.renderable.value>button,.sortable.renderable.option>button,
+.sortable.renderable, tr>th {
   text-align:center !important;
   overflow:hidden !important;
 }

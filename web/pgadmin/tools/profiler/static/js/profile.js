@@ -87,30 +87,9 @@ define([
               // Update the results
               self.AddResults(res.data.col_info, res.data.result);
 
-              var reportUrl = url_for(
-                'profiler.show_report', {
-                  'report_id': res.data.report_id,
-                });
+              // Update the saved reports
+              controller.fetchAndAddReports();
 
-              window.open(reportUrl, '_blank');
-
-              // Update saved reports
-              var reportsUrl = url_for('profiler.get_reports');
-              $.ajax({
-                url: reportsUrl,
-                method: 'GET',
-              })
-                .done(function(res) {
-                  if (res.data.status === 'Success') {
-                    controller.AddReports(res.data.result);
-                  }
-                })
-                .fail(function() {
-                  Alertify.alert(
-                    gettext('Profiler Error'),
-                    gettext('Error while fetching reports.')
-                  );
-                });
             } else if (res.data.status === 'NotConnected') {
               Alertify.alert(
                 gettext('Profiler Error'),
@@ -127,12 +106,21 @@ define([
           });
       },
 
+      /**
+       * Helper function that generates the loading wheel for indirect(global) profiling and
+       * counts down, updating the wheel
+       *
+       * @param {int} duration - The original duration of the monitoring
+       */
       update_monitor_load: function(duration) {
         var time_remaining = duration * 1000;
+
         var intervalId = setInterval(function() {
           $('.wcLoadingLabel').html(gettext('Monitoring for ' + time_remaining/1000 + ' seconds'));
           time_remaining -= 1000;
           if (time_remaining < 0) {
+
+            // kill the timer to prevent waste
             clearInterval(intervalId);
           }
         }, 1000);
@@ -174,35 +162,21 @@ define([
                     pgAdmin.csrf_token_header, pgAdmin.csrf_token
                   );
                   pgTools.Profile.docker.startLoading(gettext('Monitoring for ' + duration + ' seconds'));
-                  self.update_monitor_load(duration - 1);
 
-                  $('.profiler-container').addClass('show_progress');
+                  // We decrease the duration by 1 because time will already have passed by the
+                  // time the loading wheel is created and shown
+                  self.update_monitor_load(duration - 1);
                 },
               })
                 .done(function(res) {
                   pgTools.Profile.docker.finishLoading();
-                  $('.profiler-container').removeClass('show_progress');
 
                   if (res.data.status === 'Success') {
                     self.AddResults(res.data.col_info, res.data.result);
 
                     // Update saved reports
-                    var reportsUrl = url_for('profiler.get_reports');
-                    $.ajax({
-                      url: reportsUrl,
-                      method: 'GET',
-                    })
-                      .done(function(res) {
-                        if (res.data.status === 'Success') {
-                          controller.AddReports(res.data.result);
-                        }
-                      })
-                      .fail(function() {
-                        Alertify.alert(
-                          gettext('Profiler Error'),
-                          gettext('Error while fetching reports.')
-                        );
-                      });
+                    controller.fetchAndAddReports();
+
                   } else if (res.data.status === 'NotConnected') {
                     Alertify.alert(
                       gettext('Profiler Error'),
@@ -234,7 +208,6 @@ define([
             );
           });
       },
-
       /**
        * Updates the results panel for the profiling window
        *
@@ -250,15 +223,13 @@ define([
           self.result_grid = null;
         }
 
-        var ProfilerResultsModel = Backbone.Model.extend({
-          defaults: {
-            name: undefined,
-          },
-        });
-
         // Collection which contains the model for function informations.
         var ResultsCollection = Backbone.Collection.extend({
-          model: ProfilerResultsModel,
+          model: Backbone.Model.extend({
+            defaults: {
+              name: undefined,
+            },
+          }),
         });
 
         var resultGridCols = [];
@@ -291,6 +262,45 @@ define([
           .append(result_grid.el);
       },
 
+      /**
+       * Retrieves the parameters from the server then adds them to the parameters panel
+       *
+       */
+      fetchParameters: function() {
+        var paramUrl = url_for('profiler.get_parameters', {
+          'trans_id': pgTools.Profile.trans_id,
+        });
+        $.ajax({
+          url: paramUrl,
+          method: 'GET',
+        })
+          .done(function(res) {
+            if (res.data.status === 'Success') {
+
+              // Add the parameters to the panel
+              controller.AddParameters(res.data.result);
+            }
+
+            else if (res.data.status === 'NotConnected') {
+              Alertify.alert(
+                gettext('Profiler Error'),
+                gettext('Error while fetching parameters.')
+              );
+            }
+          })
+          .fail(function() {
+            Alertify.alert(
+              gettext('Profiler Error'),
+              gettext('Error while fetching parameters.')
+            );
+          });
+      },
+
+      /**
+       * Adds the retrieved parameters from the server to the panel
+       *
+       * @param {Array} result - The JSON containing information about the parameters
+       */
       AddParameters: function(result) {
         var self = this;
 
@@ -300,17 +310,15 @@ define([
           self.param_grid = null;
         }
 
-        var ProfilerParametersModel = Backbone.Model.extend({
-          defaults: {
-            name: undefined,
-            type: undefined,
-            value: undefined,
-          },
-        });
-
         // Collection which contains the model for function informations.
         var ParametersCollection = self.ParametersCollection = Backbone.Collection.extend({
-          model: ProfilerParametersModel,
+          model: Backbone.Model.extend({
+            defaults: {
+              name: undefined,
+              type: undefined,
+              value: undefined,
+            },
+          }),
         });
 
         var paramGridCols = [{
@@ -363,10 +371,29 @@ define([
           .find('.parameters')
           .append(param_grid.el);
       },
+
       AddSrc: function(result) {
         pgTools.Profile.editor.setValue(result);
       },
-      AddReports: function(result) {
+      fetchAndAddReports: function() {
+        var reportsUrl = url_for('profiler.get_reports');
+        $.ajax({
+          url: reportsUrl,
+          method: 'GET',
+        })
+          .done(function(res) {
+            if (res.data.status === 'Success') {
+              controller.addReports(res.data.result);
+            }
+          })
+          .fail(function() {
+            Alertify.alert(
+              gettext('Profiler Error'),
+              gettext('Error while fetching reports.')
+            );
+          });
+      },
+      addReports: function(result) {
         var self = this;
 
         // Remove the existing created grid and update the result values
@@ -375,19 +402,17 @@ define([
           self.reports_grid = null;
         }
 
-        var ProfilerReportsModel = Backbone.Model.extend({
-          defaults: {
-            profile_type: undefined,
-            database: undefined,
-            time: undefined,
-            duration: undefined,
-            report_id: undefined,
-          },
-        });
-
         // Collection which contains the model for report informations.
         var ReportsCollection = self.ReportsCollection = Backbone.Collection.extend({
-          model: ProfilerReportsModel,
+          model: Backbone.Model.extend({
+            defaults: {
+              profile_type: undefined,
+              database: undefined,
+              time: undefined,
+              duration: undefined,
+              report_id: undefined,
+            },
+          }),
         });
 
         var reportsGridCols = [
@@ -439,6 +464,8 @@ define([
             headerCell: Backgrid.HeaderCell.extend({
               className: 'width_percent_10',
             }),
+
+            // Custom button cell to add functionality when the show report button is clicked
             cell: Backgrid.Cell.extend({
               className: 'report-cell',
               events: {
@@ -446,6 +473,8 @@ define([
               },
               generateReport: function(e) {
                 e.preventDefault();
+                e.stopPropagation();
+
                 var reportUrl = url_for(
                   'profiler.show_report', {
                     'report_id': this.model.get('report_id'),
@@ -466,6 +495,8 @@ define([
             headerCell: Backgrid.HeaderCell.extend({
               className: 'width_percent_10',
             }),
+
+            // Custom button cell to add functionality when the delete report button is clicked
             cell: Backgrid.Cell.extend({
               className: 'delete-cell',
               events: {
@@ -500,29 +531,42 @@ define([
                         if (res.data.status == 'ERROR') {
                           Alertify.alert(gettext(res.data.result));
                         }
-                        this.model.collection.remove(this.model);
+
+                        pgTools.Profile.numReports -= 1;
+
+                        // TODO: Automatically move up the currentReportIndex after deletion
+                        // and show the next report instead of just resetting to 0
+                        pgTools.Profile.currentReportIndex = 0;
+
+                        // Note that since the selected report is deleted, we need to choose
+                        // another report to show
+
+                        // Make sure that there is a report to show
+                        if (pgTools.Profile.reportsColl.models.length > 0) {
+
+                          var e, currentReportId =
+                            pgTools.Profile.reportsColl.models[0].get('report_id');
+
+                          // get the correct event to pass into backgrid trigger
+                          $.each(pgTools.Profile.reports_grid.columns._listeners, function(k, v) {
+
+                            if (v.listener.model) {
+                              if (currentReportId == v.listener.model.get('report_id')) {
+                                e = v.listener;
+                              }
+                            }
+                          });
+
+                          // Finally, load the first report
+                          Backbone.trigger('rowClicked', e);
+                        }
+
+                        pgTools.Profile.reportsColl.remove(this.model);
                       });
 
-                    // Update reports
-                    var reportsUrl = url_for('profiler.get_reports');
-                    $.ajax({
-                      url: reportsUrl,
-                      method: 'GET',
-                    })
-                      .done(function(res) {
-                        if (res.data.status === 'Success') {
-                          controller.AddReports(res.data.result);
-                        }
-                      })
-                      .fail(function() {
-                        Alertify.alert(
-                          gettext('Profiler Error'),
-                          gettext('Error while fetching reports.')
-                        );
-                      });
                   },
 
-                  // On cancel do nothing
+                  // If the user decides not to delete, there is nothing to do
                   function() {}
                 );
               },
@@ -535,6 +579,7 @@ define([
           },
         ];
 
+        // Now format the information fetched from the server for rendering the grid
         var reports_obj = [];
         if (result.length != 0) {
           pgTools.Profile.numReports = result.length;
@@ -555,6 +600,8 @@ define([
         var reports_grid = this.reports_grid = new Backgrid.Grid({
           emptyText: 'No data found',
           columns: reportsGridCols,
+
+          // Custom row that will allow users to click
           row: Backgrid.Row.extend({
             highlightColor: 'lightYellow',
 
@@ -571,6 +618,7 @@ define([
           className: 'backgrid table table-bordered table-noouter-border table-bottom-border',
         });
 
+        // Display the most newly created reports first
         reports_grid.render().sort('start_date', 'descending');
 
         // Event handler for rowclick Event
@@ -592,6 +640,8 @@ define([
               method: 'GET',
             })
               .done(function(res) {
+
+                // Render the report html into the current report panel
                 pgTools.Profile.current_report_panel
                   .$container
                   .find('.current_report')
@@ -621,11 +671,6 @@ define([
           }
         );
 
-        // TODO: Fix keyboard navigation after sorting
-        reports_grid.on('sorted', function() {
-          Alertify.alert('hello');
-        });
-
         // Render the result grid into result panel
         pgTools.Profile.reports_panel
           .$container
@@ -639,18 +684,16 @@ define([
         // Default the currently showed report to the first report in the grid
         pgTools.Profile.currentReportIndex = 0;
 
-        // Show the first report by default
         // Make sure that there is a report to show
         if (pgTools.Profile.reportsColl.models.length > 0) {
-
-          var e, current_report_id =
+          var e, currentReportId =
             pgTools.Profile.reportsColl.models[0].get('report_id');
 
           // get the correct event to pass into backgrid trigger
           $.each(pgTools.Profile.reports_grid.columns._listeners, function(k, v) {
 
             if (v.listener.model) {
-              if (current_report_id == v.listener.model.get('report_id')) {
+              if (currentReportId == v.listener.model.get('report_id')) {
                 e = v.listener;
               }
             }
@@ -713,7 +756,8 @@ define([
         $btn.attr('disabled', 'disabled');
       }
     },
-    on_start: function() {
+    on_start: function(e) {
+      e.stopPropagation();
       if (pgTools.Profile.profile_type == 1) {
         controller.start_execution(pgTools.Profile.trans_id);
       } else {
@@ -721,49 +765,56 @@ define([
       }
 
     },
-    on_report_options: function() {
+    on_report_options: function(e) {
+      e.stopPropagation();
       input_report_options(pgTools.Profile.trans_id,
         pgTools.Profile.function_name_with_arguments,
         pgTools.Profile.preferences.profiler_new_browser_tab);
     },
-    on_save: function() {
+    on_save: function(e) {
+      e.stopPropagation();
       controller.save(pgTools.Profile.trans_id);
     },
-    keyAction: function(event) {
-      event.stopPropagation();
+    keyAction: function(e) {
+      e.stopPropagation();
 
-      var key = `${event.code}`;
+      var key = `${e.code}`;
 
       if (key === 'ArrowUp' || key === 'ArrowDown') {
         if (key === 'ArrowUp') {
+
+          // Bounds checking
           if (pgTools.Profile.currentReportIndex > 0) {
             pgTools.Profile.currentReportIndex -= 1;
           }
         } else if (key === 'ArrowDown') {
+
+          // Bounds checkings
           if (pgTools.Profile.currentReportIndex < pgTools.Profile.numReports - 1) {
             pgTools.Profile.currentReportIndex += 1;
           }
         }
 
+        // Bounds checking
         if (pgTools.Profile.currentReportIndex >= 0 &&
             pgTools.Profile.currentReportIndex < pgTools.Profile.numReports) {
-          var e, current_report_id;
+          var listenEvent;
 
           // find the report id of the row we want to trigger
-          current_report_id =
+          var currentReportId =
             pgTools.Profile.reportsColl.models[pgTools.Profile.currentReportIndex].get('report_id');
 
           // get the correct event to pass into backgrid trigger
           $.each(pgTools.Profile.reports_grid.columns._listeners, function(k, v) {
             if (v.listener.model) {
-              if (current_report_id == v.listener.model.get('report_id')) {
-                e = v.listener;
+              if (currentReportId == v.listener.model.get('report_id')) {
+                listenEvent = v.listener;
               }
             }
           });
 
           // now finally trigger the event
-          Backbone.trigger('rowClicked', e);
+          Backbone.trigger('rowClicked', listenEvent);
         }
       }
     },
@@ -780,17 +831,19 @@ define([
     /* We should get the transaction id from the server during initialization here */
     load: function(trans_id, profile_type, function_name_with_arguments, layout) {
 
-      // We do not want to initialize the module multiple times.
       var self = this;
 
+      // We do not want to initialize the module multiple times.
       if (this.initialized)
         return;
-
       this.initialized = true;
+
       this.trans_id = trans_id;
       this.profile_type = profile_type;
       this.profile_restarted = false;
       this.function_name_with_arguments = function_name_with_arguments;
+
+
       this.layout = layout;
 
       // variables to save to support keyboard navigation
@@ -825,52 +878,14 @@ define([
       controller.enable_toolbar_buttons();
 
       // Get reports
-      var reportsUrl = url_for('profiler.get_reports');
-      $.ajax({
-        url: reportsUrl,
-        method: 'GET',
-      })
-        .done(function(res) {
-          if (res.data.status === 'Success') {
-
-            controller.AddReports(res.data.result);
-          }
-        })
-        .fail(function() {
-          Alertify.alert(
-            gettext('Profiler Error'),
-            gettext('Error while fetching reports.')
-          );
-        });
+      controller.fetchAndAddReports();
 
       // Get parameters
-      var paramUrl = url_for('profiler.get_parameters', {
-        'trans_id': trans_id,
-      });
-      $.ajax({
-        url: paramUrl,
-        method: 'GET',
-      })
-        .done(function(res) {
-          if (res.data.status === 'Success') {
-            controller.AddParameters(res.data.result);
-          }
+      // Note that for direct profiling this will be the parameters
+      // For indirect(global) profiling, this will be the profiling arguments
+      controller.fetchParameters();
 
-          else if (res.data.status === 'NotConnected') {
-            Alertify.alert(
-              gettext('Profiler Error'),
-              gettext('Error while fetching parameters.')
-            );
-          }
-        })
-        .fail(function() {
-          Alertify.alert(
-            gettext('Profiler Error'),
-            gettext('Error while fetching parameters.')
-          );
-        });
-
-      // Direct profiling requires fetching the parameteters and sql source code
+      // Direct profiling requires fetching sql source code
       if (trans_id != undefined && profile_type) {
         // Get source code
         var srcUrl = url_for('profiler.get_src', {
