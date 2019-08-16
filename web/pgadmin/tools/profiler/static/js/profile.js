@@ -477,6 +477,7 @@ define([
                 var temp = this;
 
                 e.preventDefault();
+                e.stopPropagation();
 
                 // Create a confirm alert
                 Alertify.confirm(
@@ -575,16 +576,17 @@ define([
         // Event handler for rowclick Event
         Backbone.on('rowClicked',
           function(m){
+            // Highlight the selected report
             self.reports_grid.$el.find('td').css(
               'background-color', ''
             );
             m.$el.find('td').css('background-color', m.highlightColor);
 
+            // Generate the report html
             var reportUrl = url_for(
               'profiler.show_report', {
                 'report_id': m.model.get('report_id'),
               });
-
             $.ajax({
               url: reportUrl,
               method: 'GET',
@@ -603,6 +605,23 @@ define([
                   gettext('Error while getting report data.')
                 );
               });
+
+            // Update the current_report_index
+            for (var i = 0; i < pgTools.Profile.reportsColl.models.length; i++) {
+              var current = pgTools.Profile.reportsColl.models[0];
+
+              console.warn(current.cid);
+              console.warn(m.model.cid);
+
+              if (current.cid === m.model.cid){
+                Alertify.alert('hello');
+                pgTools.Profile.currentReportIndex = i;
+
+                // we have found the desired index so no need to continue
+                break;
+              }
+
+            }
           }
         );
 
@@ -739,7 +758,6 @@ define([
 
           // get the correct event to pass into backgrid trigger
           $.each(pgTools.Profile.reports_grid.columns._listeners, function(k, v) {
-
             if (v.listener.model) {
               if (current_report_id == v.listener.model.get('report_id')) {
                 e = v.listener;
@@ -747,6 +765,7 @@ define([
             }
           });
 
+          // now finally trigger the event
           Backbone.trigger('rowClicked', e);
         }
       }

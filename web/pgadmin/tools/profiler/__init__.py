@@ -1065,16 +1065,20 @@ def save_report(report_data, config, dbname, profile_type, duration):
 
     report = ProfilerSavedReports.query.filter_by(path=path).first()
 
+    print('og path' + path)
+
     # To prevent duplicate reports with the same filename
     # This would happen if the same profile was run multiple times in a minute
     version = ''
     while report is not None:
         if version == '':
-            version = 'a'
+            version = '(a)'
+            path = path[:-5] + version + '.html'
         else:
-            version = chr(ord(path[-5][-1]) + 1)
+            version = chr(ord(path[-7]) + 1)
+            path = path[:-7] + version + path[-6:]
 
-        path = path[-5] + version + '.html'
+        print('new path: ' + path)
         report = ProfilerSavedReports.query.filter_by(path=path).first()
 
     try:
