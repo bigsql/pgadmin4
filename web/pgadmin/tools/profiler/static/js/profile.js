@@ -69,10 +69,7 @@ define([
           url        : baseUrl,
           method     : 'GET',
           beforeSend : function(xhr) {
-            xhr.setRequestHeader(
-              pgAdmin.csrf_token_header, pgAdmin.csrf_token
-            );
-
+            xhr.setRequestHeader(pgAdmin.csrf_token_header, pgAdmin.csrf_token);
             $('.profiler-container').addClass('show_progress');
           },
         })
@@ -129,10 +126,7 @@ define([
         var self = this;
 
         // Get duration through AJAX call to display to user
-        var getDurationUrl = url_for(
-          'profiler.get_duration', {
-            'trans_id': trans_id,
-          });
+        var getDurationUrl = url_for('profiler.get_duration', { 'trans_id': trans_id });
         $.ajax({
           url    : getDurationUrl,
           method : 'GET',
@@ -142,17 +136,12 @@ define([
               duration = parseInt(res.data.duration, 10);
 
               // Make ajax call to start monitoring
-              var baseUrl = url_for(
-                'profiler.start_monitor', {
-                  'trans_id': trans_id,
-                });
+              var baseUrl = url_for('profiler.start_monitor', { 'trans_id': trans_id });
               $.ajax({
                 url        : baseUrl,
                 method     : 'GET',
                 beforeSend : function(xhr) {
-                  xhr.setRequestHeader(
-                    pgAdmin.csrf_token_header, pgAdmin.csrf_token
-                  );
+                  xhr.setRequestHeader(pgAdmin.csrf_token_header, pgAdmin.csrf_token);
                   pgTools.Profile.docker.startLoading(gettext('Monitoring for ' + duration + ' seconds'));
 
                   // We decrease the duration by 1 because time will already have passed by the
@@ -260,9 +249,7 @@ define([
        *
        */
       fetchParameters: function() {
-        var paramUrl = url_for('profiler.get_parameters', {
-          'trans_id': pgTools.Profile.trans_id,
-        });
+        var paramUrl = url_for('profiler.get_parameters', { 'trans_id': pgTools.Profile.trans_id });
         $.ajax({
           url    : paramUrl,
           method : 'GET',
@@ -638,14 +625,53 @@ define([
               method : 'GET',
             })
               .done(function(res) {
-
                 pgTools.Profile.currentId  = m.model.get('report_id');
 
-                // Render the report html into the current report panel
-                pgTools.Profile.current_report_panel
-                  .$container
-                  .find('.current_report')
-                  .html(res);
+                // We use a shadow DOM to encapsulate the report's css and javascript
+                // Note that the shadow DOM cannot use the JS of the page because we load the
+                // report data by setting innerHTML. Thus, we extract the scripts by hand and
+                // add them manually
+
+                // At this point, although the scripts can be correctly added, they do not function
+                // as intended because of encapsulation between the DOM and shadow DOM.
+                var scripts = [];
+                var resHTML = res.split(' ');
+                var save = false;
+                var currentScript = '';
+                for (var i = 0; i < resHTML.length; i++) {
+                  current = resHTML[i].trim();
+
+                  if (current === '<script') {
+                    save = true;
+
+                    // Skip 1 because of 'language = x'
+                    i++;
+
+                    continue;
+                  }
+
+                  if (current === '</script>') {
+                    save = false;
+                    scripts.push(currentScript);
+                    currentScript = '';
+                    continue;
+                  }
+
+                  if (save) currentScript += ' ' + resHTML[i];
+                }
+
+                let container = document.createElement('div');
+                container.attachShadow({mode: 'open'});
+                container.shadowRoot.innerHTML = res;
+
+                _.map(scripts, function(s) {
+                  var script = document.createElement('script');
+                  script.textContent = s;
+                  container.shadowRoot.appendChild(script);
+                });
+
+                pgTools.Profile.current_report_panel.$container.find('.current_report').html('');
+                pgTools.Profile.current_report_panel.$container.find('.current_report').append(container);
 
                 pgTools.Profile.current_report_panel.focus();
               })
@@ -696,7 +722,7 @@ define([
           .append(reports_grid.el);
 
         // Save the reports collection and reports grid, so we can use it for keyboard navigation
-        pgTools.Profile.reportsColl = self.reportsCollection;
+        pgTools.Profile.reportsColl  = self.reportsCollection;
         pgTools.Profile.reports_grid = reports_grid;
 
         // Default the currently showed report to the first report in the grid and show it
@@ -887,12 +913,9 @@ define([
       pgBrowser.bind_beforeunload();
 
       self.initializePanels();
+
       controller.enable_toolbar_buttons();
-
-      // Get reports
       controller.fetchAndAddReports();
-
-      // Get parameters
       // Note that for direct profiling this will be the parameters
       // For indirect(global) profiling, this will be the profiling arguments
       controller.fetchParameters();
