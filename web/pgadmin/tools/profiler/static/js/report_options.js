@@ -38,11 +38,11 @@ define([
     model: ProfilerReportOptionsModel,
   });
 
-  var res = function(trans_id, function_name_with_arguments, profiler_new_browser_tab) {
+  var res = function(trans_id) {
     if (!Alertify.profilerReportOptionsDialog) {
       Alertify.dialog('profilerReportOptionsDialog', function factory() {
         return {
-          main: function(title, trans_id, function_name_with_arguments, profiler_new_browser_tab) {
+          main: function(title, trans_id) {
             this.preferences = pgBrowser.get_preferences_for_module('profiler');
             this.set('title', title);
 
@@ -55,133 +55,101 @@ define([
             // setting value in alertify settings allows us to access it from
             // other functions other than main function.
             this.set('trans_id', trans_id);
-            this.set('profiler_new_browser_tab', profiler_new_browser_tab);
-            this.set('function_name_with_arguments', function_name_with_arguments);
 
-            var option_header = Backgrid.HeaderCell.extend({
-              // Add fixed width to the "option" column
-              className: 'width_percent_15',
-            });
-
-
-            var gridCols = [{
-              name: 'option',
-              label: gettext('Option'),
-              type: 'text',
-              editable: false,
-              cell: 'string',
-              headerCell: option_header,
-            },
-            {
-              name: 'value',
-              label: gettext('Value'),
-              type: 'text',
-              cell: 'string',
-            },
+            var gridCols = [
+              {
+                name       : 'option',
+                label      : gettext('Option'),
+                type       : 'text',
+                editable   : false,
+                cell       : 'string',
+                headerCell :
+                  Backgrid.HeaderCell.extend({
+                    className: 'width_percent_15',
+                  }),
+              },
+              {
+                name  : 'value',
+                label : gettext('Value'),
+                type  : 'text',
+                cell  : 'string',
+              },
             ];
-
-            /*
-            TODO: Sync server defaults config and hard-coded config here
-            var my_obj = [];
 
             var configUrl = url_for(
               'profiler.get_config', {
                 'trans_id': trans_id,
               });
 
+            var self = this;
+
             $.ajax({
-              url: configUrl,
-              method: 'GET',
+              url    : configUrl,
+              method : 'GET',
+              async  : false,
             })
               .done(function(res) {
-                var result = res.data.result;
-                if (result.length != 0) {
-                  //var param_obj = [];
-                  for (var i = 0; i < result.length; i++) {
-                    my_obj.push({
-                      'option': result[i].option,
-                      'value': result[i].value,
-                    });
+                if (res.data.status == 'Success') {
+                  var param_obj = [];
+                  if (res.data.result.length != 0) {
+                    for (var i = 0; i < res.data.result.length; i++) {
+                      param_obj.push({
+                        'option' : res.data.result[i].option,
+                        'value'  : res.data.result[i].value,
+                      });
+                    }
                   }
+
+                  self.ProfilerReportOptionsColl =
+                      new ProfilerReportOptionsCollections(param_obj);
+
+                  // Initialize a new Grid instance
+                  if (self.grid) {
+                    self.grid.remove();
+                    self.grid = null;
+                  }
+                  var grid = self.grid = new Backgrid.Grid({
+                    columns    : gridCols,
+                    collection : new ProfilerReportOptionsCollections(param_obj),
+                    className  : 'backgrid table table-bordered table-noouter-border table-bottom-border',
+                  });
+
+                  grid.render();
+                  $(self.elements.content).html(grid.el);
                 }
+              })
+              .fail(function() {
+                Alertify.alert(
+                  gettext('Profiler Error'),
+                  gettext('Could not fetch report options from server'));
               });
-            */
-
-            var obj = [];
-            obj.push({
-              'option' : 'Name',
-              'value'  : function_name_with_arguments,
-            }, {
-              'option' : 'Title',
-              'value'  : 'Pl/Profiler Report for ' + function_name_with_arguments,
-            }, {
-              'option' : 'Tabstop',
-              'value'  : '8',
-            }, {
-              'option' : 'SVG Width',
-              'value'  : '1200',
-            }, {
-              'option' : 'Table Width',
-              'value'  : '80%',
-            }, {
-              'option' : 'Description',
-              'value'  : '',
-            }, );
-
-            this.ProfilerReportOptionsColl =
-                new ProfilerReportOptionsCollections(obj);
-
-            // Initialize a new Grid instance
-            if (this.grid) {
-              this.grid.remove();
-              this.grid = null;
-            }
-            var grid = this.grid = new Backgrid.Grid({
-              columns: gridCols,
-              collection: this.ProfilerReportOptionsColl,
-              className: 'backgrid table table-bordered table-noouter-border table-bottom-border',
-            });
-
-            grid.render();
-            $(this.elements.content).html(grid.el);
-
-            // For keyboard navigation in the grid
-            // we'll set focus on checkbox from the first row if any
-            var grid_checkbox = $(grid.el).find('input:checkbox').first();
-            if (grid_checkbox.length) {
-              setTimeout(function() {
-                grid_checkbox.trigger('click');
-              }, 250);
-            }
-
           },
           settings: {
             trans_id: undefined,
-            profiler_new_browser_tab: undefined,
             function_name_with_arguments: undefined,
           },
           setup: function() {
             return {
               buttons: [{
-                text: gettext('Cancel'),
-                key: 27,
-                className: 'btn btn-secondary fa fa-times pg-alertify-button',
+                text      : gettext('Cancel'),
+                key       : 27,
+                className : 'btn btn-secondary fa fa-times pg-alertify-button',
               },{
-                text: gettext('Submit'),
-                key: 13,
-                className: 'btn btn-primary fa fa-bullseye pg-alertify-button', // TODO: replace icon
+                text      : gettext('Submit'),
+                key       : 13,
+                className : 'btn btn-primary fa fa-bullseye pg-alertify-button', // TODO: replace icon
               }],
               // Set options for dialog
               options: {
                 //disable both padding and overflow control.
-                padding: !1,
-                overflow: !1,
-                model: 0,
-                resizable: true,
-                maximizable: true,
-                pinnable: false,
-                closableByDimmer: false,
-                modal: false,
+                padding          : !1,
+                overflow         : !1,
+                model            : 0,
+                resizable        : true,
+                maximizable      : true,
+                pinnable         : false,
+                closableByDimmer : false,
+                modal            : false,
               },
             };
           },
@@ -194,10 +162,10 @@ define([
 
               var options_value_list = [];
 
-              this.grid.collection.each(function(m) {
+              self.grid.collection.each(function(m) {
                 options_value_list.push({
-                  'option': m.get('option'),
-                  'value': m.get('value'),
+                  'option' : m.get('option'),
+                  'value'  : m.get('value'),
                 });
               });
 
@@ -206,9 +174,9 @@ define([
               });
 
               $.ajax({
-                url: baseUrl,
-                method: 'POST',
-                data: {
+                url    : baseUrl,
+                method : 'POST',
+                data   : {
                   'data': JSON.stringify(options_value_list),
                 },
               })
@@ -250,11 +218,8 @@ define([
               (function(obj) {
 
                 return function() {
-
                   var enable_btn = false;
-
                   for (var i = 0; i < this.collection.length; i++) {
-
                     if (this.collection.models[i].get('is_null')) {
                       obj.__internal.buttons[1].element.disabled = false;
                       enable_btn = true;
@@ -280,7 +245,7 @@ define([
     }
 
     Alertify.profilerReportOptionsDialog(
-      gettext('Report Options'), trans_id, function_name_with_arguments, profiler_new_browser_tab
+      gettext('Report Options'), trans_id
     ).resizeTo(pgBrowser.stdW.md,pgBrowser.stdH.md);
   };
 

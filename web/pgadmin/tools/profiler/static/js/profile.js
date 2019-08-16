@@ -2,8 +2,6 @@
 //
 // pgAdmin 4 - PostgreSQL Tools
 //
-// Copyright (C) 2013 - 2019, The pgAdmin Development Team
-// This software is released under the PostgreSQL Licence
 //
 //////////////////////////////////////////////////////////////
 
@@ -68,9 +66,9 @@ define([
             'trans_id': trans_id,
           });
         $.ajax({
-          url: baseUrl,
-          method: 'GET',
-          beforeSend: function(xhr) {
+          url        : baseUrl,
+          method     : 'GET',
+          beforeSend : function(xhr) {
             xhr.setRequestHeader(
               pgAdmin.csrf_token_header, pgAdmin.csrf_token
             );
@@ -136,8 +134,8 @@ define([
             'trans_id': trans_id,
           });
         $.ajax({
-          url: getDurationUrl,
-          method: 'GET',
+          url    : getDurationUrl,
+          method : 'GET',
         })
           .done(function(res) {
             if (res.data.status === 'Success') {
@@ -149,9 +147,9 @@ define([
                   'trans_id': trans_id,
                 });
               $.ajax({
-                url: baseUrl,
-                method: 'GET',
-                beforeSend: function(xhr) {
+                url        : baseUrl,
+                method     : 'GET',
+                beforeSend : function(xhr) {
                   xhr.setRequestHeader(
                     pgAdmin.csrf_token_header, pgAdmin.csrf_token
                   );
@@ -220,9 +218,9 @@ define([
 
         // Collection which contains the model for function informations.
         var ResultsCollection = Backbone.Collection.extend({
-          model: Backbone.Model.extend({
-            defaults: {
-              name: undefined,
+          model : Backbone.Model.extend({
+            defaults : {
+              name : undefined,
             },
           }),
         });
@@ -231,9 +229,9 @@ define([
         if (_.size(columns)) {
           _.each(columns, function(c) {
             var column = {
-              type: 'text',
-              editable: false,
-              cell: 'string',
+              type     : 'text',
+              editable : false,
+              cell     : 'string',
             };
             column['name'] = column['label'] = c.name;
             resultGridCols.push(column);
@@ -242,10 +240,10 @@ define([
 
         // Initialize a new Grid instance
         var result_grid = this.result_grid = new Backgrid.Grid({
-          emptyText: 'No data found',
-          columns: resultGridCols,
-          collection: new ResultsCollection(result),
-          className: 'backgrid table table-bordered table-noouter-border table-bottom-border',
+          emptyText  : 'No data found',
+          columns    : resultGridCols,
+          collection : new ResultsCollection(result),
+          className  : 'backgrid table table-bordered table-noouter-border table-bottom-border',
         });
 
         result_grid.render();
@@ -266,8 +264,8 @@ define([
           'trans_id': pgTools.Profile.trans_id,
         });
         $.ajax({
-          url: paramUrl,
-          method: 'GET',
+          url    : paramUrl,
+          method : 'GET',
         })
           .done(function(res) {
             if (res.data.status === 'Success') {
@@ -310,33 +308,33 @@ define([
         var ParametersCollection = self.ParametersCollection = Backbone.Collection.extend({
           model: Backbone.Model.extend({
             defaults: {
-              name: undefined,
-              type: undefined,
-              value: undefined,
+              name  : undefined,
+              type  : undefined,
+              value : undefined,
             },
           }),
         });
 
         var paramGridCols = [{
-          name: 'name',
-          label: gettext('Name'),
-          type: 'text',
-          editable: false,
-          cell: 'string',
+          name     : 'name',
+          label    : gettext('Name'),
+          type     : 'text',
+          editable : false,
+          cell     : 'string',
         },
         {
-          name: 'type',
-          label: gettext('Type'),
-          type: 'text',
-          editable: false,
-          cell: 'string',
+          name     : 'type',
+          label    : gettext('Type'),
+          type     : 'text',
+          editable : false,
+          cell     : 'string',
         },
         {
-          name: 'value',
-          label: gettext('Value'),
-          type: 'text',
-          editable: false,
-          cell: 'string',
+          name     : 'value',
+          label    : gettext('Value'),
+          type     : 'text',
+          editable : false,
+          cell     : 'string',
         },
         ];
 
@@ -344,19 +342,19 @@ define([
         if (result.length != 0) {
           for (var i = 0; i < result.length; i++) {
             param_obj.push({
-              'name': result[i].name,
-              'type': result[i].type,
-              'value': result[i].value,
+              'name'  : result[i].name,
+              'type'  : result[i].type,
+              'value' : result[i].value,
             });
           }
         }
 
         // Initialize a new Grid instance
         var param_grid = this.param_grid = new Backgrid.Grid({
-          emptyText: 'No data found',
-          columns: paramGridCols,
-          collection: new ParametersCollection(param_obj),
-          className: 'backgrid table table-bordered table-noouter-border table-bottom-border',
+          emptyText  : 'No data found',
+          columns    : paramGridCols,
+          collection : new ParametersCollection(param_obj),
+          className  : 'backgrid table table-bordered table-noouter-border table-bottom-border',
         });
 
         param_grid.render();
@@ -384,8 +382,8 @@ define([
       fetchAndAddReports: function() {
         var reportsUrl = url_for('profiler.get_reports');
         $.ajax({
-          url: reportsUrl,
-          method: 'GET',
+          url    : reportsUrl,
+          method : 'GET',
         })
           .done(function(res) {
             if (res.data.status === 'Success') {
@@ -418,73 +416,77 @@ define([
         // Collection which contains the model for report informations.
         var ReportsCollection = self.ReportsCollection = Backbone.Collection.extend({
           model: Backbone.Model.extend({
-            defaults: {
-              profile_type: undefined,
-              database: undefined,
-              time: undefined,
-              duration: undefined,
-              report_id: undefined,
+            defaults : {
+              profile_type : undefined,
+              database     : undefined,
+              time         : undefined,
+              duration     : undefined,
+              report_id    : undefined,
             },
           }),
         });
 
         var reportsGridCols = [
           {
-            name: 'profile_type',
-            label: gettext('Profile Type / Function Name'),
-            type: 'text',
-            editable: false,
-            headerCell: Backgrid.HeaderCell.extend({
-              className: 'width_percent_30',
-            }),
-            cell: 'string',
+            name       : 'profile_type',
+            label      : gettext('Profile Type / Function Name'),
+            type       : 'text',
+            editable   : false,
+            headerCell :
+              Backgrid.HeaderCell.extend({
+                className : 'width_percent_30',
+              }),
+            cell       : 'string',
           },
           {
-            name: 'database',
-            label: gettext('Database Name'),
-            type: 'text',
-            editable: false,
-            headerCell: Backgrid.HeaderCell.extend({
-              className: 'width_percent_20',
-            }),
-            cell: 'string',
+            name       : 'database',
+            label      : gettext('Database Name'),
+            type       : 'text',
+            editable   : false,
+            headerCell :
+              Backgrid.HeaderCell.extend({
+                className : 'width_percent_20',
+              }),
+            cell       : 'string',
           },
           {
-            name: 'start_date',
-            label: gettext('Start Date/Time'),
-            type: 'text',
-            editable: false,
-            headerCell: Backgrid.HeaderCell.extend({
-              className: 'width_percent_15',
-            }),
-            cell: 'string',
+            name        : 'start_date',
+            label       : gettext('Start Date/Time'),
+            type        : 'text',
+            editable    : false,
+            headerCell  :
+              Backgrid.HeaderCell.extend({
+                className  : 'width_percent_15',
+              }),
+            cell        : 'string',
           },
           {
-            name: 'duration',
-            label: gettext('Duration'),
-            type: 'text',
-            headerCell: Backgrid.HeaderCell.extend({
-              className: 'width_percent_15',
-            }),
+            name       : 'duration',
+            label      : gettext('Duration'),
+            type       : 'text',
+            headerCell :
+              Backgrid.HeaderCell.extend({
+                className : 'width_percent_15',
+              }),
             editable: false,
-            cell: 'string',
+            cell       : 'string',
           },
           {
-            name: 'report_id',
-            label: gettext('Show Report'),
-            type: 'text',
-            editable: false,
-            headerCell: Backgrid.HeaderCell.extend({
-              className: 'width_percent_10',
-            }),
-
+            name       : 'report_id',
+            label      : gettext('Show Report'),
+            type       : 'text',
+            editable   : false,
+            headerCell :
+              Backgrid.HeaderCell.extend({
+                className : 'width_percent_10',
+              }),
             // Custom button cell to add functionality when the show report button is clicked
-            cell: Backgrid.Cell.extend({
-              className: 'report-cell',
-              events: {
+            cell       : Backgrid.Cell.extend({
+              className : 'report-cell',
+              events : {
                 'click button' : 'generateReport',
               },
-              generateReport: function(e) {
+              generateReport : function(e) {
                 e.preventDefault();
                 e.stopPropagation();
 
@@ -494,103 +496,87 @@ define([
                   });
                 window.open(reportUrl, '_blank');
               },
-              render: function() {
+              render : function() {
                 this.$el.html('<button> Show </button>');
                 return this;
               },
             }),
           },
           {
-            name: 'delete',
-            label: gettext('Delete Report'),
-            type: 'text',
-            editable: false,
-            headerCell: Backgrid.HeaderCell.extend({
-              className: 'width_percent_10',
-            }),
-
+            name       : 'delete',
+            label      : gettext('Delete Report'),
+            type       : 'text',
+            editable   : false,
+            headerCell :
+              Backgrid.HeaderCell.extend({
+                className : 'width_percent_10',
+              }),
             // Custom button cell to add functionality when the delete report button is clicked
-            cell: Backgrid.Cell.extend({
-              className: 'delete-cell',
-              events: {
-                'click button' : 'deleteReport',
-              },
+            cell       :
+              Backgrid.Cell.extend({
+                className : 'delete-cell',
+                events : {
+                  'click button' : 'deleteReport',
+                },
 
-              deleteReport: function(e) {
-                // need to save this because of Alertify call handler/scope
-                var temp = this;
+                deleteReport : function(e) {
+                  // need to save this because of Alertify call handler/scope
+                  var temp = this;
 
-                e.preventDefault();
-                e.stopPropagation();
+                  e.preventDefault();
+                  e.stopPropagation();
 
-                // Create a confirm alert
-                Alertify.confirm(
-                  'Delete',
-                  'Would you like to delete the selected report?',
+                  // Create a confirm alert
+                  Alertify.confirm(
+                    'Delete',
+                    'Would you like to delete the selected report?',
 
-                  // On confirmation send AJAX request to server to delete
-                  // and delete from client interface
-                  function() {
-                    var reportUrl = url_for(
-                      'profiler.delete_report', {
-                        'report_id' : temp.model.get('report_id'),
-                      });
+                    // On confirmation send AJAX request to server to delete
+                    // and delete from client interface
+                    function() {
+                      var reportUrl = url_for(
+                        'profiler.delete_report', {
+                          'report_id' : temp.model.get('report_id'),
+                        });
 
-                    $.ajax({
-                      url : reportUrl,
-                      method: 'POST',
-                    })
-                      .done(function(res) {
-                        if (res.data.status == 'ERROR') {
-                          Alertify.alert(gettext(res.data.result));
-                        }
+                      $.ajax({
+                        url    : reportUrl,
+                        method : 'POST',
+                      })
+                        .done(function(res) {
+                          if (res.data.status == 'ERROR') {
+                            Alertify.alert(
+                              gettext('Profiler Error'),
+                              gettext('Error in deleting selected report'));
+                          }
 
-                        // Remove the selected row from the collection and therefore the grid
-                        pgTools.Profile.reportsColl.remove(temp.model);
+                          // Remove the selected row from the collection and therefore the grid
+                          pgTools.Profile.reportsColl.remove(temp.model);
+                          pgTools.Profile.numReports -= 1;
 
-                        // TODO: Automatically move up the currentReportIndex after deletion
-                        // and show the next report instead of just resetting to 0
-                        pgTools.Profile.currentReportIndex = 0;
-                        pgTools.Profile.numReports -= 1;
+                          // Case of deleting the report for the row at the bottom of the grid
+                          if (pgTools.Profile.currentReportIndex === pgTools.Profile.numReports) {
+                            pgTools.Profile.currentReportIndex -= 1;
+                          }
 
-                        // Note that since the selected report is deleted, we need to choose
-                        // another report to show
+                          // Note that since the selected report is deleted, we choose to show the
+                          // report at the same row. The rows immediately below the deleted row
+                          // should be shown
+                          controller.loadReport(pgTools.Profile.currentReportIndex);
+                        });
 
-                        // Make sure that there is a report to show
-                        if (pgTools.Profile.reportsColl.models.length > 0) {
+                    },
 
-                          var e, currentReportId =
-                            pgTools.Profile.reportsColl.models[0].get('report_id');
+                    // If the user decides not to delete, there is nothing to do
+                    function() {}
+                  );
+                },
 
-                          // get the correct event to pass into backgrid trigger
-                          $.each(pgTools.Profile.reports_grid.columns._listeners, function(k, v) {
-
-                            if (v.listener.model) {
-                              if (currentReportId == v.listener.model.get('report_id')) {
-                                e = v.listener;
-                              }
-                            }
-                          });
-
-                          // Finally, load the first report
-                          Backbone.trigger('rowClicked', e);
-                        }
-                        console.warn(pgTools.Profile.reportsColl);
-                        console.warn(pgTools.Profile.reports_grid);
-                      });
-
-                  },
-
-                  // If the user decides not to delete, there is nothing to do
-                  function() {}
-                );
-              },
-
-              render: function() {
-                this.$el.html('<button> Delete </button>');
-                return this;
-              },
-            }),
+                render : function() {
+                  this.$el.html('<button> Delete </button>');
+                  return this;
+                },
+              }),
           },
         ];
 
@@ -613,24 +599,21 @@ define([
 
         // Initialize a new Grid instance
         var reports_grid = this.reports_grid = new Backgrid.Grid({
-          emptyText: 'No data found',
-          columns: reportsGridCols,
-
+          emptyText  : 'No data found',
+          columns    : reportsGridCols,
           // Custom row that will allow users to click
-          row: Backgrid.Row.extend({
-            highlightColor: 'lightYellow',
-
-            className: 'selectable-row',
-            events: {
-              'click': 'onClick',
-            },
-            onClick: function (e) {
-              e.stopPropagation();
-              Backbone.trigger('rowClicked', this);
-            },
+          row        : Backgrid.Row.extend({
+            highlightColor : 'lightYellow',
+            className      : 'selectable-row',
+            events         : {'click': 'onClick'},
+            onClick        :
+              function (e) {
+                e.stopPropagation();
+                Backbone.trigger('rowClicked', this);
+              },
           }),
-          collection: self.reportsCollection,
-          className: 'backgrid table table-bordered table-noouter-border table-bottom-border',
+          collection : self.reportsCollection,
+          className  : 'backgrid table table-bordered table-noouter-border table-bottom-border',
         });
 
         // Display the most newly created reports first
@@ -651,8 +634,8 @@ define([
                 'report_id': m.model.get('report_id'),
               });
             $.ajax({
-              url: reportUrl,
-              method: 'GET',
+              url    : reportUrl,
+              method : 'GET',
             })
               .done(function(res) {
 
@@ -688,7 +671,7 @@ define([
           }
         );
 
-        // TODO: When the grid is sorted, we should keep the index of the report we have already selected
+        // When the grid is sorted, keep the index of the report we have already selected
         this.listenTo(self.reportsCollection, 'backgrid:sorted', function() {
 
           // Update the current_report_index
@@ -701,7 +684,6 @@ define([
               // we have found the desired index so no need to continue
               break;
             }
-
           }
 
           controller.loadReport(pgTools.Profile.currentReportIndex);
@@ -765,10 +747,10 @@ define([
       controller.on('pgProfiler:button:state:report-options' , this.enable_report_options, this);
     },
     events: {
-      'click .btn-start': 'on_start',
-      'click .btn-save' : 'on_save',
-      'click .btn-report-options': 'on_report_options',
-      'keydown': 'keyAction',
+      'click .btn-start'          : 'on_start',
+      'click .btn-save'           : 'on_save',
+      'click .btn-report-options' : 'on_report_options',
+      'keydown'                   : 'keyAction',
     },
     enable_start: function(enable) {
       var $btn = this.$el.find('.btn-start');
@@ -814,9 +796,7 @@ define([
     },
     on_report_options: function(e) {
       e.stopPropagation();
-      input_report_options(pgTools.Profile.trans_id,
-        pgTools.Profile.function_name_with_arguments,
-        pgTools.Profile.preferences.profiler_new_browser_tab);
+      input_report_options(pgTools.Profile.trans_id);
     },
     on_save: function(e) {
       e.stopPropagation();
@@ -870,15 +850,14 @@ define([
         return;
       this.initialized = true;
 
-      this.trans_id = trans_id;
-      this.profile_type = profile_type;
-      this.profile_restarted = false;
+      this.trans_id                     = trans_id;
+      this.profile_type                 = profile_type;
       this.function_name_with_arguments = function_name_with_arguments;
 
       this.layout = layout;
 
       // variables to save to support keyboard navigation
-      this.reportsColl = false;
+      this.reportsColl  = false;
       this.reports_grid = false;
 
       // number of reports to prevent out of bounds keyboard navigation
@@ -897,13 +876,11 @@ define([
 
       this.docker = new wcDocker(
         '#container', {
-          allowContextMenu: false,
-          allowCollapse: false,
-          loadingClass: 'pg-sp-icon',
-          themePath: url_for('static', {
-            'filename': 'css',
-          }),
-          theme: 'webcabin.overrides.css',
+          allowContextMenu : false,
+          allowCollapse    : false,
+          loadingClass     : 'pg-sp-icon',
+          themePath        : url_for( 'static', {'filename': 'css'} ),
+          theme            : 'webcabin.overrides.css',
         });
       this.panels = [];
 
@@ -927,8 +904,8 @@ define([
           'trans_id' : trans_id,
         });
         $.ajax({
-          url: srcUrl,
-          method: 'GET',
+          url    : srcUrl,
+          method : 'GET',
         })
           .done(function(res) {
             if (res.data.status === 'Success') {
@@ -973,45 +950,45 @@ define([
 
           // Create the parameters panel to display the arguments of the functions
           var parameters = new pgAdmin.Browser.Panel({
-            name: 'parameters',
-            title: gettext('Parameters'),
-            width: '100%',
-            height: '100%',
-            isCloseable: false,
-            isPrivate: true,
-            content: '<div id ="parameters" class="parameters" tabindex="0"></div>',
+            name        : 'parameters',
+            title       : gettext('Parameters'),
+            width       : '100%',
+            height      : '100%',
+            isCloseable : false,
+            isPrivate   : true,
+            content     : '<div id ="parameters" class="parameters" tabindex="0"></div>',
           });
 
           // Create the result panel to display the result after profiling the function
           var results = new pgAdmin.Browser.Panel({
-            name: 'results',
-            title: gettext('Results'),
-            width: '100%',
-            height: '100%',
-            isCloseable: false,
-            isPrivate: true,
-            content: '<div id="profile_results" class="profile_results" tabindex="0"></div>',
+            name        : 'results',
+            title       : gettext('Results'),
+            width       : '100%',
+            height      : '100%',
+            isCloseable : false,
+            isPrivate   : true,
+            content     : '<div id="profile_results" class="profile_results" tabindex="0"></div>',
           });
 
           // Create the reports panel to display saved profiling reports
           var reports = new pgAdmin.Browser.Panel({
-            name: 'reports',
-            title: gettext('Profiling Reports'),
-            width: '100%',
-            height: '100%',
-            isCloseable: false,
-            isPrivate: true,
-            content: '<div id ="reports" class="reports" tabindex="0"></div>',
+            name        : 'reports',
+            title       : gettext('Profiling Reports'),
+            width       : '100%',
+            height      : '100%',
+            isCloseable : false,
+            isPrivate   : true,
+            content     : '<div id ="reports" class="reports" tabindex="0"></div>',
           });
 
           var current_report = new pgAdmin.Browser.Panel({
-            name: 'current_report',
-            title: gettext('Current Report'),
-            width: '100%',
-            height: '100%',
-            isCloseable: false,
-            isPrivate: true,
-            content: '<div id ="current_report" class="current_report" tabindex="0"></div>',
+            name        : 'current_report',
+            title       : gettext('Current Report'),
+            width       : '100%',
+            height      : '100%',
+            isCloseable : false,
+            isPrivate   : true,
+            content     : '<div id ="current_report" class="current_report" tabindex="0"></div>',
           });
 
           // Load all the created panels
@@ -1028,11 +1005,10 @@ define([
         pgBrowser.save_current_layout('Profiler/Layout', self.docker);
       });
 
-      self.code_editor_panel = self.docker.findPanels('code')[0];
-
-      self.parameters_panel = self.docker.findPanels('parameters')[0];
-      self.results_panel = self.docker.findPanels('results')[0];
-      self.reports_panel = self.docker.findPanels('reports')[0];
+      self.code_editor_panel    = self.docker.findPanels('code')[0];
+      self.parameters_panel     = self.docker.findPanels('parameters')[0];
+      self.results_panel        = self.docker.findPanels('results')[0];
+      self.reports_panel        = self.docker.findPanels('reports')[0];
       self.current_report_panel = self.docker.findPanels('current_report')[0];
 
       var editor_pane = $('<div id="stack_editor_pane" ' +
@@ -1044,11 +1020,9 @@ define([
       // To show the line-number and set breakpoint marker details by user.
       self.editor = CodeMirror.fromTextArea(
         code_editor_area.get(0), {
-          tabindex: -1,
-          lineNumbers: true,
-          foldOptions: {
-            widget: '\u2026',
-          },
+          tabindex    : -1,
+          lineNumbers : true,
+          foldOptions : { widget: '\u2026' },
           foldGutter: {
             rangeFinder: CodeMirror.fold.combine(
               CodeMirror.pgadminBeginRangeFinder,
@@ -1060,15 +1034,15 @@ define([
           gutters: [
             'CodeMirror-linenumbers', 'CodeMirror-foldgutter', 'breakpoints',
           ],
-          mode: 'text/x-pgsql',
-          readOnly: true,
-          extraKeys: pgAdmin.Browser.editor_shortcut_keys,
-          indentWithTabs: pgAdmin.Browser.editor_options.indent_with_tabs,
-          indentUnit: pgAdmin.Browser.editor_options.tabSize,
-          tabSize: pgAdmin.Browser.editor_options.tabSize,
-          lineWrapping: pgAdmin.Browser.editor_options.wrapCode,
-          autoCloseBrackets: pgAdmin.Browser.editor_options.insert_pair_brackets,
-          matchBrackets: pgAdmin.Browser.editor_options.brace_matching,
+          mode              : 'text/x-pgsql',
+          readOnly          : true,
+          extraKeys         : pgAdmin.Browser.editor_shortcut_keys,
+          indentWithTabs    : pgAdmin.Browser.editor_options.indent_with_tabs,
+          indentUnit        : pgAdmin.Browser.editor_options.tabSize,
+          tabSize           : pgAdmin.Browser.editor_options.tabSize,
+          lineWrapping      : pgAdmin.Browser.editor_options.wrapCode,
+          autoCloseBrackets : pgAdmin.Browser.editor_options.insert_pair_brackets,
+          matchBrackets     : pgAdmin.Browser.editor_options.brace_matching,
         });
 
       pgBrowser.Events.on('pgadmin:profiler:code:focus', ()=>{

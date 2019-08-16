@@ -1067,6 +1067,9 @@ def save_report(report_data, config, dbname, profile_type, duration):
 
     # To prevent duplicate reports with the same filename
     # This would happen if the same profile was run multiple times in a minute
+    # This function works by checking if there is a report with the given path
+    # and continuously updating the search path with '(a)', where a increments
+    # until there is a file with the given path
     version = ''
     while report is not None:
         if version == '':
@@ -1122,10 +1125,21 @@ def delete_report(report_id):
         raise Exception('No report with given report_id found')
 
     path = report.path
+
     try:
         db.session.delete(report)
-        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.exception(e)
+        return make_json_response(
+            data={
+                'status': 'ERROR'
+            }
+        )
 
+    db.session.commit()
+
+    try:
         os.remove(path)
         return make_json_response(
             data={
@@ -1136,10 +1150,10 @@ def delete_report(report_id):
         current_app.logger.exception(e)
         return make_json_response(
             data={
-                'status': 'ERROR',
-                'result': str(e)
+                'status': 'ERROR'
             }
         )
+
 
 
 @blueprint.route(
