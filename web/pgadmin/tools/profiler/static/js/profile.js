@@ -546,7 +546,6 @@ define([
                         }
 
                         // Remove the selected row from the collection and therefore the grid
-                        console.warn(temp);
                         pgTools.Profile.reportsColl.remove(temp.model);
 
                         // TODO: Automatically move up the currentReportIndex after deletion
@@ -657,6 +656,8 @@ define([
             })
               .done(function(res) {
 
+                pgTools.Profile.currentId  = m.model.get('report_id');
+
                 // Render the report html into the current report panel
                 pgTools.Profile.current_report_panel
                   .$container
@@ -689,8 +690,19 @@ define([
 
         // TODO: When the grid is sorted, we should keep the index of the report we have already selected
         this.listenTo(self.reportsCollection, 'backgrid:sorted', function() {
-          // Default the currently showed report to the first report in the grid
-          pgTools.Profile.currentReportIndex = 0;
+
+          // Update the current_report_index
+          for (var i = 0; i < pgTools.Profile.reportsColl.models.length; i++) {
+            var current = pgTools.Profile.reportsColl.models[i];
+
+            if (pgTools.Profile.currentId === current.get('report_id')) {
+              pgTools.Profile.currentReportIndex = i;
+
+              // we have found the desired index so no need to continue
+              break;
+            }
+
+          }
 
           controller.loadReport(pgTools.Profile.currentReportIndex);
         });
@@ -875,9 +887,9 @@ define([
       // index of currently selected report in the reports grid
       this.currentReportIndex = 0;
 
-      // report_id of previously shown report in the current_reports_grid
+      // report_id of currently shown report in the current_reports_grid
       // we save this so when the grid is sorted, we show the same report and update the index
-      // this.previous = 0;
+      this.currentId = -1;
 
       let browser = window.opener ?
         window.opener.pgAdmin.Browser : window.top.pgAdmin.Browser;
