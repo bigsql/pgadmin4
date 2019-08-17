@@ -58,7 +58,7 @@ define([
        * @param {int} trans_id - The unique transaction id for the already initialize profiling
        *  instance
        */
-      start_execution: function(trans_id) {
+      startExecution: function(trans_id) {
 
         // Make ajax call to run profiler
         var baseUrl = url_for(
@@ -77,6 +77,7 @@ define([
             $('.profiler-container').removeClass('show_progress');
 
             if (res.data.status === 'Success') {
+              pgTools.Profile.profile_completed = true;
               controller.addResults(res.data.col_info, res.data.result);
               controller.fetchAndAddReports();
             } else if (res.data.status === 'NotConnected') {
@@ -101,7 +102,7 @@ define([
        *
        * @param {int} duration - The original duration of the monitoring
        */
-      update_monitor_load: function(duration) {
+      updateMonitorLoad : function(duration) {
         var time_remaining = duration * 1000;
 
         var intervalId = setInterval(function() {
@@ -122,7 +123,7 @@ define([
        * @param {int} trans_id - The unique transaction id for the already initialize profiling
        *  instance
        */
-      start_monitor: function(trans_id, duration) {
+      startMonitor : function(trans_id, duration) {
         var self = this;
 
         // Get duration through AJAX call to display to user
@@ -146,10 +147,11 @@ define([
 
                   // We decrease the duration by 1 because time will already have passed by the
                   // time the loading wheel is created and shown
-                  self.update_monitor_load(duration - 1);
+                  controller.updateMonitorLoad(duration - 1);
                 },
               })
                 .done(function(res) {
+                  pgTools.Profile.profile_completed = true;
                   pgTools.Profile.docker.finishLoading();
 
                   if (res.data.status === 'Success') {
@@ -190,13 +192,46 @@ define([
           });
       },
 
+      restart : function(trans_id) {
+        var self = this,
+          restartUrl = url_for('profiler.restart', {'trans_id' : trans_id});
+
+        $.ajax({
+          url : restartUrl,
+        })
+          .done(function(res) {
+
+            if (res.data.profile_type === 'indirect') {
+              // check if we need to input arguments again
+              if (res.data.result.require_input) {
+                profile_function_again(res.data.result, 0, pgTools.Profile.trans_id);
+              } else {
+                controller.startExecution(pgTools.Profile.trans_id);
+              }
+            } else {
+              // TODO: Open profile options window
+            }
+
+          })
+          .fail(function(xhr) {
+            try {
+              var err = JSON.parse(xhr.responseText);
+              if (err.success == 0) {
+                Alertify.alert(gettext('Debugger Error'), err.errormsg);
+              }
+            } catch (e) {
+              console.warn(e.stack || e);
+            }
+          });
+      },
+
       /**
        * Updates the results panel for the profiling window
        *
        * @param {Array} columns - Contains the names of the columns for the results panel
        * @param {Array} result - Contains the values of the columns for the results panel
        */
-      addResults: function(columns, result) {
+      addResults : function(columns, result) {
         var self = this;
 
         // Remove the existing created grid and update the result values
@@ -634,30 +669,49 @@ define([
 
                 // At this point, although the scripts can be correctly added, they do not function
                 // as intended because of encapsulation between the DOM and shadow DOM.
+
+                // TODO: Fix Styling
                 var scripts = [];
+                var styleSheets = [];
+
                 var resHTML = res.split(' ');
-                var save = false;
+
+                var scriptSave = false;
+                var styleSave  = false;
+
                 var currentScript = '';
+                var currentStyle  = '';
                 for (var i = 0; i < resHTML.length; i++) {
                   current = resHTML[i].trim();
 
                   if (current === '<script') {
-                    save = true;
-
-                    // Skip 1 because of 'language = x'
-                    i++;
-
+                    scriptSave = true;
+                    i++;  // Skip 1 because of 'language = x'
                     continue;
                   }
-
                   if (current === '</script>') {
-                    save = false;
+                    scriptSave = false;
                     scripts.push(currentScript);
                     currentScript = '';
                     continue;
                   }
+                  if (scriptSave) currentScript += ' ' + resHTML[i];
 
-                  if (save) currentScript += ' ' + resHTML[i];
+                  if (current === '<style>') {
+                    styleSave = true;
+                    continue;
+                  } else if (current === '<style') {
+                    styleSave = true;
+                    i++;
+                    continue;
+                  }
+                  if (current === '</style>') {
+                    styleSave = false;
+                    styleSheets.push(currentStyle);
+                    currentStyle = '';
+                    continue;
+                  }
+                  if (styleSave) currentStyle += ' ' + resHTML[i];
                 }
 
                 let container = document.createElement('div');
@@ -668,6 +722,12 @@ define([
                   var script = document.createElement('script');
                   script.textContent = s;
                   container.shadowRoot.appendChild(script);
+                });
+
+                _.map(styleSheets, function(s) {
+                  var styleSheet = document.createElement('style');
+                  styleSheet.innerText = s;
+                  container.shadowRoot.appendChild(styleSheet);
                 });
 
                 pgTools.Profile.current_report_panel.$container.find('.current_report').html('');
@@ -813,12 +873,21 @@ define([
     },
     on_start: function(e) {
       e.stopPropagation();
-      if (pgTools.Profile.profile_type == 1) {
-        controller.start_execution(pgTools.Profile.trans_id);
-      } else {
-        controller.start_monitor(pgTools.Profile.trans_id);
+      if (pgTools.Profile.profile_completed) {
+        if (pgTools.Profile.profile_type == 1) {
+          //pass;
+        } else {
+          //pass;
+        }
       }
 
+      else {
+        if (pgTools.Profile.profile_type == 1) {
+          controller.startExecution(pgTools.Profile.trans_id);
+        } else {
+          controller.startMonitor(pgTools.Profile.trans_id);
+        }
+      }
     },
     on_report_options: function(e) {
       e.stopPropagation();
@@ -875,6 +944,8 @@ define([
       if (this.initialized)
         return;
       this.initialized = true;
+
+      this.profile_completed = false;
 
       this.trans_id                     = trans_id;
       this.profile_type                 = profile_type;

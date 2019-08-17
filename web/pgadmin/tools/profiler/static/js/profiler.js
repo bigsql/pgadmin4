@@ -206,8 +206,7 @@ define([
         i = item || t.selected(),
         d = i && i.length == 1 ? t.itemData(i) : undefined,
         node = d && pgBrowser.Nodes[d._type],
-        self = this,
-        is_edb_proc = false;
+        self = this;
 
       if (!d)
         return;
@@ -226,7 +225,7 @@ define([
             trans_id = res.data.trans_id;
           // Open Alertify the dialog to take the input arguments from user if function having input arguments
           if (profile_info[0]['require_input']) {
-            get_function_arguments(profile_info[0], 0, is_edb_proc, trans_id);
+            get_function_arguments(profile_info[0], 0, trans_id);
           } else {
             // Initialize the target and create asynchronous connection and unique transaction ID
             // If there is no arguments to the functions then we should not ask for for function arguments and

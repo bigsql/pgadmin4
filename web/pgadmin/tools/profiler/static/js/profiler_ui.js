@@ -165,11 +165,11 @@ define([
   };
 
 
-  var res = function(profile_info, restart_profile, is_edb_proc, trans_id) {
+  var res = function(profile_info, restart_profile, trans_id) {
     if (!Alertify.profilerInputArgsDialog) {
       Alertify.dialog('profilerInputArgsDialog', function factory() {
         return {
-          main: function(title, profile_info, restart_profile, is_edb_proc, trans_id) {
+          main: function(title, profile_info, restart_profile, trans_id) {
             this.preferences = window.top.pgAdmin.Browser.get_preferences_for_module('profiler');
             this.set('title', title);
 
@@ -316,8 +316,7 @@ define([
             if (profile_info['proargmodes'] != null) {
               var argmode_1 = profile_info['proargmodes'].split(',');
               for (k = 0; k < argmode_1.length; k++) {
-                if (argmode_1[k] == 'i' || argmode_1[k] == 'b' ||
-                  (is_edb_proc && argmode_1[k] == 'o')) {
+                if (argmode_1[k] == 'i' || argmode_1[k] == 'b') {
                   input_arg_id.push(k);
                 }
               }
@@ -349,8 +348,7 @@ define([
               // It will assign default values to "Default value" column
               for (j = (argname.length - 1); j >= 0; j--) {
                 if (profile_info['proargmodes'] != null) {
-                  if (argmode[j] == 'i' || argmode[j] == 'b' ||
-                    (is_edb_proc && argmode[j] == 'o')) {
+                  if (argmode[j] == 'i' || argmode[j] == 'b') {
                     if (arg_cnt) {
                       arg_cnt = arg_cnt - 1;
                       def_val_list[j] = default_args[arg_cnt];
@@ -369,8 +367,7 @@ define([
               if (argtype.length != 0) {
                 for (i = 0; i < argtype.length; i++) {
                   if (profile_info['proargmodes'] != null) {
-                    if (argmode[i] == 'i' || argmode[i] == 'b' ||
-                      (is_edb_proc && argmode[i] == 'o')) {
+                    if (argmode[i] == 'i' || argmode[i] == 'b') {
                       use_def_value = false;
                       if (def_val_list[i] != '<no default>') {
                         use_def_value = true;
@@ -400,8 +397,7 @@ define([
               // Need to update the func_obj variable from sqlite database if available
               if (func_args_data.length != 0) {
                 for (i = 0; i < func_args_data.length; i++) {
-                  if (profile_info['proargmodes'] != null &&
-                    (argmode[i] == 'o' && !is_edb_proc)) {
+                  if (profile_info['proargmodes'] != null) {
                     continue;
                   }
 
@@ -485,8 +481,7 @@ define([
                       'default_value': def_val_list[i],
                     });
                   } else {
-                    if (argmode[i] == 'i' || argmode[i] == 'b' ||
-                      (is_edb_proc && argmode[i] == 'o')) {
+                    if (argmode[i] == 'i' || argmode[i] == 'b') {
                       use_def_value = false;
                       if (def_val_list[i] != '<No default value>') {
                         use_def_value = true;
@@ -791,8 +786,29 @@ define([
                     );
                   });
               } else {
-                // TODO
-                console.warn('not implemented yet');
+                // If the profiling is starting again, all we need to do is set the arguments
+                // and run the profile
+
+                var _Url = url_for('profiler.set_arguments', {
+                  'sid': treeInfo.server._id,
+                  'did': treeInfo.database._id,
+                  'scid': treeInfo.schema._id,
+                  'func_id': treeInfo.function._id,
+                });
+                $.ajax({
+                  url: _Url,
+                  method: 'POST',
+                  data: {
+                    'data': JSON.stringify(sqlite_func_args_list),
+                  },
+                })
+                  .done(function() {})
+                  .fail(function() {
+                    Alertify.alert(
+                      gettext('Profiler error'),
+                      gettext('Uable to set the arguments on the server')
+                    );
+                  });
               }
 
               return true;
@@ -878,7 +894,7 @@ define([
     }
 
     Alertify.profilerInputArgsDialog(
-      gettext('Profiler'), profile_info, restart_profile, is_edb_proc, trans_id
+      gettext('Profiler'), profile_info, restart_profile, trans_id
     ).resizeTo(pgBrowser.stdW.md,pgBrowser.stdH.md);
   };
 
