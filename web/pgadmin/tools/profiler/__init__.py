@@ -95,11 +95,12 @@ class ProfilerModule(PgAdminModule):
                 'profiler.init_for_database', 'profiler.init_for_function',
                 'profiler.initialize_target_for_function', 'profiler.initialize_target_indirect',
                 'profiler.start_monitor', 'profiler.start_execution',
+                'profiler.restart',
                 'profiler.show_report', 'profiler.delete_report',
                 'profiler.get_src', 'profiler.get_parameters', 'profiler.get_reports',
                 'profiler.set_arguments', 'profiler.get_arguments',
                 'profiler.set_config', 'profiler.get_config',
-                'profiler.close', 'profiler.get_duration'
+                'profiler.close', 'profiler.get_duration',
                 ]
 
 
@@ -233,7 +234,7 @@ def init_function(node_type, sid, did, scid=None, fid=None):
             is_ppas_database=False, # edb/other packages not supported currently
             hasFeatureFunctionDefaults=True,
             fid=fid,
-            is_proc_supported=False # procedures not supported currently
+            is_proc_supported=True # TODO: Check server verison to make sure procedures supported
         )
 
         status, r_set = conn.execute_dict(sql)
@@ -283,8 +284,6 @@ def init_function(node_type, sid, did, scid=None, fid=None):
             'src'              : r_set['rows'][0]['prosrc'],
             'name'             : r_set['rows'][0]['name'],
             'is_func'          : r_set['rows'][0]['isfunc'],
-            'is_ppas_database' : False,
-            'is_callable'      : False,
             'schema'           : r_set['rows'][0]['schemaname'],
             'language'         : r_set['rows'][0]['lanname'],
             'return_type'      : r_set['rows'][0]['rettype'],
@@ -299,6 +298,9 @@ def init_function(node_type, sid, did, scid=None, fid=None):
             'args_value'       : '',
             'node_type'        : node_type
         }
+
+        print('AAAAAAAAA')
+        print(r_set['rows'])
 
         return make_json_response(
             data=dict(
@@ -618,8 +620,8 @@ def start_monitor(trans_id):
     if pfl_inst.profiler_data is None:
         return make_json_response(
             data={
-                'status': 'NotConnected',
-                'result': gettext(
+                'status' : 'NotConnected',
+                'result' : gettext(
                     'Not connected to server or connection with the server '
                     'has been closed.'
                 )
@@ -786,6 +788,34 @@ def start_execution(trans_id):
             'report_id' : report_id
         }
     )
+
+@blueprint.route(
+    '/restart/<int:trans_id>', methods=['GET'],
+    endpoint='restart'
+)
+@login_required
+def restart(trans_id):
+    pfl_inst = ProfilerInstance(trans_id)
+    if pfl_inst.profiler_data is None:
+        return make_json_response(
+            data={
+                'status' : 'NotConnected',
+                'result' : gettext(
+                    'Not connected to server or connection with the server '
+                    'has been closed.'
+                )
+            }
+        )
+
+    return make_json_response(
+        data={
+            'status'        : 'Success',
+            'profile_data'  : pfl_inst.profiler_data,
+            'func_data'     : pfl_inst.function_data,
+            'require_input' : pfl_inst.function_data['require_input']
+        }
+    )
+
 
 @blueprint.route(
     '/close/<int:trans_id>', methods=["DELETE"], endpoint='close'

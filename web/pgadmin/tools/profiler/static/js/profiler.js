@@ -41,7 +41,7 @@ define([
         callback: 'get_function_information',
         category: gettext('Profiling'),
         priority: 11,
-        label:gettext('Profile'),
+        label:gettext('Direct Profiling'),
         data: {
           object: 'function',
         },
@@ -55,7 +55,7 @@ define([
         callback: 'get_function_information',
         category: gettext('Profiling'),
         priority: 10,
-        label: gettext('Profile'),
+        label: gettext('Direct Profiling'),
         data: {
           object: 'procedure',
         },
@@ -189,10 +189,9 @@ define([
       })
         .done(function(res) {
 
-          let db_info = res.data.db_info,
-            trans_id = res.data.trans_id;
+          let trans_id = res.data.trans_id;
 
-          get_option_arguments(db_info, 0, trans_id);
+          get_option_arguments(trans_id);
         });
 
     },

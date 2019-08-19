@@ -12,7 +12,7 @@ define([
   'pgadmin.alertifyjs', 'sources/pgadmin', 'pgadmin.browser',
   'pgadmin.backgrid', 'wcdocker',
 ], function(
-  gettext, url_for, $, _, Backbone, Alertify, pgAdmin, pgBrowser, Backgrid
+  gettext, url_for, $, _, Backbone, Alertify, pgAdmin, pgBrowser, Backgrid,
 ) {
 
   var wcDocker = window.wcDocker;
@@ -214,10 +214,10 @@ define([
               }
             } else {
               _Url = url_for('profiler.get_arguments', {
-                'sid': profile_info.server._id,
-                'did': profile_info.database._id,
-                'scid': profile_info.schema._id,
-                'func_id': profile_info.function._id,
+                'sid': profile_info.server_id,
+                'did': profile_info.database_id,
+                'scid': profile_info.schema_id,
+                'func_id': profile_info.function_id,
               });
             }
 
@@ -775,7 +775,7 @@ define([
                       .fail(function() {
                         Alertify.alert(
                           gettext('Profiler error'),
-                          gettext('Uable to set the arguments on the server')
+                          gettext('Unable to set the arguments on the server')
                         );
                       });
                   })
@@ -790,10 +790,10 @@ define([
                 // and run the profile
 
                 var _Url = url_for('profiler.set_arguments', {
-                  'sid': treeInfo.server._id,
-                  'did': treeInfo.database._id,
-                  'scid': treeInfo.schema._id,
-                  'func_id': treeInfo.function._id,
+                  'sid': profile_info.server_id,
+                  'did': profile_info.database_id,
+                  'scid': profile_info.schema_id,
+                  'func_id': profile_info.function_id,
                 });
                 $.ajax({
                   url: _Url,
@@ -802,11 +802,13 @@ define([
                     'data': JSON.stringify(sqlite_func_args_list),
                   },
                 })
-                  .done(function() {})
+                  .done(function() {
+                    pgAdmin.Tools.Profile.constructor.prototype.startEx(self.setting('trans_id'));
+                  })
                   .fail(function() {
                     Alertify.alert(
                       gettext('Profiler error'),
-                      gettext('Uable to set the arguments on the server')
+                      gettext('Unable to set the arguments on the server')
                     );
                   });
               }
@@ -814,7 +816,7 @@ define([
               return true;
             }
 
-            if (e.button.text === gettext('Cancel')) {
+            if (e.button.text === gettext('Cancel') && self.setting('restart_profile') === 0) {
               /* Clear the trans id */
               $.ajax({
                 method: 'DELETE',

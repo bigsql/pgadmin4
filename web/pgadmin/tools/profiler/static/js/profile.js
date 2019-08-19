@@ -9,11 +9,11 @@ define([
   'sources/gettext', 'sources/url_for', 'jquery', 'underscore',
   'pgadmin.alertifyjs', 'sources/pgadmin', 'pgadmin.browser', 'backbone',
   'pgadmin.backgrid', 'pgadmin.backform', 'sources/../bundle/codemirror',
-  'pgadmin.tools.profiler.ui', 'pgadmin.tools.profiler.report',
+  'pgadmin.tools.profiler.ui', 'pgadmin.tools.profiler.options', 'pgadmin.tools.profiler.report',
   'sources/keyboard_shortcuts', 'pgadmin.tools.profiler.utils',  'wcdocker',
 ], function(
   gettext, url_for, $, _, Alertify, pgAdmin, pgBrowser, Backbone, Backgrid,
-  Backform, codemirror, profile_function_again, input_report_options,
+  Backform, codemirror, profile_function_again, monitor_function_again, input_report_options,
 ) {
 
   var CodeMirror = codemirror.default,
@@ -193,23 +193,28 @@ define([
       },
 
       restart : function(trans_id) {
-        var self = this,
-          restartUrl = url_for('profiler.restart', {'trans_id' : trans_id});
+        //var self = this,
+        var restartUrl = url_for('profiler.restart', {'trans_id' : trans_id});
 
         $.ajax({
           url : restartUrl,
         })
           .done(function(res) {
+            if (res.data.profile_data.profile_type === 'direct') {
+              if (res.data.require_input) {
 
-            if (res.data.profile_type === 'indirect') {
-              // check if we need to input arguments again
-              if (res.data.result.require_input) {
-                profile_function_again(res.data.result, 0, pgTools.Profile.trans_id);
+                var result = _.extend({}, res.data.profile_data, res.data.func_data);
+
+                result['proargtypenames'] = result['args_type'];
+                result['proargnames']     = result['args_name'];
+                result['proargmodes']     = result['arg_mode'];
+
+                profile_function_again(result, 1, pgTools.Profile.trans_id);
               } else {
                 controller.startExecution(pgTools.Profile.trans_id);
               }
             } else {
-              // TODO: Open profile options window
+              monitor_function_again(pgTools.Profile.trans_id);
             }
 
           })
@@ -405,6 +410,7 @@ define([
         var reportsUrl = url_for('profiler.get_reports');
         $.ajax({
           url    : reportsUrl,
+          async  : false,
           method : 'GET',
         })
           .done(function(res) {
@@ -875,7 +881,7 @@ define([
       e.stopPropagation();
       if (pgTools.Profile.profile_completed) {
         if (pgTools.Profile.profile_type == 1) {
-          //pass;
+          controller.restart(pgTools.Profile.trans_id);
         } else {
           //pass;
         }
@@ -1209,6 +1215,10 @@ define([
       });
 
       self.editor.focus();
+    },
+
+    startEx : function(trans_id) {
+      controller.startExecution(trans_id);
     },
     reflectPreferences: function() {
       let self = this,
