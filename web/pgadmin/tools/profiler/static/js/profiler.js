@@ -188,10 +188,9 @@ define([
         cache: false,
       })
         .done(function(res) {
-
           let trans_id = res.data.trans_id;
 
-          get_option_arguments(trans_id);
+          get_option_arguments(res.data.db_info, 0, trans_id);
         });
 
     },

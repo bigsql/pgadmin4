@@ -123,7 +123,7 @@ define([
        * @param {int} trans_id - The unique transaction id for the already initialize profiling
        *  instance
        */
-      startMonitor : function(trans_id, duration) {
+      startMonitor : function(trans_id) {
         var self = this;
 
         // Get duration through AJAX call to display to user
@@ -134,7 +134,7 @@ define([
         })
           .done(function(res) {
             if (res.data.status === 'Success') {
-              duration = parseInt(res.data.duration, 10);
+              var duration = parseInt(res.data.duration, 10);
 
               // Make ajax call to start monitoring
               var baseUrl = url_for('profiler.start_monitor', { 'trans_id': trans_id });
@@ -617,7 +617,7 @@ define([
               'profile_type': result[i].profile_type === true ? result[i].name : 'Global',
               'database'    : result[i].database,
               'start_date'  : result[i].time,
-              'duration'    : result[i].duration === -1 ? 'n/a' : result[i].duration + 'seconds',
+              'duration'    : result[i].duration === -1 ? 'n/a' : result[i].duration + ' seconds',
               'report_id'   : result[i].report_id,
             });
           }
@@ -879,21 +879,23 @@ define([
     },
     on_start: function(e) {
       e.stopPropagation();
-      if (pgTools.Profile.profile_completed) {
-        if (pgTools.Profile.profile_type == 1) {
-          controller.restart(pgTools.Profile.trans_id);
-        } else {
-          //pass;
-        }
-      }
 
-      else {
-        if (pgTools.Profile.profile_type == 1) {
-          controller.startExecution(pgTools.Profile.trans_id);
-        } else {
-          controller.startMonitor(pgTools.Profile.trans_id);
-        }
+      // if (pgTools.Profile.profile_completed) {
+      //   if (pgTools.Profile.profile_type == 1) {
+      //     controller.restart(pgTools.Profile.trans_id);
+      //   } else {
+      //     //pass;
+      //   }
+      // }
+      //
+      // else {
+      if (pgTools.Profile.profile_type == 1) {
+        controller.startExecution(pgTools.Profile.trans_id);
+      } else {
+        controller.startMonitor(pgTools.Profile.trans_id);
       }
+      //   }
+      // }
     },
     on_report_options: function(e) {
       e.stopPropagation();

@@ -45,13 +45,13 @@ define([
     if (!Alertify.profilerInputOptionsDialog) {
       Alertify.dialog('profilerInputOptionsDialog', function factory() {
         return {
-          main: function(title, db_info, restart_profile, trans_id) {
+          main: function(title, profile_info, restart_profile, trans_id) {
             this.preferences = window.top.pgAdmin.Browser.get_preferences_for_module('profiler');
             this.set('title', title);
 
             // setting value in alertify settings allows us to access it from
             // other functions other than main function.
-            this.set('db_info', db_info);
+            this.set('profile_info', profile_info);
             this.set('restart_profile', restart_profile);
             this.set('trans_id', trans_id);
 
@@ -145,23 +145,7 @@ define([
               // create asynchronous connection and unique transaction ID
               var self = this;
 
-              // If the profiling is started again then treeInfo is already
-              // stored in this.data so we can use the same.
-              if (self.setting('restart_profile') == 0) {
-                var t = pgBrowser.tree,
-                  i = t.selected(),
-                  d = i && i.length == 1 ? t.itemData(i) : undefined,
-                  node = d && pgBrowser.Nodes[d._type];
-
-                if (!d)
-                  return;
-
-                var treeInfo = node.getTreeNodeHierarchy.apply(node, [i]);
-              }
-
               var options_value_list = [];
-              // TODO
-              // var sqlite_options_list = this.sqlite_options_list = [];
 
               this.grid.collection.each(function(m) {
                 options_value_list.push({
@@ -169,12 +153,12 @@ define([
                   'value': m.get('value'),
                 });
               });
-
+              
               var baseUrl = url_for('profiler.initialize_target_indirect', {
                 'profile_type' : 'indirect',
                 'trans_id' : self.setting('trans_id'),
-                'sid' : treeInfo.server._id,
-                'did' : treeInfo.database._id,
+                'sid' : self.setting('profile_info').sid,
+                'did' : self.setting('profile_info').did,
               });
 
               $.ajax({

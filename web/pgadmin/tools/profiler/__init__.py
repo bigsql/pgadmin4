@@ -628,20 +628,26 @@ def start_monitor(trans_id):
             }
         )
 
+    print('BBBBB')
+
     duration = pfl_inst.profiler_data['duration']
     interval = pfl_inst.profiler_data['interval']
     pid      = pfl_inst.profiler_data['pid']
+
+    print('ACED')
 
     # Create asynchronous connection using random connection id.
     exe_conn_id = str(random.randint(1, 9999999))
     try:
         manager = get_driver(PG_DEFAULT_DRIVER).connection_manager(
-            pfl_inst.profiler_data['server_id'])
+            pfl_inst.profiler_data['sid'])
         conn = manager.connection(
-            did=pfl_inst.profiler_data['database_id'],
+            did=pfl_inst.profiler_data['did'],
             conn_id=exe_conn_id)
     except Exception as e:
         return internal_server_error(errormsg=str(e))
+
+    print('ABCD')
 
     # Connect the Server
     status, msg = conn.connect()
