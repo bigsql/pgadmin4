@@ -38,14 +38,14 @@ define([
       },
 
       enable_toolbar_buttons: function() {
-        var self = this;
+        let self = this;
         self.enable('start', true);
         self.enable('save' , true);
         self.enable('report-options', true);
       },
 
       disable_toolbar_buttons: function() {
-        var self = this;
+        let self = this;
         self.enable('start', false);
         self.enable('save' , false);
         self.disable('report-options', false);
@@ -58,15 +58,9 @@ define([
        * @param {int} trans_id - The unique transaction id for the already initialize profiling
        *  instance
        */
-      startExecution: function(trans_id) {
-
-        // Make ajax call to run profiler
-        var baseUrl = url_for(
-          'profiler.start_execution', {
-            'trans_id': trans_id,
-          });
+      start_execution: function(trans_id) {
         $.ajax({
-          url        : baseUrl,
+          url        : url_for('profiler.start_execution', { 'trans_id': trans_id }),
           method     : 'GET',
           beforeSend : function(xhr) {
             xhr.setRequestHeader(pgAdmin.csrf_token_header, pgAdmin.csrf_token);
@@ -78,8 +72,8 @@ define([
 
             if (res.data.status === 'Success') {
               pgTools.Profile.profile_completed = true;
-              controller.addResults(res.data.col_info, res.data.result);
-              controller.fetchAndAddReports();
+              controller.add_results(res.data.col_info, res.data.result);
+              controller.update_reports();
             } else if (res.data.status === 'NotConnected') {
               Alertify.alert(
                 gettext('Profiler Error'),
@@ -102,12 +96,12 @@ define([
        *
        * @param {int} duration - The original duration of the monitoring
        */
-      updateMonitorLoad : function(duration) {
-        var time_remaining = duration * 1000;
+      _update_monitor_load : function(duration) {
+        let time_remaining = duration * 1000;
 
-        var intervalId = setInterval(function() {
+        const intervalId = setInterval(function() {
           $('.wcLoadingLabel').html(gettext('Monitoring for ' + time_remaining/1000 + ' seconds'));
-          time_remaining -= 1000;
+          time_remaining = time_remaining - 1000;
           if (time_remaining < 0) {
 
             // kill the timer to prevent waste
@@ -123,23 +117,21 @@ define([
        * @param {int} trans_id - The unique transaction id for the already initialize profiling
        *  instance
        */
-      startMonitor : function(trans_id) {
-        var self = this;
+      start_monitor : function(trans_id) {
+        let self = this;
 
         // Get duration through AJAX call to display to user
-        var getDurationUrl = url_for('profiler.get_duration', { 'trans_id': trans_id });
         $.ajax({
-          url    : getDurationUrl,
+          url    : url_for('profiler.get_duration', { 'trans_id': trans_id }),
           method : 'GET',
         })
           .done(function(res) {
             if (res.data.status === 'Success') {
-              var duration = parseInt(res.data.duration, 10);
+              let duration = parseInt(res.data.duration, 10);
 
               // Make ajax call to start monitoring
-              var baseUrl = url_for('profiler.start_monitor', { 'trans_id': trans_id });
               $.ajax({
-                url        : baseUrl,
+                url        : url_for('profiler.start_monitor', { 'trans_id': trans_id }),
                 method     : 'GET',
                 beforeSend : function(xhr) {
                   xhr.setRequestHeader(pgAdmin.csrf_token_header, pgAdmin.csrf_token);
@@ -147,7 +139,7 @@ define([
 
                   // We decrease the duration by 1 because time will already have passed by the
                   // time the loading wheel is created and shown
-                  controller.updateMonitorLoad(duration - 1);
+                  controller._update_monitor_load(duration - 1);
                 },
               })
                 .done(function(res) {
@@ -155,10 +147,10 @@ define([
                   pgTools.Profile.docker.finishLoading();
 
                   if (res.data.status === 'Success') {
-                    self.addResults(res.data.col_info, res.data.result);
+                    self.add_results(res.data.col_info, res.data.result);
 
                     // Update saved reports
-                    controller.fetchAndAddReports();
+                    controller.update_reports();
 
                   } else if (res.data.status === 'NotConnected') {
                     Alertify.alert(
@@ -192,26 +184,27 @@ define([
           });
       },
 
+      /**
+       *
+       *
+       */
       restart : function(trans_id) {
-        //var self = this,
-        var restartUrl = url_for('profiler.restart', {'trans_id' : trans_id});
-
         $.ajax({
-          url : restartUrl,
+          url : url_for('profiler.restart', {'trans_id' : trans_id}),
         })
           .done(function(res) {
             if (res.data.profile_data.profile_type === 'direct') {
               if (res.data.require_input) {
 
-                var result = _.extend({}, res.data.profile_data, res.data.func_data);
+                const result = _.extend({}, res.data.profile_data, res.data.func_data);
 
-                result['proargtypenames'] = result['args_type'];
-                result['proargnames']     = result['args_name'];
-                result['proargmodes']     = result['arg_mode'];
+                result.proargtypenames = result.args_type;
+                result.proargnames     = result.args_name;
+                result.proargmodes     = result.arg_mode;
 
                 profile_function_again(result, 1, pgTools.Profile.trans_id);
               } else {
-                controller.startExecution(pgTools.Profile.trans_id);
+                controller.start_execution(pgTools.Profile.trans_id);
               }
             } else {
               monitor_function_again(pgTools.Profile.trans_id);
@@ -220,7 +213,7 @@ define([
           })
           .fail(function(xhr) {
             try {
-              var err = JSON.parse(xhr.responseText);
+              const err = JSON.parse(xhr.responseText);
               if (err.success == 0) {
                 Alertify.alert(gettext('Debugger Error'), err.errormsg);
               }
@@ -236,8 +229,8 @@ define([
        * @param {Array} columns - Contains the names of the columns for the results panel
        * @param {Array} result - Contains the values of the columns for the results panel
        */
-      addResults : function(columns, result) {
-        var self = this;
+      add_results : function(columns, result) {
+        let self = this;
 
         // Remove the existing created grid and update the result values
         if (self.result_grid) {
@@ -249,7 +242,7 @@ define([
         var ResultsCollection = Backbone.Collection.extend({
           model : Backbone.Model.extend({
             defaults : {
-              name : undefined,
+              name : void 0,
             },
           }),
         });
@@ -262,7 +255,7 @@ define([
               editable : false,
               cell     : 'string',
             };
-            column['name'] = column['label'] = c.name;
+            column.name = column.label = c.name;
             resultGridCols.push(column);
           });
         }
@@ -288,17 +281,16 @@ define([
        * Retrieves the parameters from the server then adds them to the parameters panel
        *
        */
-      fetchParameters: function() {
-        var paramUrl = url_for('profiler.get_parameters', { 'trans_id': pgTools.Profile.trans_id });
+      update_parameters: function() {
         $.ajax({
-          url    : paramUrl,
+          url    : url_for('profiler.get_parameters', { 'trans_id': pgTools.Profile.trans_id }),
           method : 'GET',
         })
           .done(function(res) {
             if (res.data.status === 'Success') {
 
               // Add the parameters to the panel
-              controller.addParameters(res.data.result);
+              controller._add_parameters(res.data.result);
             }
 
             else if (res.data.status === 'NotConnected') {
@@ -322,7 +314,7 @@ define([
        *
        * @param {Array} result - The JSON containing information about the parameters
        */
-      addParameters: function(result) {
+      _add_parameters: function(result) {
         var self = this;
 
         // Remove the existing created grid and update the parameter values
@@ -335,9 +327,9 @@ define([
         var ParametersCollection = self.ParametersCollection = Backbone.Collection.extend({
           model: Backbone.Model.extend({
             defaults: {
-              name  : undefined,
-              type  : undefined,
-              value : undefined,
+              name  : void 0,
+              type  : void 0,
+              value : void 0,
             },
           }),
         });
@@ -365,9 +357,9 @@ define([
         },
         ];
 
-        var param_obj = [];
+        const param_obj = [];
         if (result.length != 0) {
-          for (var i = 0; i < result.length; i++) {
+          for (let i = 0; i < result.length; i = i + 1) {
             param_obj.push({
               'name'  : result[i].name,
               'type'  : result[i].type,
@@ -398,7 +390,7 @@ define([
        *
        * @param {Array} result - The JSON containing information about the source code
        */
-      addSrc: function(result) {
+      add_src: function(result) {
         pgTools.Profile.editor.setValue(result);
       },
 
@@ -406,16 +398,15 @@ define([
        * Retrieves the saved reports from the server then adds them to the saved reports panel
        *
        */
-      fetchAndAddReports: function() {
-        var reportsUrl = url_for('profiler.get_reports');
+      update_reports: function() {
         $.ajax({
-          url    : reportsUrl,
+          url    : url_for('profiler.get_reports'),
           async  : false,
           method : 'GET',
         })
           .done(function(res) {
             if (res.data.status === 'Success') {
-              controller.addReports(res.data.result);
+              controller._addReports(res.data.result);
             }
           })
           .fail(function() {
@@ -432,7 +423,7 @@ define([
        *
        * @param {Array} result - The JSON containing information about the reports
        */
-      addReports: function(result) {
+      _addReports: function(result) {
         var self = this;
 
         // Remove the existing created grid and update the result values
@@ -445,11 +436,11 @@ define([
         var ReportsCollection = self.ReportsCollection = Backbone.Collection.extend({
           model: Backbone.Model.extend({
             defaults : {
-              profile_type : undefined,
-              database     : undefined,
-              time         : undefined,
-              duration     : undefined,
-              report_id    : undefined,
+              profile_type : void 0,
+              database     : void 0,
+              time         : void 0,
+              duration     : void 0,
+              report_id    : void 0,
             },
           }),
         });
@@ -518,11 +509,11 @@ define([
                 e.preventDefault();
                 e.stopPropagation();
 
-                var reportUrl = url_for(
+                const report_url = url_for(
                   'profiler.show_report', {
                     'report_id': this.model.get('report_id'),
                   });
-                window.open(reportUrl, '_blank');
+                window.open(report_url, '_blank');
               },
               render : function() {
                 this.$el.html('<button> Show </button>');
@@ -539,7 +530,6 @@ define([
               Backgrid.HeaderCell.extend({
                 className : 'width_percent_10',
               }),
-            // Custom button cell to add functionality when the delete report button is clicked
             cell       :
               Backgrid.Cell.extend({
                 className : 'delete-cell',
@@ -548,27 +538,22 @@ define([
                 },
 
                 deleteReport : function(e) {
-                  // need to save this because of Alertify call handler/scope
                   var temp = this;
 
                   e.preventDefault();
                   e.stopPropagation();
 
-                  // Create a confirm alert
                   Alertify.confirm(
                     'Delete',
                     'Would you like to delete the selected report?',
-
-                    // On confirmation send AJAX request to server to delete
-                    // and delete from client interface
                     function() {
-                      var reportUrl = url_for(
+                      const report_url = url_for(
                         'profiler.delete_report', {
                           'report_id' : temp.model.get('report_id'),
                         });
 
                       $.ajax({
-                        url    : reportUrl,
+                        url    : report_url,
                         method : 'POST',
                       })
                         .done(function(res) {
@@ -587,16 +572,12 @@ define([
                             pgTools.Profile.currentReportIndex -= 1;
                           }
 
-                          // Note that since the selected report is deleted, we choose to show the
-                          // report at the same row. The rows immediately below the deleted row
-                          // should be shown
-                          controller.loadReport(pgTools.Profile.currentReportIndex);
+                          // show the next row
+                          controller._loadReport(pgTools.Profile.currentReportIndex);
                         });
 
                     },
-
-                    // If the user decides not to delete, there is nothing to do
-                    function() {}
+                    null
                   );
                 },
 
@@ -609,10 +590,10 @@ define([
         ];
 
         // Now format the information fetched from the server for rendering the grid
-        var reports_obj = [];
+        const reports_obj = [];
         if (result.length != 0) {
           pgTools.Profile.numReports = result.length;
-          for (var i = 0; i < result.length; i++) {
+          for (let i = 0; i < result.length; i = i + 1) {
             reports_obj.push({
               'profile_type': result[i].profile_type === true ? result[i].name : 'Global',
               'database'    : result[i].database,
@@ -629,11 +610,10 @@ define([
         var reports_grid = this.reports_grid = new Backgrid.Grid({
           emptyText  : 'No data found',
           columns    : reportsGridCols,
-          // Custom row that will allow users to click
           row        : Backgrid.Row.extend({
             highlightColor : 'lightYellow',
             className      : 'selectable-row',
-            events         : {'click': 'onClick'},
+            events         : { 'click': 'onClick' },
             onClick        :
               function (e) {
                 e.stopPropagation();
@@ -657,12 +637,12 @@ define([
             m.$el.find('td').css('background-color', m.highlightColor);
 
             // Generate the report html
-            var reportUrl = url_for(
+            const report_url = url_for(
               'profiler.show_report', {
                 'report_id': m.model.get('report_id'),
               });
             $.ajax({
-              url    : reportUrl,
+              url    : report_url,
               method : 'GET',
             })
               .done(function(res) {
@@ -677,22 +657,22 @@ define([
                 // as intended because of encapsulation between the DOM and shadow DOM.
 
                 // TODO: Fix Styling
-                var scripts = [];
-                var styleSheets = [];
+                const scripts = [];
+                const styleSheets = [];
 
-                var resHTML = res.split(' ');
+                const resHTML = res.split(' ');
 
-                var scriptSave = false;
-                var styleSave  = false;
+                let scriptSave = false;
+                let styleSave  = false;
 
-                var currentScript = '';
-                var currentStyle  = '';
-                for (var i = 0; i < resHTML.length; i++) {
-                  current = resHTML[i].trim();
+                let currentScript = '';
+                let currentStyle  = '';
+                for (let i = 0; i < resHTML.length; i = i + 1) {
+                  const current = resHTML[i].trim();
 
                   if (current === '<script') {
                     scriptSave = true;
-                    i++;  // Skip 1 because of 'language = x'
+                    i = i + 1;  // Skip 1 because of 'language = x'
                     continue;
                   }
                   if (current === '</script>') {
@@ -701,14 +681,14 @@ define([
                     currentScript = '';
                     continue;
                   }
-                  if (scriptSave) currentScript += ' ' + resHTML[i];
+                  if (scriptSave) currentScript = currentScript +  ' ' + resHTML[i];
 
                   if (current === '<style>') {
                     styleSave = true;
                     continue;
                   } else if (current === '<style') {
                     styleSave = true;
-                    i++;
+                    i = i + 1;
                     continue;
                   }
                   if (current === '</style>') {
@@ -717,7 +697,7 @@ define([
                     currentStyle = '';
                     continue;
                   }
-                  if (styleSave) currentStyle += ' ' + resHTML[i];
+                  if (styleSave) currentStyle = currentStyle + ' ' + resHTML[i];
                 }
 
                 let container = document.createElement('div');
@@ -725,13 +705,13 @@ define([
                 container.shadowRoot.innerHTML = res;
 
                 _.map(scripts, function(s) {
-                  var script = document.createElement('script');
+                  let script = document.createElement('script');
                   script.textContent = s;
                   container.shadowRoot.appendChild(script);
                 });
 
                 _.map(styleSheets, function(s) {
-                  var styleSheet = document.createElement('style');
+                  let styleSheet = document.createElement('style');
                   styleSheet.innerText = s;
                   container.shadowRoot.appendChild(styleSheet);
                 });
@@ -749,8 +729,8 @@ define([
               });
 
             // Update the current_report_index
-            for (var i = 0; i < pgTools.Profile.reportsColl.models.length; i++) {
-              var current = pgTools.Profile.reportsColl.models[i];
+            for (let i = 0; i < pgTools.Profile.reportsColl.models.length; i = i + 1) {
+              const current = pgTools.Profile.reportsColl.models[i];
 
               if (current.cid === m.model.cid){
                 pgTools.Profile.currentReportIndex = i;
@@ -767,8 +747,8 @@ define([
         this.listenTo(self.reportsCollection, 'backgrid:sorted', function() {
 
           // Update the current_report_index
-          for (var i = 0; i < pgTools.Profile.reportsColl.models.length; i++) {
-            var current = pgTools.Profile.reportsColl.models[i];
+          for (let i = 0; i < pgTools.Profile.reportsColl.models.length; i = i + 1) {
+            const current = pgTools.Profile.reportsColl.models[i];
 
             if (pgTools.Profile.currentId === current.get('report_id')) {
               pgTools.Profile.currentReportIndex = i;
@@ -778,7 +758,7 @@ define([
             }
           }
 
-          controller.loadReport(pgTools.Profile.currentReportIndex);
+          controller._loadReport(pgTools.Profile.currentReportIndex);
         });
 
         // Render the result grid into result panel
@@ -793,7 +773,7 @@ define([
 
         // Default the currently showed report to the first report in the grid and show it
         pgTools.Profile.currentReportIndex = 0;
-        controller.loadReport(pgTools.Profile.currentReportIndex);
+        controller._loadReport(pgTools.Profile.currentReportIndex);
       },
 
       /**
@@ -802,7 +782,7 @@ define([
        *
        * @param {int} reportIndex - The index of the row containing the report we want to show
        */
-      loadReport : function(reportIndex) {
+      _loadReport : function(reportIndex) {
 
         // Make sure that there is a report to show
         if (pgTools.Profile.reportsColl.models.length > 0) {
@@ -845,7 +825,7 @@ define([
       'keydown'                   : 'keyAction',
     },
     enable_start: function(enable) {
-      var $btn = this.$el.find('.btn-start');
+      const $btn = this.$el.find('.btn-start');
 
       if (enable) {
         $btn.prop('disabled', false);
@@ -856,7 +836,7 @@ define([
       }
     },
     enable_save: function(enable) {
-      var $btn = this.$el.find('.btn-save');
+      const $btn = this.$el.find('.btn-save');
 
       if (enable) {
         $btn.prop('disabled', false);
@@ -867,7 +847,7 @@ define([
       }
     },
     enable_report_options: function(enable) {
-      var $btn = this.$el.find('.btn-report-options');
+      const $btn = this.$el.find('.btn-report-options');
 
       if (enable) {
         $btn.prop('disabled', false);
@@ -880,6 +860,7 @@ define([
     on_start: function(e) {
       e.stopPropagation();
 
+      // TODO
       // if (pgTools.Profile.profile_completed) {
       //   if (pgTools.Profile.profile_type == 1) {
       //     controller.restart(pgTools.Profile.trans_id);
@@ -890,9 +871,9 @@ define([
       //
       // else {
       if (pgTools.Profile.profile_type == 1) {
-        controller.startExecution(pgTools.Profile.trans_id);
+        controller.start_execution(pgTools.Profile.trans_id);
       } else {
-        controller.startMonitor(pgTools.Profile.trans_id);
+        controller.start_monitor(pgTools.Profile.trans_id);
       }
       //   }
       // }
@@ -908,28 +889,15 @@ define([
     keyAction: function(e) {
       e.stopPropagation();
 
-      var key = `${e.code}`;
+      const key = `${e.code}`;
 
       if (key === 'ArrowUp' || key === 'ArrowDown') {
-        if (key === 'ArrowUp') {
+        const delta = (key === 'ArrowUp') ? -1 : 1;
+        const new_index = pgTools.Profile.currentReportIndex + delta;
 
-          // Bounds checking
-          if (pgTools.Profile.currentReportIndex > 0) {
-            pgTools.Profile.currentReportIndex -= 1;
-          }
-        } else if (key === 'ArrowDown') {
-
-          // Bounds checkings
-          if (pgTools.Profile.currentReportIndex < pgTools.Profile.numReports - 1) {
-            pgTools.Profile.currentReportIndex += 1;
-          }
-        }
-
-        // Bounds checking
-        if (pgTools.Profile.currentReportIndex >= 0 &&
-            pgTools.Profile.currentReportIndex < pgTools.Profile.numReports) {
-
-          controller.loadReport(pgTools.Profile.currentReportIndex);
+        if (new_index >= 0 && new_index < pgTools.Profile.numReports) {
+          pgTools.Profile.currentReportIndex = new_index;
+          controller._loadReport(pgTools.Profile.currentReportIndex);
         }
       }
     },
@@ -946,7 +914,7 @@ define([
     /* We should get the transaction id from the server during initialization here */
     load: function(trans_id, profile_type, function_name_with_arguments, layout) {
 
-      var self = this;
+      let self = this;
 
       // We do not want to initialize the module multiple times.
       if (this.initialized)
@@ -994,24 +962,22 @@ define([
       self.initializePanels();
 
       controller.enable_toolbar_buttons();
-      controller.fetchAndAddReports();
+      controller.update_reports();
       // Note that for direct profiling this will be the parameters
       // For indirect(global) profiling, this will be the profiling arguments
-      controller.fetchParameters();
+      controller.update_parameters();
 
       // Direct profiling requires fetching sql source code
-      if (trans_id != undefined && profile_type) {
-        // Get source code
-        var srcUrl = url_for('profiler.get_src', {
-          'trans_id' : trans_id,
-        });
+      if (trans_id != void 0 && profile_type) {
+
+        // Get source code to display in code editor panel
         $.ajax({
-          url    : srcUrl,
+          url    : url_for('profiler.get_src', { 'trans_id' : trans_id }),
           method : 'GET',
         })
           .done(function(res) {
             if (res.data.status === 'Success') {
-              controller.addSrc(res.data.result);
+              controller.add_src(res.data.result);
             }
 
             else if (res.data.status === 'NotConnected') {
@@ -1045,7 +1011,7 @@ define([
 
     // Create the profiler layout with splitter and display the appropriate data received from server.
     initializePanels: function() {
-      var self = this;
+      let self = this;
       this.registerPanel(
         'code', self.function_name_with_arguments, '100%', '50%',
         function() {
@@ -1219,8 +1185,8 @@ define([
       self.editor.focus();
     },
 
-    startEx : function(trans_id) {
-      controller.startExecution(trans_id);
+    start_execution : function(trans_id) {
+      controller.start_execution(trans_id);
     },
     reflectPreferences: function() {
       let self = this,
@@ -1244,7 +1210,7 @@ define([
 
     // Register the panel with new profiler docker instance.
     registerPanel: function(name, title, width, height, onInit) {
-      var self = this;
+      let self = this;
 
       this.docker.registerPanelType(name, {
         title: title,

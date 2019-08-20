@@ -39,7 +39,6 @@ from pgadmin.tools.profiler.utils.profiler_report import plprofiler_report
 
 ASYNC_OK = 1
 
-####################################################################################################
 
 class ProfilerModule(PgAdminModule):
     """
@@ -84,8 +83,8 @@ class ProfilerModule(PgAdminModule):
             'Properties', 'profiler_top_k',
             gettext("Number of functions to report for"), 'integer', 10,
             category_label=gettext('Properties'),
-            help_str=gettext('The profiler will generate a report for the given number '
-                             'of functions')
+            help_str=gettext('The profiler will generate a report for the given '
+                             'number of functions')
         )
 
     # TODO: Keyboard shortcuts
@@ -93,11 +92,13 @@ class ProfilerModule(PgAdminModule):
     def get_exposed_url_endpoints(self):
         return ['profiler.index','profiler.profile',
                 'profiler.init_for_database', 'profiler.init_for_function',
-                'profiler.initialize_target_for_function', 'profiler.initialize_target_indirect',
+                'profiler.initialize_target_for_function',
+                'profiler.initialize_target_indirect',
                 'profiler.start_monitor', 'profiler.start_execution',
                 'profiler.restart',
                 'profiler.show_report', 'profiler.delete_report',
-                'profiler.get_src', 'profiler.get_parameters', 'profiler.get_reports',
+                'profiler.get_src', 'profiler.get_parameters',
+                'profiler.get_reports',
                 'profiler.set_arguments', 'profiler.get_arguments',
                 'profiler.set_config', 'profiler.get_config',
                 'profiler.close', 'profiler.get_duration',
@@ -157,7 +158,6 @@ def script_profiler_direct_js():
         mimetype="application/javascript"
     )
 
-####################################################################################################
 
 @blueprint.route(
     '/init/<node_type>/<int:sid>/<int:did>',
@@ -215,8 +215,8 @@ def init_function(node_type, sid, did, scid=None, fid=None):
         return make_json_response(
             data=dict(
                 db_info={
-                    'sid' : sid,
-                    'did' : did
+                    'sid': sid,
+                    'did': did
                 },
                 trans_id=pfl_inst.trans_id
             ),
@@ -231,7 +231,7 @@ def init_function(node_type, sid, did, scid=None, fid=None):
 
         sql = render_template(
             "/".join([template_path, 'get_function_profile_info.sql']),
-            is_ppas_database=False, # edb/other packages not supported currently
+            is_ppas_database=False,
             hasFeatureFunctionDefaults=True,
             fid=fid,
             is_proc_supported=True # TODO: Check server verison to make sure procedures supported
@@ -250,11 +250,11 @@ def init_function(node_type, sid, did, scid=None, fid=None):
             current_app.logger.debug(msg)
             return internal_server_error(msg)
 
-        data = {'name'          : r_set['rows'][0]['proargnames'],
-                'type'          : r_set['rows'][0]['proargtypenames'],
-                'use_default'   : r_set['rows'][0]['pronargdefaults'],
-                'default_value' : r_set['rows'][0]['proargdefaults'],
-                'require_input' : True}
+        data = {'name': r_set['rows'][0]['proargnames'],
+                'type': r_set['rows'][0]['proargtypenames'],
+                'use_default': r_set['rows'][0]['pronargdefaults'],
+                'default_value': r_set['rows'][0]['proargdefaults'],
+                'require_input': True}
 
         # Below will check do we really required for the user input arguments and
         # show input dialog
@@ -280,28 +280,24 @@ def init_function(node_type, sid, did, scid=None, fid=None):
         # Create a profiler instance
         pfl_inst = ProfilerInstance()
         pfl_inst.function_data = {
-            'oid'              : fid,
-            'src'              : r_set['rows'][0]['prosrc'],
-            'name'             : r_set['rows'][0]['name'],
-            'is_func'          : r_set['rows'][0]['isfunc'],
-            'schema'           : r_set['rows'][0]['schemaname'],
-            'language'         : r_set['rows'][0]['lanname'],
-            'return_type'      : r_set['rows'][0]['rettype'],
-            'args_type'        : r_set['rows'][0]['proargtypenames'],
-            'args_name'        : r_set['rows'][0]['proargnames'],
-            'arg_mode'         : r_set['rows'][0]['proargmodes'],
-            'use_default'      : r_set['rows'][0]['pronargdefaults'],
-            'default_value'    : r_set['rows'][0]['proargdefaults'],
-            'pkgname'          : r_set['rows'][0]['pkgname'],
-            'pkg'              : r_set['rows'][0]['pkg'],
-            'require_input'    : data['require_input'],
-            'args_value'       : '',
-            'node_type'        : node_type
+            'oid': fid,
+            'src': r_set['rows'][0]['prosrc'],
+            'name': r_set['rows'][0]['name'],
+            'is_func': r_set['rows'][0]['isfunc'],
+            'schema': r_set['rows'][0]['schemaname'],
+            'language': r_set['rows'][0]['lanname'],
+            'return_type': r_set['rows'][0]['rettype'],
+            'args_type': r_set['rows'][0]['proargtypenames'],
+            'args_name': r_set['rows'][0]['proargnames'],
+            'arg_mode': r_set['rows'][0]['proargmodes'],
+            'use_default': r_set['rows'][0]['pronargdefaults'],
+            'default_value': r_set['rows'][0]['proargdefaults'],
+            'pkgname': r_set['rows'][0]['pkgname'],
+            'pkg': r_set['rows'][0]['pkg'],
+            'require_input': data['require_input'],
+            'args_value': '',
+            'node_type': node_type
         }
-
-        print('AAAAAAAAA')
-        print(r_set['rows'])
-
         return make_json_response(
             data=dict(
                 profile_info=r_set['rows'],
@@ -319,8 +315,8 @@ def profile_new(trans_id):
 
     Parameters:
         trans_id
-        - The unique transaction id that corresponds with the previously initialized
-          profiler instance
+        - The unique transaction id that corresponds with the previously
+          initialized profiler instance
     Returns: Generated html template with the new window to start profiling
     """
     pfl_inst = ProfilerInstance(trans_id)
@@ -426,7 +422,7 @@ def initialize_target_indirect(profile_type, trans_id, sid, did):
         scid
         - Schema Id
     Returns:
-        JSON response with the transaciton id
+        JSON response with the transaction id
     """
 
     # Create asynchronous connection using random connection id.
@@ -466,18 +462,18 @@ def initialize_target_indirect(profile_type, trans_id, sid, did):
             current_app.logger.debug(msg)
             return internal_server_error(msg)
 
-    # Input checking
+    # TODO: Input checking
     try:
         pfl_inst.profiler_data = {
-            'duration' : data[0]['value'],
-            'interval' : data[1]['value'],
-            'pid'      : data[2]['value']
+            'duration': data[0]['value'],
+            'interval': data[1]['value'],
+            'pid': data[2]['value']
         }
     except Exception as e:
         return make_json_response(
             data={
-                'status' : 'ERROR',
-                'result' : 'Invalid input type'
+                'status': 'ERROR',
+                'result': 'Invalid input type'
             }
         )
 
@@ -575,24 +571,24 @@ def initialize_target(profile_type, trans_id, sid, did,
             pfl_inst.function_data['args_value'] = data
 
     pfl_inst.profiler_data = {
-        'conn_id'         : conn_id,
-        'server_id'       : sid,
-        'database_id'     : did,
-        'schema_id'       : scid,
-        'profile_type'    : 'direct',
-        'function_id'     : func_id,
-        'function_name'   : pfl_inst.function_data['name'],
-        'profile_type'    : profile_type,
-        'restart_profile' : 0
+        'conn_id': conn_id,
+        'server_id': sid,
+        'database_id': did,
+        'schema_id': scid,
+        'profile_type': 'direct',
+        'function_id': func_id,
+        'function_name': pfl_inst.function_data['name'],
+        'profile_type': profile_type,
+        'restart_profile': 0
     }
 
     pfl_inst.config = {
-        'name'        : pfl_inst.function_data['name'],
-        'title'       : 'Pl/Profiler Report for ' + pfl_inst.function_data['name'],
-        'tabstop'     : '8',
-        'svg_width'   : '1200',
-        'table_width' : '80%',
-        'desc'        : ''
+        'name': pfl_inst.function_data['name'],
+        'title': 'Pl/Profiler Report for ' + pfl_inst.function_data['name'],
+        'tabstop': '8',
+        'svg_width': '1200',
+        'table_width': '80%',
+        'desc': ''
     }
 
     pfl_inst.update_session()
@@ -620,21 +616,17 @@ def start_monitor(trans_id):
     if pfl_inst.profiler_data is None:
         return make_json_response(
             data={
-                'status' : 'NotConnected',
-                'result' : gettext(
+                'status': 'NotConnected',
+                'result': gettext(
                     'Not connected to server or connection with the server '
                     'has been closed.'
                 )
             }
         )
 
-    print('BBBBB')
-
     duration = pfl_inst.profiler_data['duration']
     interval = pfl_inst.profiler_data['interval']
-    pid      = pfl_inst.profiler_data['pid']
-
-    print('ACED')
+    pid = pfl_inst.profiler_data['pid']
 
     # Create asynchronous connection using random connection id.
     exe_conn_id = str(random.randint(1, 9999999))
@@ -647,9 +639,6 @@ def start_monitor(trans_id):
     except Exception as e:
         return internal_server_error(errormsg=str(e))
 
-    print('ABCD')
-
-    # Connect the Server
     status, msg = conn.connect()
     if not status:
         return internal_server_error(errormsg=str(msg))
@@ -681,9 +670,8 @@ def start_monitor(trans_id):
         conn.execute_async('SELECT pl_profiler_set_enabled_pid(0)')
         conn.execute_async('RESET search_path')
 
-    # At this point we have the data in shared memory and need to create a report from it
-    report_data = generate_report(conn, 'shared', opt_top=10, func_oids={})
-    save_report(report_data,
+    report_data = _generate_report(conn, 'shared', opt_top=10, func_oids={})
+    _save_report(report_data,
                 pfl_inst.config,
                 conn.as_dict()['database'],
                 pfl_inst.profiler_data['profile_type'],
@@ -692,7 +680,7 @@ def start_monitor(trans_id):
 
     return make_json_response(
         data = {
-            'status' : 'Success'
+            'status': 'Success'
         }
     )
 
@@ -718,8 +706,8 @@ def start_execution(trans_id):
     if pfl_inst.profiler_data is None:
         return make_json_response(
             data={
-                'status' : 'NotConnected',
-                'result' : gettext(
+                'status': 'NotConnected',
+                'result': gettext(
                     'Not connected to server or connection with the server '
                     'has been closed.'
                 )
@@ -756,13 +744,14 @@ def start_execution(trans_id):
     sql += ');'
 
     try:
-        conn.execute_async('SET search_path to ' + pfl_inst.function_data['schema'] + ';')
+        schema = pfl_inst.function_data['schema']
+        conn.execute_async('SET search_path to ' + schema + ';')
         conn.execute_async('SELECT pl_profiler_set_enabled_local(true)')
         conn.execute_async('SELECT pl_profiler_reset_local()')
         conn.execute_async('SELECT pl_profiler_set_collect_interval(0)')
         status, result = conn.execute_async_list(sql)
-        report_data = generate_report(conn, 'local', opt_top=10, func_oids={}) # TODO: Add support for K top
-        report_id = save_report(report_data,
+        report_data = _generate_report(conn, 'local', opt_top=10, func_oids={}) # TODO: Add support for K top
+        report_id = _save_report(report_data,
                                 pfl_inst.config,
                                 conn.as_dict()['database'],
                                 pfl_inst.profiler_data['profile_type'],
@@ -773,8 +762,8 @@ def start_execution(trans_id):
         current_app.logger.exception(e)
         return make_json_response(
             data={
-                'status' : 'ERROR',
-                'result' : str(e),
+                'status': 'ERROR',
+                'result': str(e),
             }
         )
 
@@ -788,10 +777,10 @@ def start_execution(trans_id):
 
     return make_json_response(
         data={
-            'status'    : 'Success',
-            'result'    :  result,
-            'col_info'  : [columns],
-            'report_id' : report_id
+            'status': 'Success',
+            'result':  result,
+            'col_info': [columns],
+            'report_id': report_id
         }
     )
 
@@ -805,8 +794,8 @@ def restart(trans_id):
     if pfl_inst.profiler_data is None:
         return make_json_response(
             data={
-                'status' : 'NotConnected',
-                'result' : gettext(
+                'status': 'NotConnected',
+                'result': gettext(
                     'Not connected to server or connection with the server '
                     'has been closed.'
                 )
@@ -815,10 +804,10 @@ def restart(trans_id):
 
     return make_json_response(
         data={
-            'status'        : 'Success',
-            'profile_data'  : pfl_inst.profiler_data,
-            'func_data'     : pfl_inst.function_data,
-            'require_input' : pfl_inst.function_data['require_input']
+            'status': 'Success',
+            'profile_data': pfl_inst.profiler_data,
+            'func_data': pfl_inst.function_data,
+            'require_input': pfl_inst.function_data['require_input']
         }
     )
 
@@ -889,12 +878,10 @@ def close_profiler_session(_trans_id, close_all=False):
         finally:
             pfl_inst.clear()
 
-####################################################################################################
-### Functions interacting with report manipulation #################################################
-####################################################################################################
-def generate_report(conn, data_location, opt_top, func_oids = None):
+
+def _generate_report(conn, data_location, opt_top, func_oids = None):
     """
-    generate_report(trans_id)
+    _generate_report(trans_id)
 
     This method is used to generate HTML report data in our sqlite database
 
@@ -964,9 +951,9 @@ def generate_report(conn, data_location, opt_top, func_oids = None):
     func_list = []
     for row in result:
         func_list.append({
-                'funcname' : str(row['proname']),
-                'funcoid'  : str(row['oid']),
-                'schema'   : str(row['nspname']),
+                'funcname': str(row['proname']),
+                'funcoid': str(row['oid']),
+                'schema': str(row['nspname']),
             })
 
     # ----
@@ -1018,14 +1005,14 @@ def generate_report(conn, data_location, opt_top, func_oids = None):
         # With that we can start the definition.
         # ----
         func_def = {
-                'funcoid'    : func_oid,
-                'schema'     : row['nspname'],
-                'funcname'   : row['proname'],
-                'funcresult' : row['pg_get_function_result'],
-                'funcargs'   : row['pg_get_function_arguments'],
-                'total_time' : linestats[func_oid][0][3],
-                'self_time'  : int(row['self_time']),
-                'source'     : [],
+                'funcoid': func_oid,
+                'schema': row['nspname'],
+                'funcname': row['proname'],
+                'funcresult': row['pg_get_function_result'],
+                'funcargs': row['pg_get_function_arguments'],
+                'total_time': linestats[func_oid][0][3],
+                'self_time': int(row['self_time']),
+                'source': [],
             }
 
         # ----
@@ -1033,11 +1020,11 @@ def generate_report(conn, data_location, opt_top, func_oids = None):
         # ----
         for row in linestats[func_oid]:
             func_def['source'].append({
-                    'line_number'  : int(row[1]),
-                    'source'       : row[5],
-                    'exec_count'   : int(row[2]),
-                    'total_time'   : int(row[3]),
-                    'longest_time' : int(row[4]),
+                    'line_number': int(row[1]),
+                    'source': row[5],
+                    'exec_count': int(row[2]),
+                    'total_time': int(row[3]),
+                    'longest_time': int(row[4]),
                 })
 
         # ----
@@ -1058,12 +1045,19 @@ def generate_report(conn, data_location, opt_top, func_oids = None):
     flamedata = ""
     callgraph = []
     for row in result:
-        flamedata += str(row['array_to_string']) + " " + str(row['us_self']) + "\n"
+        flamedata += \
+            str(row['array_to_string']) + " " + str(row['us_self']) + "\n"
         callgraph.append((row['stack'],
                           int(row['call_count']),
                           int(row['us_total']),
                           int(row['us_children']),
                           int(row['us_self'])))
+
+    overflow_flags = {
+        'callgraph_overflow': False,
+        'functions_overflow': False,
+        'lines_overflow': False,
+    }
 
     if data_location == 'shared':
         sql = render_template(
@@ -1071,35 +1065,36 @@ def generate_report(conn, data_location, opt_top, func_oids = None):
                   'get_overflow_flags.sql'])
         )
         status, result = conn.execute_async_list(sql)
-        overflow_flags = result[0]
+        overflow_flags['callgraph_overflow'] = \
+            result[0]['pl_profiler_callgraph_overflow']
+        overflow_flags['functions_overflow'] = \
+            result[0]['pl_profiler_functions_overflow']
+        overflow_flags['lines_overflow'] = \
+            result[0]['pl_profiler_lines_overflow']
 
     return {
-            'callgraph_overflow' : False \
-                if data_location == 'local' \
-                else overflow_flags['pl_profiler_callgraph_overflow'],
-            'functions_overflow' : False \
-                if data_location == 'local' \
-                else overflow_flags['pl_profiler_functions_overflow'],
-            'lines_overflow' : False \
-                if data_location == 'local' \
-                else overflow_flags['pl_profiler_lines_overflow'],
-            'func_list' : func_list,
-            'func_defs' : func_defs,
-            'flamedata' : flamedata,
-            'callgraph' : callgraph,
+            'callgraph_overflow': overflow_flags['callgraph_overflow'],
+            'functions_overflow': overflow_flags['functions_overflow'],
+            'lines_overflow': overflow_flags['lines_overflow'],
+            'func_list': func_list,
+            'func_defs': func_defs,
+            'flamedata': flamedata,
+            'callgraph': callgraph,
             'func_oids_by_user': func_oids_by_user,
-            'found_more_funcs' : found_more_funcs,
+            'found_more_funcs': found_more_funcs,
         }
 
-def save_report(report_data, config, dbname, profile_type, duration):
+def _save_report(report_data, config, dbname, profile_type, duration):
     """
-    save_report(report_data, config, dbname, profile_type)
+    _save_report(report_data, config, dbname, profile_type)
 
-    This method is responsible for generating a HTML report and saving it internally
+    This method is responsible for generating a HTML report and
+    saving it internally
 
     Parameters:
         report_data
-        - The generated function/linestat data that will be used to generate a report
+        - The generated function/linestat data that will be used to
+          generate a report
         config
         - Report options such as name/title/desc
         dbname
@@ -1115,7 +1110,8 @@ def save_report(report_data, config, dbname, profile_type, duration):
 
     now = datetime.now().strftime("%Y-%m-%d;%H:%M")
     path = os.path.dirname(os.path.abspath(current_app.root_path))
-    path = os.path.join(path, 'pgadmin', 'instance', config['name'] + '@' + now + '.html')
+    path = os.path.join(path, 'pgadmin', 'instance')
+    path = os.path.join(path, config['name'] + '@' + now + '.html')
 
     report = ProfilerSavedReports.query.filter_by(path=path).first()
 
@@ -1143,12 +1139,12 @@ def save_report(report_data, config, dbname, profile_type, duration):
             output_fd.close()
 
             profile_report = ProfilerSavedReports(
-                name     = config['name'],
-                direct   = False if profile_type == 'indirect' else True,
-                dbname   = dbname,
-                time     = now,
-                duration = duration,
-                path     = path
+                name=config['name'],
+                direct=False if profile_type == 'indirect' else True,
+                dbname=dbname,
+                time=now,
+                duration=duration,
+                path=path
             )
 
             db.session.add(profile_report)
@@ -1169,9 +1165,9 @@ def delete_report(report_id):
     """
     delete_report(report_id)
 
-    This method is responsible for deleting the report with the given report id from PgAdmin4.
-    This includes deleting the report data from the internal sqlite3 database and removing it from
-    the file system.
+    This method is responsible for deleting the report with the given report
+    id from PgAdmin4. This includes deleting the report data from the internal
+    sqlite3 database and removing it from the file system.
 
     Parameters:
         report_id
@@ -1203,7 +1199,7 @@ def delete_report(report_id):
         os.remove(path)
         return make_json_response(
             data={
-                'status' : 'Success'
+                'status': 'Success'
             }
         )
     except Exception as e:
@@ -1225,8 +1221,8 @@ def show_report(report_id):
     """
     show_report(report_id)
 
-    This method is responsible for finding the saved HTML report that corresponds to the given
-    report id
+    This method is responsible for finding the saved HTML report that
+    corresponds to the given report id
 
     Parameters:
         report_id
@@ -1248,9 +1244,7 @@ def show_report(report_id):
 
         return Response(report_data, mimetype="text/html")
 
-####################################################################################################
-### Functions interacting with internal PgAdmin4 sqlite3 database ##################################
-####################################################################################################
+
 @blueprint.route(
     '/get_arguments/<int:sid>/<int:did>/<int:scid>/<int:func_id>',
     methods=['GET'], endpoint='get_arguments'
@@ -1297,11 +1291,11 @@ def get_arguments_sqlite(sid, did, scid, func_id):
 
         for i in range(0, PflFuncArgsCount):
             info = {
-                "arg_id"        : args_list[i].arg_id,
-                "is_null"       : args_list[i].is_null,
-                "is_expression" : args_list[i].is_expression,
-                "use_default"   : args_list[i].use_default,
-                "value"         : args_list[i].value
+                'arg_id': args_list[i].arg_id,
+                'is_null': args_list[i].is_null,
+                'is_expression': args_list[i].is_expression,
+                'use_default': args_list[i].use_default,
+                'value': args_list[i].value
             }
             args_data.append(info)
 
@@ -1309,16 +1303,16 @@ def get_arguments_sqlite(sid, did, scid, func_id):
         # that entry
         return make_json_response(
             data={
-                'result'     : args_data,
-                'args_count' : PflFuncArgsCount}
+                'result': args_data,
+                'args_count': PflFuncArgsCount}
         )
     else:
         # As we do not have any entry available for that function so we need
         # to add that entry
         return make_json_response(
             data={
-                'result'     : 'result',
-                'args_count' : PflFuncArgsCount}
+                'result': 'result',
+                'args_count': PflFuncArgsCount}
         )
 
 @blueprint.route(
@@ -1388,10 +1382,10 @@ def set_arguments_sqlite(sid, did, scid, func_id):
                     arg_id=data[i]['arg_id']
                 ).first()
 
-                PflFuncArgs.is_null       = data[i]['is_null']
+                PflFuncArgs.is_null = data[i]['is_null']
                 PflFuncArgs.is_expression = data[i]['is_expression']
-                PflFuncArgs.use_default   = data[i]['use_default']
-                PflFuncArgs.value         = array_string
+                PflFuncArgs.use_default = data[i]['use_default']
+                PflFuncArgs.value = array_string
             else:
                 profiler_func_args = ProfilerFunctionArguments(
                     server_id=data[i]['server_id'],
@@ -1419,9 +1413,7 @@ def set_arguments_sqlite(sid, did, scid, func_id):
 
     return make_json_response(data={'status': True, 'result': 'Success'})
 
-####################################################################################################
-### Functions that provide information for the client-side panels ##################################
-####################################################################################################
+
 @blueprint.route(
     '/get_src/<int:trans_id>', methods=['GET'],
     endpoint='get_src'
@@ -1444,8 +1436,8 @@ def get_src(trans_id):
     if pfl_inst.profiler_data is None:
         return make_json_response(
             data={
-                'status' : 'NotConnected',
-                'result' : gettext(
+                'status': 'NotConnected',
+                'result': gettext(
                     'Not connected to server or connection with the server '
                     'has been closed.'
                 )
@@ -1454,8 +1446,8 @@ def get_src(trans_id):
     if pfl_inst.profiler_data['profile_type'] == 'indirect':
         return make_json_response(
             data={
-                'status' : 'Error',
-                'result' : gettext(
+                'status': 'Error',
+                'result': gettext(
                     'Was this an indirect profiling instance?'
                 )
             }
@@ -1463,8 +1455,8 @@ def get_src(trans_id):
 
     return make_json_response(
         data={
-            'status' : 'Success',
-            'result' : pfl_inst.function_data['src']
+            'status': 'Success',
+            'result': pfl_inst.function_data['src']
         }
     )
 
@@ -1496,8 +1488,8 @@ def get_parameters(trans_id):
     if pfl_inst.profiler_data is None:
         return make_json_response(
             data={
-                'status' : 'NotConnected',
-                'result' : gettext(
+                'status': 'NotConnected',
+                'result': gettext(
                     'Not connected to server or connection with the server '
                     'has been closed.'
                 )
@@ -1507,27 +1499,27 @@ def get_parameters(trans_id):
     if pfl_inst.profiler_data['profile_type'] == 'direct':
         return make_json_response(
             data={
-                'status' : 'Success',
-                'result' : pfl_inst.function_data['args_value']
+                'status': 'Success',
+                'result': pfl_inst.function_data['args_value']
             }
         )
 
-    else: # profile type is indirect
+    else:
         return make_json_response(
             data={
                 'status': 'Success',
                 'result': [
-                    {'name'  : 'Duration',
-                     'type'  : 'Monitoring Parameter',
-                     'value' : pfl_inst.profiler_data['duration']},
-                    {'name'  : 'Interval',
-                     'type'  : 'Monitoring Parameter',
-                     'value' : pfl_inst.profiler_data['interval']},
-                    {'name'  : 'PID',
-                     'type'  : 'Monitoring Parameter',
-                     'value' : pfl_inst.profiler_data['pid'] \
-                               if pfl_inst.profiler_data['pid'] != 'No PID specified' \
-                               else pfl_inst.profiler_data['pid']}
+                    {'name': 'Duration',
+                     'type': 'Monitoring Parameter',
+                     'value': pfl_inst.profiler_data['duration']},
+                    {'name': 'Interval',
+                     'type': 'Monitoring Parameter',
+                     'value': pfl_inst.profiler_data['interval']},
+                    {'name': 'PID',
+                     'type': 'Monitoring Parameter',
+                     'value': pfl_inst.profiler_data['pid'] \
+                              if pfl_inst.profiler_data['pid'] != 'No PID specified' \
+                              else pfl_inst.profiler_data['pid']}
                 ]
             }
         )
@@ -1541,31 +1533,28 @@ def get_reports():
     """
     get_reports()
 
-    This method is responsible for retrieving all of the saved reports that are currently stored
-    by PgAdmin
+    This method is responsible for retrieving all of the saved reports
+    that are currently stored by PgAdmin
 
     Returns:
         A formatted list that contains identifying information for all of the reports
         that are currently saved
     """
-
-    # Retrieve the reports from the sqlite db
     saved_reports = ProfilerSavedReports.query.all()
 
-    # Format the reports to send to the client
     reports = []
     for report in saved_reports:
-        reports.append({'name'         : report.name,
-                        'database'     : report.dbname,
-                        'time'         : report.time,
-                        'profile_type' : report.direct,
-                        'duration'     : report.duration,
-                        'report_id'    : report.rid})
+        reports.append({'name': report.name,
+                        'database': report.dbname,
+                        'time': report.time,
+                        'profile_type': report.direct,
+                        'duration': report.duration,
+                        'report_id': report.rid})
 
     return make_json_response(
         data={
-            'status' : 'Success',
-            'result' : reports
+            'status': 'Success',
+            'result': reports
         }
     )
 
@@ -1577,8 +1566,9 @@ def get_duration(trans_id):
     """
     get_duration(trans_id)
 
-    This method is responsible for retrieving the duration of indirect(global) profiling for the
-    profiling instance that corresponds with the given transaction id
+    This method is responsible for retrieving the duration of indirect(global)
+    profiling for the profiling instance that corresponds with the given
+    transaction id
 
     Parameters:
         trans_id
@@ -1589,8 +1579,8 @@ def get_duration(trans_id):
     if pfl_inst.profiler_data is None:
         return make_json_response(
             data={
-                'status' : 'NotConnected',
-                'result' : gettext(
+                'status': 'NotConnected',
+                'result': gettext(
                     'Not connected to server or connection with the server '
                     'has been closed'
                 )
@@ -1599,17 +1589,18 @@ def get_duration(trans_id):
     if pfl_inst.profiler_data['duration'] is None:
         return make_json_response(
             data={
-                'status' : 'Error',
-                'result' : gettext(
-                    'Duration not found, was this an indirect profiling instance?'
+                'status': 'Error',
+                'result': gettext(
+                    'Duration not found, was this an indirect profiling '
+                    'instance?'
                 )
             }
         )
 
     return make_json_response(
         data={
-            'status'   : 'Success',
-            'duration' : pfl_inst.profiler_data['duration']
+            'status': 'Success',
+            'duration': pfl_inst.profiler_data['duration']
         }
     )
 
@@ -1623,8 +1614,9 @@ def get_config(trans_id):
     """
     get_config(trans_id)
 
-    This method is responsible for formatting and getting the report configuration items for the
-    profiling instance that corresponds with the given transaction id
+    This method is responsible for formatting and getting the report
+    configuration items for the profiling instance that corresponds with the
+    given transaction id
 
     Parameters:
         trans_id
@@ -1635,8 +1627,8 @@ def get_config(trans_id):
     if pfl_inst.profiler_data is None:
         return make_json_response(
             data={
-                'status' : 'NotConnected',
-                'result' : gettext(
+                'status': 'NotConnected',
+                'result': gettext(
                     'Not connected to server or connection with the server '
                     'has been closed'
                 )
@@ -1645,8 +1637,8 @@ def get_config(trans_id):
     if pfl_inst.config is None:
         return make_json_response(
             data={
-                'status' : 'Error',
-                'result' : gettext(
+                'status': 'Error',
+                'result': gettext(
                     'Config not found'
                 )
             }
@@ -1656,14 +1648,14 @@ def get_config(trans_id):
     result = []
     for option in pfl_inst.config:
         result.append({
-            'option' : option,
-            'value'  : pfl_inst.config[option]
+            'option': option,
+            'value': pfl_inst.config[option]
         })
 
     return make_json_response(
         data={
-            'status' : 'Success',
-            'result' : result
+            'status': 'Success',
+            'result': result
         }
     )
 
@@ -1676,8 +1668,8 @@ def set_config(trans_id):
     """
     set_config(trans_id)
 
-    This method is responsible for setting the configuration options for the report to be generated
-    for a given profiling instance
+    This method is responsible for setting the configuration options for the
+    report to be generated for a given profiling instance
 
     Parameters:
         trans_id
@@ -1688,8 +1680,8 @@ def set_config(trans_id):
     if pfl_inst.profiler_data is None:
         return make_json_response(
             data={
-                'status' : 'NotConnected',
-                'result' : gettext(
+                'status': 'NotConnected',
+                'result': gettext(
                     'Not connected to server or connection with the server '
                     'has been closed.'
                 )
@@ -1699,17 +1691,17 @@ def set_config(trans_id):
     data = json.loads(request.values['data'], encoding='utf-8')
     try:
         pfl_inst.config = {
-                   'name'        : data[0]['value'],
-                   'title'       : data[1]['value'],
-                   'tabstop'     : data[2]['value'],
-                   'svg_width'   : data[3]['value'],
-                   'table_width' : data[4]['value'],
-                   'desc'        : data[5]['value']
+                   'name': data[0]['value'],
+                   'title': data[1]['value'],
+                   'tabstop': data[2]['value'],
+                   'svg_width': data[3]['value'],
+                   'table_width': data[4]['value'],
+                   'desc': data[5]['value']
                   }
 
         return make_json_response(
             data={
-                'status' : 'Success',
+                'status': 'Success',
             }
         )
 
@@ -1717,7 +1709,7 @@ def set_config(trans_id):
         current_app.logger.exception(e)
         return make_json_response(
             data={
-                'status' : 'ERROR',
-                'result' : str(e)
+                'status': 'ERROR',
+                'result': str(e)
             }
         )

@@ -15,9 +15,9 @@ define([
   gettext, url_for, $, _, Backbone, Alertify, pgAdmin, pgBrowser, Backgrid
 ) {
 
-  var wcDocker = window.wcDocker;
+  let wcDocker = window.wcDocker;
 
-  var ProfilerInputOptionsModel = Backbone.Model.extend({
+  const ProfilerInputOptionsModel = Backbone.Model.extend({
     defaults: {
       option: undefined,
       value: undefined,
@@ -26,7 +26,7 @@ define([
       if (_.isUndefined(this.get('value')) ||
         _.isNull(this.get('value')) ||
         String(this.get('value')).replace(/^\s+|\s+$/g, '') == '') {
-        var msg = gettext('Please enter a value for the parameter.');
+        const msg = gettext('Please enter a value for the parameter.');
         this.errorModel.set('value', msg);
         return msg;
       } else {
@@ -37,11 +37,11 @@ define([
   });
 
   // Collection which contains the model for function informations.
-  var ProfilerInputOptionsCollections = Backbone.Collection.extend({
+  const ProfilerInputOptionsCollections = Backbone.Collection.extend({
     model: ProfilerInputOptionsModel,
   });
 
-  var res = function(profile_info, restart_profile, trans_id) {
+  const res = function(profile_info, restart_profile, trans_id) {
     if (!Alertify.profilerInputOptionsDialog) {
       Alertify.dialog('profilerInputOptionsDialog', function factory() {
         return {
@@ -55,7 +55,7 @@ define([
             this.set('restart_profile', restart_profile);
             this.set('trans_id', trans_id);
 
-            var my_obj = [];
+            const my_obj = [];
             my_obj.push({
               'option' : 'Duration',
               'value'  : '',
@@ -68,13 +68,13 @@ define([
               'value'  : '',
             },);
 
-            var option_header = Backgrid.HeaderCell.extend({
+            const option_header = Backgrid.HeaderCell.extend({
               // Add fixed width to the "option" column
               className: 'width_percent_25',
             });
 
 
-            var gridCols = [{
+            const gridCols = [{
               name: 'option',
               label: gettext('Option'),
               type: 'text',
@@ -86,7 +86,8 @@ define([
               name: 'value',
               label: gettext('Value'),
               type: 'text',
-              cell: 'string',
+              editable: true,
+              cell: Backgrid.IntegerCell,
             },
             ];
 
@@ -98,7 +99,7 @@ define([
               this.grid.remove();
               this.grid = null;
             }
-            var grid = this.grid = new Backgrid.Grid({
+            const grid = this.grid = new Backgrid.Grid({
               columns: gridCols,
               collection: this.ProfilerInputOptionsColl,
               className: 'backgrid table table-bordered table-noouter-border table-bottom-border',
@@ -143,9 +144,9 @@ define([
             if (e.button.text === gettext('Profile')) {
               // Initialize the target once the debug button is clicked and
               // create asynchronous connection and unique transaction ID
-              var self = this;
+              let self = this;
 
-              var options_value_list = [];
+              const options_value_list = [];
 
               this.grid.collection.each(function(m) {
                 options_value_list.push({
@@ -153,8 +154,8 @@ define([
                   'value': m.get('value'),
                 });
               });
-              
-              var baseUrl = url_for('profiler.initialize_target_indirect', {
+
+              const baseUrl = url_for('profiler.initialize_target_indirect', {
                 'profile_type' : 'indirect',
                 'trans_id' : self.setting('trans_id'),
                 'sid' : self.setting('profile_info').sid,
@@ -169,7 +170,7 @@ define([
                 },
               })
                 .done(function(res) {
-                  var url = url_for(
+                  const url = url_for(
                     'profiler.profile', {
                       'trans_id' : res.data.profilerTransId,
                     }
@@ -184,7 +185,7 @@ define([
                         frame.openURL(url);
                       });
 
-                    var dashboardPanel = pgBrowser.docker.findPanels('properties'),
+                    let dashboardPanel = pgBrowser.docker.findPanels('properties'),
                       panel = pgBrowser.docker.addPanel(
                         'frm_profiler', wcDocker.DOCK.STACKED, dashboardPanel[0]
                       );
@@ -193,7 +194,7 @@ define([
 
                     // Panel Closed event
                     panel.on(wcDocker.EVENT.CLOSED, function() {
-                      var closeUrl = url_for('profiler.close', {
+                      const closeUrl = url_for('profiler.close', {
                         'trans_id': res.data.profilerTransId,
                       });
                       $.ajax({
@@ -243,9 +244,9 @@ define([
 
                 return function() {
 
-                  var enable_btn = false;
+                  let enable_btn = false;
 
-                  for (var i = 0; i < this.collection.length; i++) {
+                  for (let i = 0; i < this.collection.length; i++) {
 
                     if (this.collection.models[i].get('is_null')) {
                       obj.__internal.buttons[1].element.disabled = false;
