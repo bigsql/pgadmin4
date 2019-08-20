@@ -685,7 +685,6 @@ define([
               if (self.setting('restart_profile') == 0) {
                 if (d._type == 'function') {
                   baseUrl = url_for('profiler.initialize_target_for_function', {
-                    'profile_type': 'direct',
                     'trans_id': self.setting('trans_id'),
                     'sid': treeInfo.server._id,
                     'did': treeInfo.database._id,
@@ -694,7 +693,6 @@ define([
                   });
                 } else if (d._type == 'procedure') {
                   baseUrl = url_for('profiler.initialize_target_for_function', {
-                    'profile_type': 'direct',
                     'trans_id': self.setting('trans_id'),
                     'sid': treeInfo.server._id,
                     'did': treeInfo.database._id,

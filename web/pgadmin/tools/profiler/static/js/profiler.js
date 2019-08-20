@@ -242,7 +242,6 @@ define([
             if (d._type == 'function') {
               initTargetUrl = url_for(
                 'profiler.initialize_target_for_function', {
-                  'profile_type': 'direct',
                   'trans_id': trans_id,
                   'sid': treeInfo.server._id,
                   'did': treeInfo.database._id,
@@ -253,7 +252,6 @@ define([
             } else if(d._type == 'procedure') {
               initTargetUrl = url_for(
                 'profiler.initialize_target_for_function', {
-                  'profile_type': 'direct',
                   'trans_id': trans_id,
                   'sid': treeInfo.server._id,
                   'did': treeInfo.database._id,

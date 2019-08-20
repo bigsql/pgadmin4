@@ -400,12 +400,12 @@ def profile_new(trans_id):
     )
 
 @blueprint.route(
-    '/initialize_target_indirect/<profile_type>/<int:trans_id>/<int:sid>/<int:did>/',
+    '/initialize_target_indirect/<int:trans_id>/<int:sid>/<int:did>/',
     methods=['GET', 'POST'],
     endpoint='initialize_target_indirect'
 )
 @login_required
-def initialize_target_indirect(profile_type, trans_id, sid, did):
+def initialize_target_indirect(trans_id, sid, did):
     """
     This method is responsible for creating an asynchronous connection
     for indirect profiling.
@@ -450,17 +450,15 @@ def initialize_target_indirect(profile_type, trans_id, sid, did):
     if request.method == 'POST':
         data = json.loads(request.values['data'], encoding='utf-8')
 
-    # Need to check if plugin is really loaded or not with "plprofiler" string
-    if profile_type == 'indirect':
-        if "plprofiler" not in rid_pre:
-            msg = gettext(
-                "The profiler plugin is not enabled. "
-                "Please add the plugin to the shared_preload_libraries "
-                "setting in the postgresql.conf file and restart the "
-                "database server for indirect profiling."
-            )
-            current_app.logger.debug(msg)
-            return internal_server_error(msg)
+    if "plprofiler" not in rid_pre:
+        msg = gettext(
+            "The profiler plugin is not enabled. "
+            "Please add the plugin to the shared_preload_libraries "
+            "setting in the postgresql.conf file and restart the "
+            "database server for indirect profiling."
+        )
+        current_app.logger.debug(msg)
+        return internal_server_error(msg)
 
     # TODO: Input checking
     try:
@@ -499,23 +497,21 @@ def initialize_target_indirect(profile_type, trans_id, sid, did):
                                     'profilerTransId': trans_id})
 
 @blueprint.route(
-    '/initialize_target/<profile_type>/<int:trans_id>/<int:sid>/<int:did>/'
+    '/initialize_target/<int:trans_id>/<int:sid>/<int:did>/'
     '<int:scid>/<int:func_id>',
     methods=['GET', 'POST'],
     endpoint='initialize_target_for_function'
 )
 @login_required
-def initialize_target(profile_type, trans_id, sid, did,
+def initialize_target(trans_id, sid, did,
                       scid, func_id):
     """
-    initialize_target(profile_type, sid, did, scid, func_id)
+    initialize_target(sid, did, scid, func_id)
 
     This method is responsible for creating an asynchronous connection
     for direct profiling.
 
     Parameters:
-        profile_type
-        - Type of profiling (Direct or Indirect)
         sid
         - Server Id
         did
@@ -549,16 +545,15 @@ def initialize_target(profile_type, trans_id, sid, did,
         )
 
     # Need to check if plugin is not loaded or not with "plprofiler" string
-    if profile_type == 'direct':
-        if "plprofiler" in rid_pre:
-            msg = gettext(
-                "The profiler plugin is enabled globally. "
-                "Please remove the plugin to the shared_preload_libraries "
-                "setting in the postgresql.conf file and restart the "
-                "database server for direct profiling."
-            )
-            current_app.logger.debug(msg)
-            return internal_server_error(msg)
+    if "plprofiler" in rid_pre:
+        msg = gettext(
+            "The profiler plugin is enabled globally. "
+            "Please remove the plugin to the shared_preload_libraries "
+            "setting in the postgresql.conf file and restart the "
+            "database server for direct profiling."
+        )
+        current_app.logger.debug(msg)
+        return internal_server_error(msg)
 
 
     # Set the template path required to read the sql files
@@ -578,7 +573,6 @@ def initialize_target(profile_type, trans_id, sid, did,
         'profile_type': 'direct',
         'function_id': func_id,
         'function_name': pfl_inst.function_data['name'],
-        'profile_type': profile_type,
         'restart_profile': 0
     }
 

@@ -58,14 +58,14 @@ define([
             const my_obj = [];
             my_obj.push({
               'option' : 'Duration',
-              'value'  : '',
+              'value'  : void 0,
             }, {
               'option' : 'Interval',
-              'value'  : '',
+              'value'  : void 0,
             },
             {
               'option' : 'PID (Optional)',
-              'value'  : '',
+              'value'  : void 0,
             },);
 
             const option_header = Backgrid.HeaderCell.extend({
@@ -156,7 +156,6 @@ define([
               });
 
               const baseUrl = url_for('profiler.initialize_target_indirect', {
-                'profile_type' : 'indirect',
                 'trans_id' : self.setting('trans_id'),
                 'sid' : self.setting('profile_info').sid,
                 'did' : self.setting('profile_info').did,
