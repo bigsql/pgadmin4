@@ -17,7 +17,7 @@ define([
   gettext, url_for, $, _, S, Alertify, pgAdmin, pgBrowser, Backbone, Backgrid,
   CodeMirror, Backform, get_function_arguments, get_option_arguments, profilerUtils
 ) {
-  var pgTools = pgAdmin.Tools = pgAdmin.Tools || {},
+  const pgTools = pgAdmin.Tools = pgAdmin.Tools || {},
     wcDocker = window.wcDocker;
 
   /* Return back, this has been called more than once */
@@ -105,8 +105,8 @@ define([
 
     },
     can_profile: function(itemData, item) {
-      var t = pgBrowser.tree,
-        i = item,
+      const t = pgBrowser.tree;
+      let i = item,
         d = itemData;
       // To iterate over tree to check parent node
       while (i) {
@@ -119,7 +119,7 @@ define([
       }
 
       // Find the function is really available in database
-      var tree = pgBrowser.tree,
+      const tree = pgBrowser.tree,
         info = tree.selected(),
         d_ = info && info.length == 1 ? tree.itemData(info) : undefined;
 
@@ -139,8 +139,7 @@ define([
     },
 
     generate_url: function(_url, treeInfo, node) {
-      var url = '{BASEURL}{URL}/{OBJTYPE}{REF}',
-        ref = '';
+      let ref = '';
 
       _.each(
         _.sortBy(
@@ -158,20 +157,21 @@ define([
           ref = S('%s/%s').sprintf(ref, encodeURI(o._id)).value();
         });
 
-      var args = {
+      const args = {
         'URL': _url,
         'BASEURL': url_for('profiler.index'),
         'REF': ref,
         'OBJTYPE': encodeURI(node.type),
       };
 
+      const url = '{BASEURL}{URL}/{OBJTYPE}{REF}';
       return url.replace(/{(\w+)}/g, function(match, arg) {
         return args[arg];
       });
     },
 
     get_options: function(args, item) {
-      var t = pgBrowser.tree,
+      const t = pgBrowser.tree,
         i = item || t.selected(),
         d = i && i.length == 1 ? t.itemData(i) : undefined,
         node = d && pgBrowser.Nodes[d._type];
@@ -180,16 +180,14 @@ define([
         return;
 
       // Generate the URL to create a profiler instance
-      var treeInfo = node.getTreeNodeHierarchy.apply(node, [i]),
-        initUrl = this.generate_url('init', treeInfo, node);
+      const treeInfo = node.getTreeNodeHierarchy.apply(node, [i]);
 
       $.ajax({
-        url: initUrl,
+        url: this.generate_url('init', treeInfo, node),
         cache: false,
       })
         .done(function(res) {
           let trans_id = res.data.trans_id;
-
           get_option_arguments(res.data.db_info, 0, trans_id);
         });
 
@@ -200,7 +198,7 @@ define([
       in the user input dialog
     */
     get_function_information: function(args, item) {
-      var t = pgBrowser.tree,
+      const t = pgBrowser.tree,
         i = item || t.selected(),
         d = i && i.length == 1 ? t.itemData(i) : undefined,
         node = d && pgBrowser.Nodes[d._type],
@@ -210,16 +208,14 @@ define([
         return;
 
       // Generate the URL to create a profiler instance
-      var treeInfo = node.getTreeNodeHierarchy.apply(node, [i]),
-        initUrl = this.generate_url('init', treeInfo, node);
-
+      const treeInfo = node.getTreeNodeHierarchy.apply(node, [i]);
       $.ajax({
-        url: initUrl,
+        url: this.generate_url('init', treeInfo, node),
         cache: false,
       })
         .done(function(res) {
 
-          let profile_info = res.data.profile_info,
+          const profile_info = res.data.profile_info,
             trans_id = res.data.trans_id;
           // Open Alertify the dialog to take the input arguments from user if function having input arguments
           if (profile_info[0]['require_input']) {
@@ -228,16 +224,17 @@ define([
             // Initialize the target and create asynchronous connection and unique transaction ID
             // If there is no arguments to the functions then we should not ask for for function arguments and
             // Directly open the panel
-            var t = pgBrowser.tree,
+            const t = pgBrowser.tree,
               i = t.selected(),
               d = i && i.length == 1 ? t.itemData(i) : undefined,
               node = d && pgBrowser.Nodes[d._type];
 
-            if (!d)
+            if (!d) {
               return;
+            }
 
-            var treeInfo = node.getTreeNodeHierarchy.apply(node, [i]),
-              initTargetUrl;
+            const treeInfo = node.getTreeNodeHierarchy.apply(node, [i]);
+            let initTargetUrl = '';
 
             if (d._type == 'function') {
               initTargetUrl = url_for(
@@ -266,23 +263,18 @@ define([
               method: 'GET',
             })
               .done(function() {
-
-                var url = url_for('profiler.profile', {
-                  'trans_id': trans_id,
-                });
+                const url = url_for('profiler.profile', { 'trans_id': trans_id });
 
                 if (self.preferences.profiler_new_browser_tab) {
                   window.open(url, '_blank');
                 } else {
                   pgBrowser.Events.once(
                     'pgadmin-browser:frame:urlloaded:frm_profiler',
-                    function(frame) {
-                      frame.openURL(url);
-                    }
+                    (frame) => frame.openURL(url)
                   );
 
                   // Create the profiler panel as per the data received from user input dialog.
-                  var dashboardPanel = pgBrowser.docker.findPanels(
+                  const dashboardPanel = pgBrowser.docker.findPanels(
                       'properties'
                     ),
                     panel = pgBrowser.docker.addPanel(
@@ -293,11 +285,8 @@ define([
 
                   // Register Panel Closed event
                   panel.on(wcDocker.EVENT.CLOSED, function() {
-                    var closeUrl = url_for('profiler.close', {
-                      'trans_id': trans_id,
-                    });
                     $.ajax({
-                      url: closeUrl,
+                      url: url_for('profiler.close', { 'trans_id': trans_id }),
                       method: 'DELETE',
                     });
                   });
@@ -313,7 +302,7 @@ define([
         })
         .fail(function(xhr) {
           try {
-            var err = JSON.parse(xhr.responseText);
+            const err = JSON.parse(xhr.responseText);
             if (err.success == 0) {
               Alertify.alert(gettext('Debugger Error'), err.errormsg);
             }
