@@ -306,6 +306,201 @@ def init_function(node_type, sid, did, scid=None, fid=None):
             status=200
         )
 
+@blueprint.route(
+    '/initialize_target_indirect/<int:trans_id>/<int:sid>/<int:did>/',
+    methods=['GET', 'POST'],
+    endpoint='initialize_target_indirect'
+)
+@login_required
+def initialize_target_indirect(trans_id, sid, did):
+    """
+    Create an asynchronous connection for indirect profiling. Also sets default
+    report configuration options and profiler instance data.
+
+    Parameters:
+        profile_type
+        - Type of profiling (Direct or Indirect)
+        trans_id
+        - The unique transaction id for a profiler instance
+        sid
+        - Server Id
+        did
+        - Database Id
+        scid
+        - Schema Id
+    Returns:
+        JSON response with the transaction id
+    """
+
+    # Create asynchronous connection using random connection id.
+    conn_id = str(random.randint(1, 9999999))
+    try:
+        manager = get_driver(PG_DEFAULT_DRIVER).connection_manager(sid)
+        conn = manager.connection(did=did, conn_id=conn_id)
+    except Exception as e:
+        return internal_server_error(errormsg=str(e))
+
+    # Connect the Server
+    status, msg = conn.connect()
+    if not status:
+        return internal_server_error(errormsg=str(msg))
+
+    user = manager.user_info
+
+    status_in, rid_pre = conn.execute_scalar("SHOW shared_preload_libraries")
+    if not status_in:
+        return internal_server_error(
+            gettext("Could not fetch profiler plugin information.")
+        )
+
+    pfl_inst = ProfilerInstance(trans_id)
+    if request.method == 'POST':
+        data = json.loads(request.values['data'], encoding='utf-8')
+
+    if "plprofiler" not in rid_pre:
+        msg = gettext(
+            "The profiler plugin is not enabled. "
+            "Please add the plugin to the shared_preload_libraries "
+            "setting in the postgresql.conf file and restart the "
+            "database server for indirect profiling."
+        )
+        current_app.logger.debug(msg)
+        return internal_server_error(msg)
+
+    # TODO: Input checking
+    try:
+        pfl_inst.profiler_data = {
+            'duration': data[0]['value'],
+            'interval': data[1]['value'],
+            'pid': data[2]['value']
+        }
+    except Exception as e:
+        return make_json_response(
+            data={
+                'status': 'ERROR',
+                'result': 'Invalid input type'
+            }
+        )
+
+    pfl_inst.profiler_data['conn_id'] = conn_id
+    pfl_inst.profiler_data['sid'] = sid
+    pfl_inst.profiler_data['did'] = did
+    pfl_inst.profiler_data['scid'] = scid
+    pfl_inst.profiler_data['function_name'] = 'Indirect'
+    pfl_inst.profiler_data['profile_type'] = 'indirect'
+    pfl_inst.profiler_data['restart_profile'] = 0
+
+    pfl_inst.config = {
+        'name': 'Indirect',
+        'title': 'Pl/Profiler Report for ' + conn.as_dict()['database'],
+        'tabstop': '8',
+        'svg_width': '1200',
+        'table_width': '80%',
+        'desc': ''
+    }
+
+    pfl_inst.update_session()
+
+    return make_json_response(data={'status': status,
+                                    'profilerTransId': trans_id})
+
+@blueprint.route(
+    '/initialize_target/<int:trans_id>/<int:sid>/<int:did>/'
+    '<int:scid>/<int:func_id>',
+    methods=['GET', 'POST'],
+    endpoint='initialize_target_for_function'
+)
+@login_required
+def initialize_target(trans_id, sid, did,
+                      scid, func_id):
+    """
+    initialize_target(sid, did, scid, func_id)
+
+    Create an asynchronous connection for direct profiling. Also sets default
+    report configuration options and profiler instance data.
+
+    Parameters:
+        trans_id
+        - transaction Id
+        sid
+        - Server Id
+        did
+        - Database Id
+        scid
+        - Schema Id
+        func_id
+        - Function Id
+    Returns:
+        JSON response for the client with the unique transaction id
+    """
+
+    # Create asynchronous connection using random connection id.
+    conn_id = str(random.randint(1, 9999999))
+    try:
+        manager = get_driver(PG_DEFAULT_DRIVER).connection_manager(sid)
+        conn = manager.connection(did=did, conn_id=conn_id)
+    except Exception as e:
+        return internal_server_error(errormsg=str(e))
+
+    # Connect the Server
+    status, msg = conn.connect()
+    if not status:
+        return internal_server_error(errormsg=str(msg))
+
+    user = manager.user_info
+
+    status_in, rid_pre = conn.execute_scalar("SHOW shared_preload_libraries")
+    if not status_in:
+        return internal_server_error(
+            gettext("Could not fetch profiler plugin information.")
+        )
+
+    # Need to check if plugin is not loaded or not with "plprofiler" string
+    if "plprofiler" in rid_pre:
+        msg = gettext(
+            "The profiler plugin is enabled globally. "
+            "Please remove the plugin to the shared_preload_libraries "
+            "setting in the postgresql.conf file and restart the "
+            "database server for direct profiling."
+        )
+        current_app.logger.debug(msg)
+        return internal_server_error(msg)
+
+
+    # Set the template path required to read the sql files
+    template_path = 'profiler/sql'
+
+    pfl_inst = ProfilerInstance(trans_id)
+    if request.method == 'POST':
+        data = json.loads(request.values['data'], encoding='utf-8')
+        if data:
+            pfl_inst.function_data['args_value'] = data
+
+    pfl_inst.profiler_data = {
+        'conn_id': conn_id,
+        'server_id': sid,
+        'database_id': did,
+        'schema_id': scid,
+        'profile_type': 'direct',
+        'function_id': func_id,
+        'function_name': pfl_inst.function_data['name'],
+        'restart_profile': 0
+    }
+
+    pfl_inst.config = {
+        'name': pfl_inst.function_data['name'],
+        'title': 'Pl/Profiler Report for ' + pfl_inst.function_data['name'],
+        'tabstop': '8',
+        'svg_width': '1200',
+        'table_width': '80%',
+        'desc': ''
+    }
+
+    pfl_inst.update_session()
+
+    return make_json_response(data={'status': status,
+                                    'profilerTransId': trans_id})
+
 @blueprint.route('/profile/<int:trans_id>', methods=['GET'], endpoint='profile')
 @login_required
 def profile_new(trans_id):
@@ -398,197 +593,6 @@ def profile_new(trans_id):
         function_name_with_arguments=function_name_with_arguments,
         layout=layout
     )
-
-@blueprint.route(
-    '/initialize_target_indirect/<int:trans_id>/<int:sid>/<int:did>/',
-    methods=['GET', 'POST'],
-    endpoint='initialize_target_indirect'
-)
-@login_required
-def initialize_target_indirect(trans_id, sid, did):
-    """
-    This method is responsible for creating an asynchronous connection
-    for indirect profiling.
-
-    Parameters:
-        profile_type
-        - Type of profiling (Direct or Indirect)
-        trans_id
-        - The unique transaction id for a profiler instance
-        sid
-        - Server Id
-        did
-        - Database Id
-        scid
-        - Schema Id
-    Returns:
-        JSON response with the transaction id
-    """
-
-    # Create asynchronous connection using random connection id.
-    conn_id = str(random.randint(1, 9999999))
-    try:
-        manager = get_driver(PG_DEFAULT_DRIVER).connection_manager(sid)
-        conn = manager.connection(did=did, conn_id=conn_id)
-    except Exception as e:
-        return internal_server_error(errormsg=str(e))
-
-    # Connect the Server
-    status, msg = conn.connect()
-    if not status:
-        return internal_server_error(errormsg=str(msg))
-
-    user = manager.user_info
-
-    status_in, rid_pre = conn.execute_scalar("SHOW shared_preload_libraries")
-    if not status_in:
-        return internal_server_error(
-            gettext("Could not fetch profiler plugin information.")
-        )
-
-    pfl_inst = ProfilerInstance(trans_id)
-    if request.method == 'POST':
-        data = json.loads(request.values['data'], encoding='utf-8')
-
-    if "plprofiler" not in rid_pre:
-        msg = gettext(
-            "The profiler plugin is not enabled. "
-            "Please add the plugin to the shared_preload_libraries "
-            "setting in the postgresql.conf file and restart the "
-            "database server for indirect profiling."
-        )
-        current_app.logger.debug(msg)
-        return internal_server_error(msg)
-
-    # TODO: Input checking
-    try:
-        pfl_inst.profiler_data = {
-            'duration': data[0]['value'],
-            'interval': data[1]['value'],
-            'pid': data[2]['value']
-        }
-    except Exception as e:
-        return make_json_response(
-            data={
-                'status': 'ERROR',
-                'result': 'Invalid input type'
-            }
-        )
-
-    pfl_inst.profiler_data['conn_id'] = conn_id
-    pfl_inst.profiler_data['sid'] = sid
-    pfl_inst.profiler_data['did'] = did
-    pfl_inst.profiler_data['function_name'] = 'Indirect'
-    pfl_inst.profiler_data['profile_type'] = 'indirect'
-    pfl_inst.profiler_data['restart_profile'] = 0
-
-    pfl_inst.config = {
-        'name': 'Indirect',
-        'title': 'Pl/Profiler Report for ' + conn.as_dict()['database'],
-        'tabstop': '8',
-        'svg_width': '1200',
-        'table_width': '80%',
-        'desc': ''
-    }
-
-    pfl_inst.update_session()
-
-    return make_json_response(data={'status': status,
-                                    'profilerTransId': trans_id})
-
-@blueprint.route(
-    '/initialize_target/<int:trans_id>/<int:sid>/<int:did>/'
-    '<int:scid>/<int:func_id>',
-    methods=['GET', 'POST'],
-    endpoint='initialize_target_for_function'
-)
-@login_required
-def initialize_target(trans_id, sid, did,
-                      scid, func_id):
-    """
-    initialize_target(sid, did, scid, func_id)
-
-    This method is responsible for creating an asynchronous connection
-    for direct profiling.
-
-    Parameters:
-        sid
-        - Server Id
-        did
-        - Database Id
-        scid
-        - Schema Id
-        func_id
-        - Function Id
-
-    """
-
-    # Create asynchronous connection using random connection id.
-    conn_id = str(random.randint(1, 9999999))
-    try:
-        manager = get_driver(PG_DEFAULT_DRIVER).connection_manager(sid)
-        conn = manager.connection(did=did, conn_id=conn_id)
-    except Exception as e:
-        return internal_server_error(errormsg=str(e))
-
-    # Connect the Server
-    status, msg = conn.connect()
-    if not status:
-        return internal_server_error(errormsg=str(msg))
-
-    user = manager.user_info
-
-    status_in, rid_pre = conn.execute_scalar("SHOW shared_preload_libraries")
-    if not status_in:
-        return internal_server_error(
-            gettext("Could not fetch profiler plugin information.")
-        )
-
-    # Need to check if plugin is not loaded or not with "plprofiler" string
-    if "plprofiler" in rid_pre:
-        msg = gettext(
-            "The profiler plugin is enabled globally. "
-            "Please remove the plugin to the shared_preload_libraries "
-            "setting in the postgresql.conf file and restart the "
-            "database server for direct profiling."
-        )
-        current_app.logger.debug(msg)
-        return internal_server_error(msg)
-
-
-    # Set the template path required to read the sql files
-    template_path = 'profiler/sql'
-
-    pfl_inst = ProfilerInstance(trans_id)
-    if request.method == 'POST':
-        data = json.loads(request.values['data'], encoding='utf-8')
-        if data:
-            pfl_inst.function_data['args_value'] = data
-
-    pfl_inst.profiler_data = {
-        'conn_id': conn_id,
-        'server_id': sid,
-        'database_id': did,
-        'schema_id': scid,
-        'profile_type': 'direct',
-        'function_id': func_id,
-        'function_name': pfl_inst.function_data['name'],
-        'restart_profile': 0
-    }
-
-    pfl_inst.config = {
-        'name': pfl_inst.function_data['name'],
-        'title': 'Pl/Profiler Report for ' + pfl_inst.function_data['name'],
-        'tabstop': '8',
-        'svg_width': '1200',
-        'table_width': '80%',
-        'desc': ''
-    }
-
-    pfl_inst.update_session()
-
-    return make_json_response(data={'status': status,
-                                    'profilerTransId': trans_id})
 
 @blueprint.route(
     '/start_monitor/<int:trans_id>', methods=['GET'],

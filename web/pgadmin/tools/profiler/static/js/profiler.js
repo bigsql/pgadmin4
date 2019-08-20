@@ -104,6 +104,17 @@ define([
       });
 
     },
+
+    /**
+     * Determines whether a function is able to profiled. In order for a function to be
+     * profilable, it must be available in the database and be in plpgsql language
+     *
+     * @param {Object} itemData  information about the function stored on the server
+     * @param {Object} item      information about the function used to traverse the
+     *                           server browser tree
+     *
+     * @returns {boolean} true if the given function is profilable, false otherwise
+     */
     can_profile: function(itemData, item) {
       const t = pgBrowser.tree;
       let i = item,
@@ -126,11 +137,6 @@ define([
       if (!d_)
         return false;
 
-      // For trigger node, language will be undefined
-      if (d_.language == undefined && d_._type == 'trigger'){
-        return true;
-      }
-
       if (d_.language != 'plpgsql') {
         return false;
       }
@@ -138,7 +144,18 @@ define([
       return true;
     },
 
-    generate_url: function(_url, treeInfo, node) {
+    /**
+     * Helper function that generates a url for a given node
+     *
+     * @param {String} _url     the url endpoint base that will be used for generation
+     * @param {Object} treeInfo information about the function in the server browser tree
+     * @param {Object} node     the specific server browser item that will be used to extract
+     *                          server id, database id, etc.
+     *
+     * @returns {String} URL for AJAX request to server, customized based on node type, server id,
+     *                   database id, function id
+     */
+    _generate_url: function(_url, treeInfo, node) {
       let ref = '';
 
       _.each(
@@ -170,7 +187,13 @@ define([
       });
     },
 
-    get_options: function(args, item) {
+    /**
+     * Callback function that will open up an in-browser window for the user to input
+     * values in regards to global monitoring
+     *
+     * @param {Object} item
+     */
+    get_options: function(item) {
       const t = pgBrowser.tree,
         i = item || t.selected(),
         d = i && i.length == 1 ? t.itemData(i) : undefined,
@@ -183,7 +206,7 @@ define([
       const treeInfo = node.getTreeNodeHierarchy.apply(node, [i]);
 
       $.ajax({
-        url: this.generate_url('init', treeInfo, node),
+        url: this._generate_url('init', treeInfo, node),
         cache: false,
       })
         .done(function(res) {
@@ -193,11 +216,16 @@ define([
 
     },
 
-    /*
-      Get the function information for the direct profiling to display the functions arguments and  other informations
-      in the user input dialog
-    */
+    /**
+     * Callback function for function profiling that will determine if a function requires
+     * arguments then prompts the user to input values for the arguments (if necessary)
+     *
+     * @param {Object} item information about the function used to traverse the
+     *                      server browser tree
+     */
     get_function_information: function(args, item) {
+      console.warn(args);
+
       const t = pgBrowser.tree,
         i = item || t.selected(),
         d = i && i.length == 1 ? t.itemData(i) : undefined,
@@ -210,7 +238,7 @@ define([
       // Generate the URL to create a profiler instance
       const treeInfo = node.getTreeNodeHierarchy.apply(node, [i]);
       $.ajax({
-        url: this.generate_url('init', treeInfo, node),
+        url: self._generate_url('init', treeInfo, node),
         cache: false,
       })
         .done(function(res) {

@@ -15,18 +15,18 @@ define([
   gettext, url_for, $, _, Backbone, Alertify, pgAdmin, pgBrowser, Backgrid,
 ) {
 
-  var wcDocker = window.wcDocker;
+  const wcDocker = window.wcDocker;
 
   /*
    * Function used to return the respective Backgrid control based on the data type
    * of function input argument.
    */
-  var cellFunction = function(model) {
-    var variable_type = model.get('type');
+  const cellFunction = function(model) {
+    const variable_type = model.get('type');
 
     // if variable type is an array then we need to render the custom control to take the input from user.
     if (variable_type.indexOf('[]') != -1) {
-      var data_type = variable_type.replace('[]' ,'');
+      const data_type = variable_type.replace('[]' ,'');
 
       switch (data_type) {
       case 'boolean':
@@ -103,8 +103,8 @@ define([
    * Function used to return the respective Backgrid string or boolean control based on the data type
    * of function input argument.
    */
-  var cellExprControlFunction = function(model) {
-    var variable_type = model.get('type');
+  const cellExprControlFunction = function(model) {
+    const variable_type = model.get('type');
     if (variable_type.indexOf('[]') != -1) {
       return Backgrid.StringCell;
     }
@@ -115,7 +115,7 @@ define([
    *  ProfilerInputArgsModel used to represent input parameters for the function to profile
    *  for function objects.
    **/
-  var ProfilerInputArgsModel = Backbone.Model.extend({
+  const ProfilerInputArgsModel = Backbone.Model.extend({
     defaults: {
       name: undefined,
       type: undefined,
@@ -129,7 +129,7 @@ define([
       if (_.isUndefined(this.get('value')) ||
         _.isNull(this.get('value')) ||
         String(this.get('value')).replace(/^\s+|\s+$/g, '') == '') {
-        var msg = gettext('Please enter a value for the parameter.');
+        const msg = gettext('Please enter a value for the parameter.');
         this.errorModel.set('value', msg);
         return msg;
       } else {
@@ -141,12 +141,12 @@ define([
   });
 
   // Collection which contains the model for function informations.
-  var ProfilerInputArgCollections = Backbone.Collection.extend({
+  const ProfilerInputArgCollections = Backbone.Collection.extend({
     model: ProfilerInputArgsModel,
   });
 
   // function will enable/disable the use_default column based on the value received.
-  var disableDefaultCell = function(d) {
+  const disableDefaultCell = function(d) {
     if (d instanceof Backbone.Model) {
       return d.get('use_default');
     }
@@ -154,9 +154,9 @@ define([
   };
 
   // Enable/Disable the control based on the array data type of the function input arguments
-  var disableExpressionControl = function(d) {
+  const disableExpressionControl = function(d) {
     if (d instanceof Backbone.Model) {
-      var argType = d.get('type');
+      const argType = d.get('type');
       if (argType.indexOf('[]') != -1) {
         return false;
       }
@@ -165,7 +165,7 @@ define([
   };
 
 
-  var res = function(profile_info, restart_profile, trans_id) {
+  const res = function(profile_info, restart_profile, trans_id) {
     if (!Alertify.profilerInputArgsDialog) {
       Alertify.dialog('profilerInputArgsDialog', function factory() {
         return {
@@ -180,21 +180,26 @@ define([
             this.set('trans_id', trans_id);
 
             // Variables to store the data sent from sqlite database
-            var func_args_data = this.func_args_data = [];
+            const func_args_data = this.func_args_data = [];
 
             // As we are not getting pgBrowser.tree when we profile again
             // so tree info will be updated from the server data
+            let i = void 0;
+            let _Url = void 0;
+            let d = void 0;
+
             if (restart_profile == 0) {
-              var t = pgBrowser.tree,
-                i = t.selected(),
-                d = i && i.length == 1 ? t.itemData(i) : undefined,
-                node = d && pgBrowser.Nodes[d._type];
+              const t = pgBrowser.tree;
+
+              i = t.selected();
+              d = i && i.length == 1 ? t.itemData(i) : undefined;
+
+              let node = d && pgBrowser.Nodes[d._type];
 
               if (!d)
                 return;
 
-              var treeInfo = node.getTreeNodeHierarchy.apply(node, [i]),
-                _Url;
+              const treeInfo = node.getTreeNodeHierarchy.apply(node, [i]);
 
               if (d._type == 'function') {
                 _Url = url_for('profiler.get_arguments', {
@@ -248,14 +253,11 @@ define([
                 );
               });
 
-            var argname, argtype, argmode, default_args_count, default_args, arg_cnt;
+            let argmode = void 0;
+            let default_args = void 0;
+            let arg_cnt = void 0;
 
-            var value_header = Backgrid.HeaderCell.extend({
-              // Add fixed width to the "value" column
-              className: 'width_percent_25',
-            });
-
-            var def_val_list = [],
+            const def_val_list = [],
               gridCols = [{
                 name: 'name',
                 label: gettext('Name'),
@@ -289,7 +291,10 @@ define([
                 type: 'text',
                 editable: true,
                 cellFunction: cellFunction,
-                headerCell: value_header,
+                headerCell: Backgrid.HeaderCell.extend({
+                  // Add fixed width to the "value" column
+                  className: 'width_percent_25',
+                }),
               },
               {
                 name: 'use_default',
@@ -307,46 +312,45 @@ define([
               },
               ];
 
-            var my_obj = [];
-            var func_obj = []; // For getting/setting params from sqlite db
+            const my_obj = [];
+            const func_obj = []; // For getting/setting params from sqlite db
 
             // Below will calculate the input argument id required to store in sqlite database
-            var input_arg_id = this.input_arg_id = [],
-              k;
+            const input_arg_id = this.input_arg_id = [];
+
             if (profile_info['proargmodes'] != null) {
-              var argmode_1 = profile_info['proargmodes'].split(',');
-              for (k = 0; k < argmode_1.length; k++) {
+              const argmode_1 = profile_info['proargmodes'].split(',');
+              for (let k = 0; k < argmode_1.length; k++) {
                 if (argmode_1[k] == 'i' || argmode_1[k] == 'b') {
                   input_arg_id.push(k);
                 }
               }
             } else {
-              var argtype_1 = profile_info['proargtypenames'].split(',');
-              for (k = 0; k < argtype_1.length; k++) {
+              const argtype_1 = profile_info['proargtypenames'].split(',');
+              for (let k = 0; k < argtype_1.length; k++) {
                 input_arg_id.push(k);
               }
             }
 
-            argtype = profile_info['proargtypenames'].split(',');
+            let argtype = profile_info['proargtypenames'].split(',');
 
             if (profile_info['proargmodes'] != null) {
               argmode = profile_info['proargmodes'].split(',');
             }
 
             if (profile_info['pronargdefaults']) {
-              default_args_count = profile_info['pronargdefaults'];
+              let default_args_count = profile_info['pronargdefaults'];
               default_args = profile_info['proargdefaults'].split(',');
               arg_cnt = default_args_count;
             }
 
-            var vals, values, index;
-            var use_def_value, j;
+            let use_def_value = void 0;
 
             if (profile_info['proargnames'] != null) {
-              argname = profile_info['proargnames'].split(',');
+              let argname = profile_info['proargnames'].split(',');
 
               // It will assign default values to "Default value" column
-              for (j = (argname.length - 1); j >= 0; j--) {
+              for (let j = (argname.length - 1); j >= 0; j--) {
                 if (profile_info['proargmodes'] != null) {
                   if (argmode[j] == 'i' || argmode[j] == 'b') {
                     if (arg_cnt) {
@@ -365,7 +369,7 @@ define([
               }
 
               if (argtype.length != 0) {
-                for (i = 0; i < argtype.length; i++) {
+                for (let i = 0; i < argtype.length; i++) {
                   if (profile_info['proargmodes'] != null) {
                     if (argmode[i] == 'i' || argmode[i] == 'b') {
                       use_def_value = false;
@@ -396,15 +400,15 @@ define([
 
               // Need to update the func_obj variable from sqlite database if available
               if (func_args_data.length != 0) {
-                for (i = 0; i < func_args_data.length; i++) {
+                for (let i = 0; i < func_args_data.length; i++) {
                   if (profile_info['proargmodes'] != null) {
                     continue;
                   }
 
-                  index = func_args_data[i]['arg_id'];
-                  values = [];
+                  let index = func_args_data[i]['arg_id'];
+                  let values = [];
                   if (argtype[index].indexOf('[]') != -1) {
-                    vals = func_args_data[i]['value'].split(',');
+                    let vals = func_args_data[i]['value'].split(',');
                     _.each(vals, function(val) {
                       values.push({
                         'value': val,
@@ -430,15 +434,15 @@ define([
                Generate the name parameter if function do not have arguments name
                like pflparam1, pflparam2 etc.
               */
-              var myargname = [];
+              const myargname = [];
 
-              for (i = 0; i < argtype.length; i++) {
+              for (let i = 0; i < argtype.length; i++) {
                 myargname[i] = 'pflparam' + (i + 1);
               }
 
               // If there is no default arguments
               if (!profile_info['pronargdefaults']) {
-                for (i = 0; i < argtype.length; i++) {
+                for (let i = 0; i < argtype.length; i++) {
                   my_obj.push({
                     'name': myargname[i],
                     'type': argtype[i],
@@ -450,7 +454,7 @@ define([
               } else {
                 // If there is default arguments
                 //Below logic will assign default values to "Default value" column
-                for (j = (myargname.length - 1); j >= 0; j--) {
+                for (let j = (myargname.length - 1); j >= 0; j--) {
                   if (profile_info['proargmodes'] == null) {
                     if (arg_cnt) {
                       arg_cnt = arg_cnt - 1;
@@ -468,7 +472,7 @@ define([
                   }
                 }
 
-                for (i = 0; i < argtype.length; i++) {
+                for (let i = 0; i < argtype.length; i++) {
                   if (profile_info['proargmodes'] == null) {
                     use_def_value = false;
                     if (def_val_list[i] != '<No default value>') {
@@ -497,11 +501,11 @@ define([
 
                   // Need to update the func_obj variable from sqlite database if available
                   if (func_args_data.length != 0) {
-                    for (i = 0; i < func_args_data.length; i++) {
-                      index = func_args_data[i]['arg_id'];
-                      values = [];
+                    for (let i = 0; i < func_args_data.length; i++) {
+                      let index = func_args_data[i]['arg_id'];
+                      let values = [];
                       if (argtype[index].indexOf('[]') != -1) {
-                        vals = func_args_data[i]['value'].split(',');
+                        let vals = func_args_data[i]['value'].split(',');
                         _.each(vals, function(val) {
                           values.push({
                             'value': val,
@@ -540,7 +544,7 @@ define([
               this.grid.remove();
               this.grid = null;
             }
-            var grid = this.grid = new Backgrid.Grid({
+            const grid = this.grid = new Backgrid.Grid({
               columns: gridCols,
               collection: this.profilerInputArgsColl,
               className: 'backgrid table table-bordered table-noouter-border table-bottom-border',
@@ -551,7 +555,7 @@ define([
 
             // For keyboard navigation in the grid
             // we'll set focus on checkbox from the first row if any
-            var grid_checkbox = $(grid.el).find('input:checkbox').first();
+            const grid_checkbox = $(grid.el).find('input:checkbox').first();
             if (grid_checkbox.length) {
               setTimeout(function() {
                 grid_checkbox.trigger('click');
@@ -594,25 +598,28 @@ define([
             if (e.button.text === gettext('Profile')) {
               // Initialize the target once the profile button is clicked and
               // create asynchronous connection and unique transaction ID
-              var self = this;
+              const self = this;
 
               // If the profiling is started again then treeInfo is already
               // stored in this.data so we can use the same.
+              let treeInfo = void 0;
+              let i = void 0;
+              let d = void 0;
               if (self.setting('restart_profile') == 0) {
-                var t = pgBrowser.tree,
-                  i = t.selected(),
-                  d = i && i.length == 1 ? t.itemData(i) : undefined,
-                  node = d && pgBrowser.Nodes[d._type];
+                const t = pgBrowser.tree;
+                i = t.selected();
+                d = i && i.length == 1 ? t.itemData(i) : void 0;
+                let node = d && pgBrowser.Nodes[d._type];
 
                 if (!d)
                   return;
 
-                var treeInfo = node.getTreeNodeHierarchy.apply(node, [i]);
+                treeInfo = node.getTreeNodeHierarchy.apply(node, [i]);
               }
 
-              var args_value_list = [];
-              var sqlite_func_args_list = this.sqlite_func_args_list = [];
-              var int_count = 0;
+              const args_value_list = [];
+              const sqlite_func_args_list = this.sqlite_func_args_list = [];
+              let int_count = 0;
 
               // Store arguments values into args_value_list
               this.grid.collection.each(function(m) {
@@ -642,7 +649,7 @@ define([
                 }
 
                 if (self.setting('restart_profile') == 0) {
-                  var f_id;
+                  let f_id = void 0;
                   if (d._type == 'function') {
                     f_id = treeInfo.function._id;
                   } else if (d._type == 'procedure') {
@@ -679,12 +686,13 @@ define([
                 int_count = int_count + 1;
               });
 
-              var baseUrl;
+              let baseUrl = void 0;
 
               // TODO: At this point, we are assuming that profiling is not starting again
               if (self.setting('restart_profile') == 0) {
                 if (d._type == 'function') {
                   baseUrl = url_for('profiler.initialize_target_for_function', {
+                    'profile_type': 'direct',
                     'trans_id': self.setting('trans_id'),
                     'sid': treeInfo.server._id,
                     'did': treeInfo.database._id,
@@ -693,6 +701,7 @@ define([
                   });
                 } else if (d._type == 'procedure') {
                   baseUrl = url_for('profiler.initialize_target_for_function', {
+                    'profile_type': 'direct',
                     'trans_id': self.setting('trans_id'),
                     'sid': treeInfo.server._id,
                     'did': treeInfo.database._id,
@@ -709,7 +718,7 @@ define([
                   },
                 })
                   .done(function(res) {
-                    var url = url_for(
+                    const url = url_for(
                       'profiler.profile', {
                         'trans_id': res.data.profilerTransId,
                       }
@@ -725,7 +734,7 @@ define([
                         });
 
                       // Create the profiler panel as per the data received from user input dialog.
-                      var dashboardPanel = pgBrowser.docker.findPanels('properties'),
+                      const dashboardPanel = pgBrowser.docker.findPanels('properties'),
                         panel = pgBrowser.docker.addPanel(
                           'frm_profiler', wcDocker.DOCK.STACKED, dashboardPanel[0]
                         );
@@ -734,7 +743,7 @@ define([
 
                       // Panel Closed event
                       panel.on(wcDocker.EVENT.CLOSED, function() {
-                        var closeUrl = url_for('profiler.close', {
+                        let closeUrl = url_for('profiler.close', {
                           'trans_id': res.data.profilerTransId,
                         });
                         $.ajax({
@@ -744,7 +753,7 @@ define([
                       });
                     }
 
-                    var _Url;
+                    let _Url = '';
 
                     if (d._type == 'function') {
                       _Url = url_for('profiler.set_arguments', {
@@ -787,7 +796,7 @@ define([
                 // If the profiling is starting again, all we need to do is set the arguments
                 // and run the profile
 
-                var _Url = url_for('profiler.set_arguments', {
+                const _Url = url_for('profiler.set_arguments', {
                   'sid': profile_info.server_id,
                   'did': profile_info.database_id,
                   'scid': profile_info.schema_id,
@@ -814,7 +823,7 @@ define([
               return true;
             }
 
-            if (e.button.text === gettext('Cancel') && self.setting('restart_profile') === 0) {
+            if (e.button.text === gettext('Cancel') && this.setting('restart_profile') === 0) {
               /* Clear the trans id */
               $.ajax({
                 method: 'DELETE',
@@ -852,9 +861,9 @@ define([
 
                 return function() {
 
-                  var enable_btn = false;
+                  let enable_btn = false;
 
-                  for (var i = 0; i < this.collection.length; i++) {
+                  for (let i = 0; i < this.collection.length; i++) {
 
                     if (this.collection.models[i].get('is_null')) {
                       obj.__internal.buttons[1].element.disabled = false;

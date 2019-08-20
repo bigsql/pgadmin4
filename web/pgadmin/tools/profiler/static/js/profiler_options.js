@@ -215,7 +215,7 @@ define([
             }
 
 
-            if (e.button.text === gettext('Cancel')) {
+            if (e.button.text === gettext('Cancel') && this.setting('restart_profile') === 0) {
               /* Clear the trans id */
               $.ajax({
                 method: 'DELETE',
