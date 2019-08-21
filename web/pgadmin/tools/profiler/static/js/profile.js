@@ -55,8 +55,8 @@ define([
        * Sends a message to the server to start direct profiling, then if successful, updates the
        * results, updates the reports, and opens the newly created report in a new tab
        *
-       * @param {int} trans_id - The unique transaction id for the already initialize profiling
-       *  instance
+       * @param {int} trans_id The unique transaction id for the already initialize profiling
+       *                       instance
        */
       start_execution: function(trans_id) {
         $.ajax({
@@ -114,8 +114,8 @@ define([
        * Sends a message to the server to start indirect profiling, then if successful,
        * updates the reports, and opens the newly created report in a new tab
        *
-       * @param {int} trans_id - The unique transaction id for the already initialize profiling
-       *  instance
+       * @param {int} trans_id The unique transaction id for the already initialize profiling
+       *                       instance
        */
       start_monitor : function(trans_id) {
         let self = this;
@@ -185,7 +185,7 @@ define([
       },
 
       /**
-       *
+       * TODO
        *
        */
       restart : function(trans_id) {
@@ -226,8 +226,8 @@ define([
       /**
        * Updates the results panel for the profiling window
        *
-       * @param {Array} columns - Contains the names of the columns for the results panel
-       * @param {Array} result - Contains the values of the columns for the results panel
+       * @param {Array} columns Contains the names of the columns for the results panel
+       * @param {Array} result  Contains the values of the columns for the results panel
        */
       add_results : function(columns, result) {
         let self = this;
@@ -312,7 +312,7 @@ define([
        * Adds the retrieved parameters from the server to the panel. Also initializes the grid
        * that contains the parameters
        *
-       * @param {Array} result - The JSON containing information about the parameters
+       * @param {Array} result The JSON containing information about the parameters
        */
       _add_parameters: function(result) {
         var self = this;
@@ -653,52 +653,8 @@ define([
                 // report data by setting innerHTML. Thus, we extract the scripts by hand and
                 // add them manually
 
-                // At this point, although the scripts can be correctly added, they do not function
-                // as intended because of encapsulation between the DOM and shadow DOM.
-
-                // TODO: Fix Styling
-                const scripts = [];
-                const styleSheets = [];
-
-                const resHTML = res.split(' ');
-
-                let scriptSave = false;
-                let styleSave  = false;
-
-                let currentScript = '';
-                let currentStyle  = '';
-                for (let i = 0; i < resHTML.length; i = i + 1) {
-                  const current = resHTML[i].trim();
-
-                  if (current === '<script') {
-                    scriptSave = true;
-                    i = i + 1;  // Skip 1 because of 'language = x'
-                    continue;
-                  }
-                  if (current === '</script>') {
-                    scriptSave = false;
-                    scripts.push(currentScript);
-                    currentScript = '';
-                    continue;
-                  }
-                  if (scriptSave) currentScript = currentScript +  ' ' + resHTML[i];
-
-                  if (current === '<style>') {
-                    styleSave = true;
-                    continue;
-                  } else if (current === '<style') {
-                    styleSave = true;
-                    i = i + 1;
-                    continue;
-                  }
-                  if (current === '</style>') {
-                    styleSave = false;
-                    styleSheets.push(currentStyle);
-                    currentStyle = '';
-                    continue;
-                  }
-                  if (styleSave) currentStyle = currentStyle + ' ' + resHTML[i];
-                }
+                // The scripts do not function at all
+                // because of encapsulation between the DOM and shadow DOM.
 
                 let container = document.createElement('div');
                 container.attachShadow({mode: 'open'});
@@ -716,10 +672,12 @@ define([
                   container.shadowRoot.appendChild(styleSheet);
                 });
 
-                pgTools.Profile.current_report_panel.$container.find('.current_report').html('');
-                pgTools.Profile.current_report_panel.$container.find('.current_report').append(container);
+                const current_reports = pgTools.Profile.current_report_panel;
 
-                pgTools.Profile.current_report_panel.focus();
+                current_reports.$container.find('.current_report').html('');
+                current_reports.$container.find('.current_report').append(container);
+
+                current_reports.focus();
               })
               .fail(function() {
                 Alertify.alert(
@@ -860,7 +818,7 @@ define([
     on_start: function(e) {
       e.stopPropagation();
 
-      // TODO
+      // TODO:
       // if (pgTools.Profile.profile_completed) {
       //   if (pgTools.Profile.profile_type == 1) {
       //     controller.restart(pgTools.Profile.trans_id);
@@ -996,6 +954,13 @@ define([
       }
     },
 
+    /**
+     * Creates the default panel layout. This will be code editorpanel at the top, with the
+     * current report panel stacked next to it. Then the parameters panel at the bottom, with
+     * the results and saved reports panels stacked on top of it.
+     *
+     * @param {Object} docker The instance of the wcDocker that panels will be added to
+     */
     buildDefaultLayout: function(docker) {
       let code_editor_panel = docker.addPanel('code', wcDocker.DOCK.TOP);
 
@@ -1009,7 +974,11 @@ define([
       });
     },
 
-    // Create the profiler layout with splitter and display the appropriate data received from server.
+    /**
+     * Creates the profiler layout with splitter and display the appropriate data
+     * received from server.
+     *
+     */
     initializePanels: function() {
       let self = this;
       this.registerPanel(

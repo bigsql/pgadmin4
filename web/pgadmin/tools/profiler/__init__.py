@@ -326,8 +326,6 @@ def initialize_target_indirect(trans_id, sid, did):
         - Server Id
         did
         - Database Id
-        scid
-        - Schema Id
     Returns:
         JSON response with the transaction id
     """
@@ -372,7 +370,7 @@ def initialize_target_indirect(trans_id, sid, did):
         pfl_inst.profiler_data = {
             'duration': data[0]['value'],
             'interval': data[1]['value'],
-            'pid': data[2]['value']
+            'pid': data[2]['value'] if 'value' in data[2] else None
         }
     except Exception as e:
         return make_json_response(
@@ -383,12 +381,10 @@ def initialize_target_indirect(trans_id, sid, did):
         )
 
     pfl_inst.profiler_data['conn_id'] = conn_id
-    pfl_inst.profiler_data['sid'] = sid
-    pfl_inst.profiler_data['did'] = did
-    pfl_inst.profiler_data['scid'] = scid
+    pfl_inst.profiler_data['server_id'] = sid
+    pfl_inst.profiler_data['database_id'] = did
     pfl_inst.profiler_data['function_name'] = 'Indirect'
     pfl_inst.profiler_data['profile_type'] = 'indirect'
-    pfl_inst.profiler_data['restart_profile'] = 0
 
     pfl_inst.config = {
         'name': 'Indirect',
@@ -484,7 +480,6 @@ def initialize_target(trans_id, sid, did,
         'profile_type': 'direct',
         'function_id': func_id,
         'function_name': pfl_inst.function_data['name'],
-        'restart_profile': 0
     }
 
     pfl_inst.config = {
@@ -510,8 +505,7 @@ def profile_new(trans_id):
 
     Parameters:
         trans_id
-        - The unique transaction id that corresponds with the previously
-          initialized profiler instance
+        - unique transaction id
     Returns: Generated html template with the new window to start profiling
     """
     pfl_inst = ProfilerInstance(trans_id)
@@ -817,9 +811,8 @@ def close(trans_id):
     """
     close(trans_id)
 
-    This method is used to close the asynchronous connection
-    and remove the information of unique transaction id from
-    the session variable.
+    Closes the asynchronous connection and remove the information of
+    unique transaction id from the session variable.
 
     Parameters:
         trans_id
@@ -1106,7 +1099,7 @@ def _save_report(report_data, config, dbname, profile_type, duration):
     report_data['config'] = config
 
 
-    now = datetime.now().strftime("%Y-%m-%d;%H:%M")
+    now = datetime.now().strftime("%Y-%m-%d/%H:%M")
     path = os.path.dirname(os.path.abspath(current_app.root_path))
     path = os.path.join(path, 'pgadmin', 'instance')
     path = os.path.join(path, config['name'] + '@' + now + '.html')
@@ -1252,7 +1245,7 @@ def get_arguments_sqlite(sid, did, scid, func_id):
     """
     get_arguments_sqlite(sid, did, scid, func_id)
 
-    This method is responsible to get the function arguments saved to sqlite
+    Gets the function arguments saved to sqlite
     database during profiling
 
     Parameters:
@@ -1265,7 +1258,7 @@ def get_arguments_sqlite(sid, did, scid, func_id):
         func_id
         - Function Id
     Returns:
-        TODO
+        Formated JSON response of information about each argument
     """
     PflFuncArgsCount = ProfilerFunctionArguments.query.filter_by(
         server_id=sid,
@@ -1335,7 +1328,7 @@ def set_arguments_sqlite(sid, did, scid, func_id):
         func_id
         - Function Id
     Returns:
-        TODO
+        JSON response to communicate if argument setting was successful
     """
 
     if request.values['data']:
@@ -1516,7 +1509,7 @@ def get_parameters(trans_id):
                     {'name': 'PID',
                      'type': 'Monitoring Parameter',
                      'value': pfl_inst.profiler_data['pid'] \
-                              if pfl_inst.profiler_data['pid'] != 'No PID specified' \
+                              if pfl_inst.profiler_data['pid'] != None \
                               else pfl_inst.profiler_data['pid']}
                 ]
             }

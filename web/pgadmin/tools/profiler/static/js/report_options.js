@@ -14,7 +14,7 @@ define([
   gettext, url_for, $, _, Backbone, Alertify, pgAdmin, pgBrowser, Backgrid
 ) {
 
-  var ProfilerReportOptionsModel = Backbone.Model.extend({
+  const ProfilerReportOptionsModel = Backbone.Model.extend({
     defaults: {
       option: undefined,
       value: undefined,
@@ -23,7 +23,7 @@ define([
       if (_.isUndefined(this.get('value')) ||
         _.isNull(this.get('value')) ||
         String(this.get('value')).replace(/^\s+|\s+$/g, '') == '') {
-        var msg = gettext('Please enter a value for the parameter.');
+        const msg = gettext('Please enter a value for the parameter.');
         this.errorModel.set('value', msg);
         return msg;
       } else {
@@ -34,11 +34,11 @@ define([
   });
 
   // Collection which contains the model for function informations.
-  var ProfilerReportOptionsCollections = Backbone.Collection.extend({
+  const ProfilerReportOptionsCollections = Backbone.Collection.extend({
     model: ProfilerReportOptionsModel,
   });
 
-  var res = function(trans_id) {
+  const res = function(trans_id) {
     if (!Alertify.profilerReportOptionsDialog) {
       Alertify.dialog('profilerReportOptionsDialog', function factory() {
         return {
@@ -56,7 +56,7 @@ define([
             // other functions other than main function.
             this.set('trans_id', trans_id);
 
-            var gridCols = [
+            const gridCols = [
               {
                 name       : 'option',
                 label      : gettext('Option'),
@@ -76,23 +76,18 @@ define([
               },
             ];
 
-            var configUrl = url_for(
-              'profiler.get_config', {
-                'trans_id': trans_id,
-              });
-
-            var self = this;
+            const self = this;
 
             $.ajax({
-              url    : configUrl,
+              url    : url_for('profiler.get_config', { 'trans_id': trans_id }),
               method : 'GET',
               async  : false,
             })
               .done(function(res) {
                 if (res.data.status == 'Success') {
-                  var param_obj = [];
+                  const param_obj = [];
                   if (res.data.result.length != 0) {
-                    for (var i = 0; i < res.data.result.length; i++) {
+                    for (let i = 0; i < res.data.result.length; i++) {
                       param_obj.push({
                         'option' : res.data.result[i].option,
                         'value'  : res.data.result[i].value,
@@ -108,7 +103,7 @@ define([
                     self.grid.remove();
                     self.grid = null;
                   }
-                  var grid = self.grid = new Backgrid.Grid({
+                  const grid = self.grid = new Backgrid.Grid({
                     columns    : gridCols,
                     collection : new ProfilerReportOptionsCollections(param_obj),
                     className  : 'backgrid table table-bordered table-noouter-border table-bottom-border',
@@ -158,9 +153,9 @@ define([
             if (e.button.text === gettext('Submit')) {
               // Initialize the target once the debug button is clicked and
               // create asynchronous connection and unique transaction ID
-              var self = this;
+              const self = this;
 
-              var options_value_list = [];
+              const options_value_list = [];
 
               self.grid.collection.each(function(m) {
                 options_value_list.push({
@@ -169,12 +164,8 @@ define([
                 });
               });
 
-              var baseUrl = url_for('profiler.set_config', {
-                'trans_id' : self.setting('trans_id'),
-              });
-
               $.ajax({
-                url    : baseUrl,
+                url    : url_for('profiler.set_config', { 'trans_id' : self.setting('trans_id') }),
                 method : 'POST',
                 data   : {
                   'data': JSON.stringify(options_value_list),
@@ -185,6 +176,9 @@ define([
                     Alertify.alert(gettext(res.data.result));
                   }
 
+                  if (res.data.status == 'Success') {
+                    Alertify.success('Succesfully saved report options', 3);
+                  }
                 })
                 .fail(function() {
                   Alertify.alert(
@@ -192,8 +186,6 @@ define([
                     gettext('Error while fetching reports.')
                   );
                 });
-
-
               return true;
             }
 
@@ -218,8 +210,8 @@ define([
               (function(obj) {
 
                 return function() {
-                  var enable_btn = false;
-                  for (var i = 0; i < this.collection.length; i++) {
+                  let enable_btn = false;
+                  for (let i = 0; i < this.collection.length; i++) {
                     if (this.collection.models[i].get('is_null')) {
                       obj.__internal.buttons[1].element.disabled = false;
                       enable_btn = true;

@@ -15,7 +15,7 @@ define([
   gettext, url_for, $, _, Backbone, Alertify, pgAdmin, pgBrowser, Backgrid
 ) {
 
-  let wcDocker = window.wcDocker;
+  const wcDocker = window.wcDocker;
 
   const ProfilerInputOptionsModel = Backbone.Model.extend({
     defaults: {
@@ -23,9 +23,10 @@ define([
       value: undefined,
     },
     validate: function() {
-      if (_.isUndefined(this.get('value')) ||
-        _.isNull(this.get('value')) ||
-        String(this.get('value')).replace(/^\s+|\s+$/g, '') == '') {
+      if (_.isUndefined(this.get('value'))
+        || _.isNull(this.get('value'))
+        || String(this.get('value')).replace(/^\s+|\s+$/g, '') == '')
+      {
         const msg = gettext('Please enter a value for the parameter.');
         this.errorModel.set('value', msg);
         return msg;
@@ -41,37 +42,38 @@ define([
     model: ProfilerInputOptionsModel,
   });
 
-  const res = function(profile_info, restart_profile, trans_id) {
+  const res = function(profile_info, trans_id) {
     if (!Alertify.profilerInputOptionsDialog) {
       Alertify.dialog('profilerInputOptionsDialog', function factory() {
         return {
-          main: function(title, profile_info, restart_profile, trans_id) {
+          /**
+           * Sets up the Alertify dialog box by creating the grid and input areas
+           *
+           * @param {String} title        The title to display in the Alertify dialog box
+           * @param {Object} profile_info Information about the profile(In this case the server Id and db Id)
+           * @param {int} trans_id        The unique transaction id that was created for this profiling session
+           */
+          main: function(title, profile_info, trans_id) {
             this.preferences = window.top.pgAdmin.Browser.get_preferences_for_module('profiler');
             this.set('title', title);
 
             // setting value in alertify settings allows us to access it from
             // other functions other than main function.
             this.set('profile_info', profile_info);
-            this.set('restart_profile', restart_profile);
             this.set('trans_id', trans_id);
 
             const my_obj = [];
             my_obj.push({
-              'option' : 'Duration',
+              'option' : 'Duration (sec)',
               'value'  : void 0,
             }, {
-              'option' : 'Interval',
+              'option' : 'Interval (sec)',
               'value'  : void 0,
             },
             {
               'option' : 'PID (Optional)',
               'value'  : void 0,
             },);
-
-            const option_header = Backgrid.HeaderCell.extend({
-              // Add fixed width to the "option" column
-              className: 'width_percent_25',
-            });
 
 
             const gridCols = [{
@@ -80,7 +82,10 @@ define([
               type: 'text',
               editable: false,
               cell: 'string',
-              headerCell: option_header,
+              headerCell: Backgrid.HeaderCell.extend({
+                // Add fixed width to the "option" column
+                className: 'width_percent_25',
+              }),
             },
             {
               name: 'value',
@@ -111,7 +116,6 @@ define([
           },
           settings: {
             profile_info: undefined,
-            restart_profile: undefined,
             trans_id: undefined,
           },
           setup: function() {
@@ -123,7 +127,7 @@ define([
               },{
                 text: gettext('Profile'),
                 key: 13,
-                className: 'btn btn-primary fa fa-bullseye pg-alertify-button', // TODO: replace icon
+                className: 'btn btn-primary fa fa-bullseye pg-alertify-button',
               }],
               // Set options for dialog
               options: {
@@ -139,7 +143,18 @@ define([
               },
             };
           },
-          // Callback functions when click on the buttons of the Alertify dialogs
+
+          /**
+           * Callback function that fires when one of the Alertify dialog options are chosen.
+           * Determines which option was chosen. If the 'Profile' option was chosen, then the
+           * profiling options will be sent to the server and be used to create a new
+           * indirect(global) profiling instance
+           *
+           * @param {Object} e the event object that was fired
+           *
+           * @returns {boolean} true if the 'Profile' button was selected and server correctly
+           *                    created a profiling instance
+           */
           callback: function(e) {
             if (e.button.text === gettext('Profile')) {
               // Initialize the target once the debug button is clicked and
@@ -215,7 +230,7 @@ define([
             }
 
 
-            if (e.button.text === gettext('Cancel') && this.setting('restart_profile') === 0) {
+            if (e.button.text === gettext('Cancel')) {
               /* Clear the trans id */
               $.ajax({
                 method: 'DELETE',
@@ -242,15 +257,13 @@ define([
               (function(obj) {
 
                 return function() {
-
                   let enable_btn = false;
 
                   for (let i = 0; i < this.collection.length; i++) {
 
-                    if (this.collection.models[i].get('is_null')) {
-                      obj.__internal.buttons[1].element.disabled = false;
+                    if (this.collection.models[i].get('value') == null ||
+                        this.collection.models[i].get('value') == void 0) {
                       enable_btn = true;
-                      continue;
                     }
                   }
                   if (!enable_btn)
@@ -272,7 +285,7 @@ define([
     }
 
     Alertify.profilerInputOptionsDialog(
-      gettext('Global Profiling Options'), profile_info, restart_profile, trans_id
+      gettext('Global Profiling Options'), profile_info, trans_id
     ).resizeTo(pgBrowser.stdW.md,pgBrowser.stdH.md);
   };
 

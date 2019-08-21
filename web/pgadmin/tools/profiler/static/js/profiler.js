@@ -191,9 +191,11 @@ define([
      * Callback function that will open up an in-browser window for the user to input
      * values in regards to global monitoring
      *
-     * @param {Object} item
+     * @param {Object} args
+     * @param {Object} item information about the function used to traverse the
+     *                      server browser tree
      */
-    get_options: function(item) {
+    get_options: function(args, item) {
       const t = pgBrowser.tree,
         i = item || t.selected(),
         d = i && i.length == 1 ? t.itemData(i) : undefined,
@@ -211,7 +213,7 @@ define([
       })
         .done(function(res) {
           let trans_id = res.data.trans_id;
-          get_option_arguments(res.data.db_info, 0, trans_id);
+          get_option_arguments(res.data.db_info, trans_id);
         });
 
     },
@@ -220,12 +222,11 @@ define([
      * Callback function for function profiling that will determine if a function requires
      * arguments then prompts the user to input values for the arguments (if necessary)
      *
+     * @param {Object} args node type
      * @param {Object} item information about the function used to traverse the
      *                      server browser tree
      */
     get_function_information: function(args, item) {
-      console.warn(args);
-
       const t = pgBrowser.tree,
         i = item || t.selected(),
         d = i && i.length == 1 ? t.itemData(i) : undefined,
