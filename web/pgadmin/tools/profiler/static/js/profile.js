@@ -28,26 +28,30 @@ define([
   if (pgTools.Profile)
     return pgTools.Profile;
 
+  /**
+   * Primary event handler that will interact with the wcDocker instance
+   *
+   */
   var controller = new(function() {});
 
   _.extend(
     controller, Backbone.Events, {
+      /**
+       * Trigger the event and change the button view to enable/disable the buttons for profiling
+       */
       enable: function(btn, enable) {
-        // trigger the event and change the button view to enable/disable the buttons for profiling
         this.trigger('pgProfiler:button:state:' + btn, enable);
       },
 
       enable_toolbar_buttons: function() {
         let self = this;
         self.enable('start', true);
-        self.enable('save' , true);
         self.enable('report-options', true);
       },
 
       disable_toolbar_buttons: function() {
         let self = this;
         self.enable('start', false);
-        self.enable('save' , false);
         self.disable('report-options', false);
       },
 
@@ -118,8 +122,6 @@ define([
        *                       instance
        */
       start_monitor : function(trans_id) {
-        let self = this;
-
         // Get duration through AJAX call to display to user
         $.ajax({
           url    : url_for('profiler.get_duration', { 'trans_id': trans_id }),
@@ -147,15 +149,13 @@ define([
                   pgTools.Profile.docker.finishLoading();
 
                   if (res.data.status === 'Success') {
-                    self.add_results(res.data.col_info, res.data.result);
-
                     // Update saved reports
                     controller.update_reports();
 
                   } else if (res.data.status === 'NotConnected') {
                     Alertify.alert(
                       gettext('Profiler Error'),
-                      gettext('Error when starting monitoring.')
+                      gettext('Not Connected.')
                     );
                   }
                 })
@@ -171,7 +171,7 @@ define([
             } else if (res.data.status == 'Not Connected') {
               Alertify.alert(
                 gettext('Profiler Error'),
-                gettext('Could not connect to the server.')
+                gettext('Not Connected.')
               );
             }
 
@@ -238,7 +238,7 @@ define([
           self.result_grid = null;
         }
 
-        // Collection which contains the model for function informations.
+        // Collection which contains the model for results
         var ResultsCollection = Backbone.Collection.extend({
           model : Backbone.Model.extend({
             defaults : {
@@ -406,7 +406,7 @@ define([
         })
           .done(function(res) {
             if (res.data.status === 'Success') {
-              controller._addReports(res.data.result);
+              controller._add_reports(res.data.result);
             }
           })
           .fail(function() {
@@ -423,7 +423,7 @@ define([
        *
        * @param {Array} result - The JSON containing information about the reports
        */
-      _addReports: function(result) {
+      _add_reports: function(result) {
         var self = this;
 
         // Remove the existing created grid and update the result values
@@ -573,7 +573,7 @@ define([
                           }
 
                           // show the next row
-                          controller._loadReport(pgTools.Profile.currentReportIndex);
+                          controller._load_report(pgTools.Profile.currentReportIndex);
                         });
 
                     },
@@ -652,25 +652,9 @@ define([
                 // Note that the shadow DOM cannot use the JS of the page because we load the
                 // report data by setting innerHTML. Thus, we extract the scripts by hand and
                 // add them manually
-
-                // The scripts do not function at all
-                // because of encapsulation between the DOM and shadow DOM.
-
                 let container = document.createElement('div');
                 container.attachShadow({mode: 'open'});
                 container.shadowRoot.innerHTML = res;
-
-                _.map(scripts, function(s) {
-                  let script = document.createElement('script');
-                  script.textContent = s;
-                  container.shadowRoot.appendChild(script);
-                });
-
-                _.map(styleSheets, function(s) {
-                  let styleSheet = document.createElement('style');
-                  styleSheet.innerText = s;
-                  container.shadowRoot.appendChild(styleSheet);
-                });
 
                 const current_reports = pgTools.Profile.current_report_panel;
 
@@ -716,7 +700,7 @@ define([
             }
           }
 
-          controller._loadReport(pgTools.Profile.currentReportIndex);
+          controller._load_report(pgTools.Profile.currentReportIndex);
         });
 
         // Render the result grid into result panel
@@ -731,7 +715,7 @@ define([
 
         // Default the currently showed report to the first report in the grid and show it
         pgTools.Profile.currentReportIndex = 0;
-        controller._loadReport(pgTools.Profile.currentReportIndex);
+        controller._load_report(pgTools.Profile.currentReportIndex);
       },
 
       /**
@@ -740,7 +724,7 @@ define([
        *
        * @param {int} reportIndex - The index of the row containing the report we want to show
        */
-      _loadReport : function(reportIndex) {
+      _load_report : function(reportIndex) {
 
         // Make sure that there is a report to show
         if (pgTools.Profile.reportsColl.models.length > 0) {
@@ -758,7 +742,7 @@ define([
             }
           });
 
-          // Finally, load the first report
+          // Finally, load the report
           Backbone.trigger('rowClicked', e);
         }
       },
@@ -766,35 +750,22 @@ define([
   );
 
   /*
-    Profiler tool var view to create the button toolbar and listen to the button click event and inform the
-    controller about the click and controller will take the action for the specified button click.
-  */
+   * Profiler tool var view to create the button toolbar and listen to the button click event and inform the
+   * controller about the click and controller will take the action for the specified button click.
+   */
   var ProfilerToolbarView = Backbone.View.extend({
     el: '.profiler_main_container',
     initialize: function() {
       controller.on('pgProfiler:button:state:start', this.enable_start, this);
-      controller.on('pgProfiler:button:state:save' , this.enable_save, this);
       controller.on('pgProfiler:button:state:report-options' , this.enable_report_options, this);
     },
     events: {
       'click .btn-start'          : 'on_start',
-      'click .btn-save'           : 'on_save',
       'click .btn-report-options' : 'on_report_options',
       'keydown'                   : 'keyAction',
     },
     enable_start: function(enable) {
       const $btn = this.$el.find('.btn-start');
-
-      if (enable) {
-        $btn.prop('disabled', false);
-        $btn.removeAttr('disabled');
-      } else {
-        $btn.prop('disabled', true);
-        $btn.attr('disabled', 'disabled');
-      }
-    },
-    enable_save: function(enable) {
-      const $btn = this.$el.find('.btn-save');
 
       if (enable) {
         $btn.prop('disabled', false);
@@ -840,10 +811,6 @@ define([
       e.stopPropagation();
       input_report_options(pgTools.Profile.trans_id);
     },
-    on_save: function(e) {
-      e.stopPropagation();
-      controller.save(pgTools.Profile.trans_id);
-    },
     keyAction: function(e) {
       e.stopPropagation();
 
@@ -855,7 +822,7 @@ define([
 
         if (new_index >= 0 && new_index < pgTools.Profile.numReports) {
           pgTools.Profile.currentReportIndex = new_index;
-          controller._loadReport(pgTools.Profile.currentReportIndex);
+          controller._load_report(pgTools.Profile.currentReportIndex);
         }
       }
     },
@@ -863,13 +830,22 @@ define([
 
 
   /*
-    Function is responsible to create the new wcDocker instance for profiler and
-    initialize the profiler panel inside the docker instance.
-  */
+   * Function is responsible to create the new wcDocker instance for profiler and
+   * initialize the profiler panel inside the docker instance.
+   */
   var Profile = function() {};
 
   _.extend(Profile.prototype, {
-    /* We should get the transaction id from the server during initialization here */
+    /**
+     * Sets up the wcDocker instance for the profiler, intializes the panels, and loads server
+     * data to display to the user
+     *
+     * @param {int} trans_id     the unique transaction id for the current profiling session
+     * @param {int} profile_type flag to determine if profiling is indirect(0) or direct(1)
+     * @param {String} function_name_with_arguments the name of the function we wish to profile
+     *                 note that this should be 'indirect' in indirect profiling instances
+     * @param {Object} layout the layout of the panels in the window to be loaded
+     */
     load: function(trans_id, profile_type, function_name_with_arguments, layout) {
 
       let self = this;
@@ -977,7 +953,6 @@ define([
     /**
      * Creates the profiler layout with splitter and display the appropriate data
      * received from server.
-     *
      */
     initializePanels: function() {
       let self = this;
@@ -1147,9 +1122,7 @@ define([
       /* Register for preference changed event broadcasted in parent
        * to reload the shorcuts.
        */
-      pgBrowser.onPreferencesChange('profiler', function() {
-        self.reflectPreferences();
-      });
+      pgBrowser.onPreferencesChange('profiler', () => { self.reflectPreferences(); });
 
       self.editor.focus();
     },
@@ -1157,27 +1130,26 @@ define([
     start_execution : function(trans_id) {
       controller.start_execution(trans_id);
     },
+
+    /**
+     * Retrieve preferences for the profiler
+     */
     reflectPreferences: function() {
       let self = this,
         browser = window.opener ? window.opener.pgAdmin.Browser : window.top.pgAdmin.Browser;
       self.preferences = browser.get_preferences_for_module('profiler');
       self.toolbarView.preferences = self.preferences;
-
-      /* TODO: Update the shortcuts of the buttons */
-      /* Update the shortcuts of the buttons */
-      /*
-      self.toolbarView.$el.find('#btn-start')
-        .attr('title', keyboardShortcuts.shortcut_accesskey_title('Start',self.preferences.btn_step_into))
-        .attr('accesskey', keyboardShortcuts.shortcut_key(self.preferences.start));
-
-
-      self.toolbarView.$el.find('#btn-save')
-        .attr('title', keyboardShortcuts.shortcut_accesskey_title('Save',self.preferences.btn_start))
-        .attr('accesskey', keyboardShortcuts.shortcut_key(self.preferences.save));*/
-
     },
 
-    // Register the panel with new profiler docker instance.
+    /**
+     * Register the panel with the given parameters to the wcDocker instance
+     *
+     * @param {String} name  name of the panel
+     * @param {String} title title of th panel to be displayed to the User
+     * @param {int} width    width of the panel (%)
+     * @param {int} height   height of the panel (%)
+     * @param {function} onInit function to be called on initialization
+     */
     registerPanel: function(name, title, width, height, onInit) {
       let self = this;
 

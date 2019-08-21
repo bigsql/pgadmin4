@@ -624,9 +624,9 @@ def start_monitor(trans_id):
     exe_conn_id = str(random.randint(1, 9999999))
     try:
         manager = get_driver(PG_DEFAULT_DRIVER).connection_manager(
-            pfl_inst.profiler_data['sid'])
+            pfl_inst.profiler_data['server_id'])
         conn = manager.connection(
-            did=pfl_inst.profiler_data['did'],
+            did=pfl_inst.profiler_data['database_id'],
             conn_id=exe_conn_id)
     except Exception as e:
         return internal_server_error(errormsg=str(e))
@@ -647,11 +647,18 @@ def start_monitor(trans_id):
         conn.execute_async('SET search_path to ' + namespace)
         conn.execute_async('SELECT pl_profiler_reset_shared()')
         if (pid is not None and pid is not ''):
-            conn.execute_async('SELECT pl_profiler_set_enable_pid(' + pid + ')')
+            conn.execute_async('SELECT pl_profiler_set_enable_pid(' + str(pid) + ')')
         else:
             conn.execute_async('SELECT pl_profiler_set_enabled_global(true)')
-        conn.execute_async('SELECT pl_profiler_set_collect_interval(' + interval + ')')
+        conn.execute_async('SELECT pl_profiler_set_collect_interval(' + str(interval) + ')')
         conn.execute_async('RESET search_path')
+
+        report_data = _generate_report(conn, 'shared', opt_top=10, func_oids={})
+        _save_report(report_data,
+                    pfl_inst.config,
+                    conn.as_dict()['database'],
+                    pfl_inst.profiler_data['profile_type'],
+                    int(pfl_inst.profiler_data['duration']))
         try:
             time.sleep(int(duration))
         finally:
@@ -661,14 +668,6 @@ def start_monitor(trans_id):
         conn.execute_async('SELECT pl_profiler_set_enabled_global(false)')
         conn.execute_async('SELECT pl_profiler_set_enabled_pid(0)')
         conn.execute_async('RESET search_path')
-
-    report_data = _generate_report(conn, 'shared', opt_top=10, func_oids={})
-    _save_report(report_data,
-                pfl_inst.config,
-                conn.as_dict()['database'],
-                pfl_inst.profiler_data['profile_type'],
-                int(pfl_inst.profiler_data['duration']))
-
 
     return make_json_response(
         data = {
@@ -748,16 +747,16 @@ def start_execution(trans_id):
                                 conn.as_dict()['database'],
                                 pfl_inst.profiler_data['profile_type'],
                                 -1)
-        conn.execute_async('SELECT pl_profiler_set_enabled_local(false)')
-        conn.execute_async('RESET search_path')
     except Exception as e:
         current_app.logger.exception(e)
         return make_json_response(
             data={
                 'status': 'ERROR',
-                'result': str(e),
             }
         )
+    finally:
+        conn.execute_async('SELECT pl_profiler_set_enabled_local(false)')
+        conn.execute_async('RESET search_path')
 
     # Format the result to display the result to client
     columns = {}
@@ -1099,7 +1098,7 @@ def _save_report(report_data, config, dbname, profile_type, duration):
     report_data['config'] = config
 
 
-    now = datetime.now().strftime("%Y-%m-%d/%H:%M")
+    now = datetime.now().strftime("%Y-%m-%d | %H:%M")
     path = os.path.dirname(os.path.abspath(current_app.root_path))
     path = os.path.join(path, 'pgadmin', 'instance')
     path = os.path.join(path, config['name'] + '@' + now + '.html')
@@ -1414,14 +1413,14 @@ def get_src(trans_id):
     """
     get_src(trans_id)
 
-    This method is responsible for retrieving the source code for the function that corresponds
+    Retrieves the source code for the function that corresponds
     with the given transaction id
 
     Parameters:
         trans_id
         - Transaction ID
     Returns:
-        The function data for the function that corresponds with the given transaction id
+        The function source code for the function that corresponds with the given transaction id
     """
     pfl_inst = ProfilerInstance(trans_id)
     if pfl_inst.profiler_data is None:
@@ -1508,9 +1507,7 @@ def get_parameters(trans_id):
                      'value': pfl_inst.profiler_data['interval']},
                     {'name': 'PID',
                      'type': 'Monitoring Parameter',
-                     'value': pfl_inst.profiler_data['pid'] \
-                              if pfl_inst.profiler_data['pid'] != None \
-                              else pfl_inst.profiler_data['pid']}
+                     'value': pfl_inst.profiler_data['pid']}
                 ]
             }
         )
