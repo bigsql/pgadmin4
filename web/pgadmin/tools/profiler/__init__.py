@@ -39,6 +39,10 @@ from pgadmin.tools.profiler.utils.profiler_report import plprofiler_report
 
 ASYNC_OK = 1
 
+DEFAULT_TABSTOP = '8'
+DEFAULT_SVG_WIDTH = '1200'
+DEFAULT_TABLE_WIDTH = '80%'
+DEFAULT_DESC = ''
 
 class ProfilerModule(PgAdminModule):
     """
@@ -227,6 +231,8 @@ def init_function(node_type, sid, did, scid=None, fid=None):
         # Set the template path required to read the sql files
         template_path = 'profiler/sql'
 
+        is_proc_supported = True if manager.version >= 110000 else False
+
         sql = ''
 
         sql = render_template(
@@ -234,7 +240,7 @@ def init_function(node_type, sid, did, scid=None, fid=None):
             is_ppas_database=False,
             hasFeatureFunctionDefaults=True,
             fid=fid,
-            is_proc_supported=True # TODO: Check server verison to make sure procedures supported
+            is_proc_supported=is_proc_supported
         )
 
         status, r_set = conn.execute_dict(sql)
@@ -389,10 +395,10 @@ def initialize_target_indirect(trans_id, sid, did):
     pfl_inst.config = {
         'name': 'Indirect',
         'title': 'Pl/Profiler Report for ' + conn.as_dict()['database'],
-        'tabstop': '8',
-        'svg_width': '1200',
-        'table_width': '80%',
-        'desc': ''
+        'tabstop': DEFAULT_TABSTOP,
+        'svg_width': DEFAULT_SVG_WIDTH,
+        'table_width': DEFAULT_TABLE_WIDTH,
+        'desc': DEFAULT_DESC
     }
 
     pfl_inst.update_session()
@@ -485,10 +491,10 @@ def initialize_target(trans_id, sid, did,
     pfl_inst.config = {
         'name': pfl_inst.function_data['name'],
         'title': 'Pl/Profiler Report for ' + pfl_inst.function_data['name'],
-        'tabstop': '8',
-        'svg_width': '1200',
-        'table_width': '80%',
-        'desc': ''
+        'tabstop': DEFAULT_TABSTOP,
+        'svg_width': DEFAULT_SVG_WIDTH,
+        'table_width': DEFAULT_TABLE_WIDTH,
+        'desc': DEFAULT_DESC
     }
 
     pfl_inst.update_session()
@@ -722,17 +728,12 @@ def start_execution(trans_id):
         return internal_server_error(errormsg=str(msg))
 
     # Render the sql to run the function/procedure here
-    # TODO: convert into sql template
-    func_name = pfl_inst.function_data['name']
-    func_args = pfl_inst.function_data['args_value']
-    sql = 'SELECT ' if pfl_inst.function_data['node_type'] == 'function' else 'CALL '
-    sql = sql + func_name + '('
-    for arg_idx in range(len(func_args)):
-        sql += str(func_args[arg_idx]['type']) + ' '
-        sql += '\'' + str(func_args[arg_idx]['value']) + '\''
-        if (arg_idx < len(func_args) - 1):
-            sql += ', '
-    sql += ');'
+    sql = render_template(
+        '/'.join(['profiler/sql', 'execute.sql']),
+        func_name=pfl_inst.function_data['name'],
+        is_func=pfl_inst.function_data['is_func'],
+        data=pfl_inst.function_data['args_value']
+    )
 
     try:
         schema = pfl_inst.function_data['schema']
@@ -761,7 +762,6 @@ def start_execution(trans_id):
     # Format the result to display the result to client
     columns = {}
 
-    # TODO: Test functionality for multiple return values
     for res in result:
         for key in res:
             columns['name'] = key
@@ -848,6 +848,9 @@ def close_profiler_session(_trans_id, close_all=False):
                     conn = manager.connection(
                         did=pfl_obj['database_id'],
                         conn_id=pfl_obj['conn_id'])
+
+                    conn.execute_async('SELECT pl_profiler_set_enabled_local(false)')
+                    conn.execute_async('SELECT pl_profiler_set_enabled_global(false)')
                     if conn.connected():
                         conn.cancel_transaction(
                             pfl_obj['conn_id'],
@@ -1521,8 +1524,7 @@ def get_reports():
     """
     get_reports()
 
-    This method is responsible for retrieving all of the saved reports
-    that are currently stored by PgAdmin
+    Retrieves all of the saved reports that are currently stored by PgAdmin
 
     Returns:
         A formatted list that contains identifying information for all of the reports
@@ -1635,10 +1637,26 @@ def get_config(trans_id):
     # Formatting the config for column view for client
     result = []
     for option in pfl_inst.config:
-        result.append({
-            'option': option,
-            'value': pfl_inst.config[option]
-        })
+        if option == 'svg_width':
+            result.append({
+                'option': 'SVG_Width',
+                'value': pfl_inst.config[option]
+            })
+        elif option == 'table_width':
+            result.append({
+                'option': 'Table_Width',
+                'value': pfl_inst.config[option]
+            })
+        elif option == 'desc':
+            result.append({
+                'option': 'Description',
+                'value': pfl_inst.config[option]
+            })
+        else:
+            result.append({
+                'option': option.capitalize(),
+                'value': pfl_inst.config[option]
+            })
 
     return make_json_response(
         data={

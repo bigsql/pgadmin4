@@ -169,6 +169,14 @@ define([
     if (!Alertify.profilerInputArgsDialog) {
       Alertify.dialog('profilerInputArgsDialog', function factory() {
         return {
+
+          /**
+           * Sets up the Alertify dialog box by creating grid and input areas
+           *
+           * @param {String} title title of the window
+           * @param {Object} profile_info information of the profile(e.g. server_id, db_id)
+           * @param {number} trans_id the unique transaction Id that was generated
+           */
           main: function(title, profile_info, restart_profile, trans_id) {
             this.preferences = window.top.pgAdmin.Browser.get_preferences_for_module('profiler');
             this.set('title', title);
@@ -593,7 +601,18 @@ define([
               },
             };
           },
-          // Callback functions when click on the buttons of the Alertify dialogs
+          
+          /**
+           * Callback function that fires when one of the Alertify dialog options are chosen.
+           * Determines which option was chosen. If the 'Profile' option was chosen, then the
+           * profiling options will be sent to the server and be used to create a new
+           * direct profiling instance
+           *
+           * @param {Object} e the event object that was fired
+           *
+           * @returns {boolean} true if the 'Profile' button was selected and server correctly
+           *                    created a profiling instance
+           */
           callback: function(e) {
             if (e.button.text === gettext('Profile')) {
               // Initialize the target once the profile button is clicked and

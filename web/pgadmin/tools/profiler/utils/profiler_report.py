@@ -83,8 +83,11 @@ class plprofiler_report:
         self.out("""  </tr>""")
         self.out("""  <tr>""")
         self.out("""    <td colspan="2">""")
-        self.out("""      <b><code>&nbsp;&nbsp;&nbsp;&nbsp;RETURNS&nbsp;{funcresult}</code></b>""".format(
-                    funcresult = func_def['funcresult'].replace(' ', '&nbsp;')))
+        if func_def['funcresult'] is not None:
+            self.out("""      <b><code>&nbsp;&nbsp;&nbsp;&nbsp;RETURNS&nbsp;{funcresult}</code></b>""".format(
+                        funcresult = func_def['funcresult'].replace(' ', '&nbsp;')))
+        else:
+            self.out("""      <b><code>&nbsp;&nbsp;&nbsp;&nbsp;RETURNS&nbsp;</code></b>""")
         self.out("""    </td>""")
         self.out("""  </tr>""")
         self.out("""</table>""")
