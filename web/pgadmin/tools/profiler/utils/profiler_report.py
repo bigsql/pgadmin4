@@ -138,7 +138,6 @@ class plprofiler_report:
             raise Exception("flamegraph returned with exit code %d\n%s" %(
                     proc.returncode, str(err)))
         return str(svg.decode('utf-8 '))
-        # return "\n".join(svg.split("\n")[2:])
 
     def out(self, line):
         self.outfd.write(line + '\n')

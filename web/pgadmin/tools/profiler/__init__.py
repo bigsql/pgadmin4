@@ -658,15 +658,14 @@ def start_monitor(trans_id):
             conn.execute_async('SELECT pl_profiler_set_enabled_global(true)')
         conn.execute_async('SELECT pl_profiler_set_collect_interval(' + str(interval) + ')')
         conn.execute_async('RESET search_path')
-
-        report_data = _generate_report(conn, 'shared', opt_top=10, func_oids={})
-        _save_report(report_data,
-                    pfl_inst.config,
-                    conn.as_dict()['database'],
-                    pfl_inst.profiler_data['profile_type'],
-                    int(pfl_inst.profiler_data['duration']))
         try:
             time.sleep(int(duration))
+            report_data = _generate_report(conn, 'shared', opt_top=10, func_oids={})
+            _save_report(report_data,
+                        pfl_inst.config,
+                        conn.as_dict()['database'],
+                        pfl_inst.profiler_data['profile_type'],
+                        int(pfl_inst.profiler_data['duration']))
         finally:
             pass
     finally:
