@@ -248,7 +248,7 @@ define([
             trans_id = res.data.trans_id;
           // Open Alertify the dialog to take the input arguments from user if function having input arguments
           if (profile_info[0]['require_input']) {
-            get_function_arguments(profile_info[0], 0, trans_id);
+            get_function_arguments(profile_info[0], trans_id);
           } else {
             // Initialize the target and create asynchronous connection and unique transaction ID
             // If there is no arguments to the functions then we should not ask for for function arguments and

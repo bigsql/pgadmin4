@@ -1,7 +1,6 @@
 /////////////////////////////////////////////////////////////
 //
 //
-// TODO: support for restart_profile
 //
 //
 //
@@ -165,7 +164,7 @@ define([
   };
 
 
-  const res = function(profile_info, restart_profile, trans_id) {
+  const res = function(profile_info, trans_id) {
     if (!Alertify.profilerInputArgsDialog) {
       Alertify.dialog('profilerInputArgsDialog', function factory() {
         return {
@@ -177,14 +176,13 @@ define([
            * @param {Object} profile_info information of the profile(e.g. server_id, db_id)
            * @param {number} trans_id the unique transaction Id that was generated
            */
-          main: function(title, profile_info, restart_profile, trans_id) {
+          main: function(title, profile_info, trans_id) {
             this.preferences = window.top.pgAdmin.Browser.get_preferences_for_module('profiler');
             this.set('title', title);
 
             // setting value in alertify settings allows us to access it from
             // other functions other than main function.
             this.set('profile_info', profile_info);
-            this.set('restart_profile', restart_profile);
             this.set('trans_id', trans_id);
 
             // Variables to store the data sent from sqlite database
@@ -196,41 +194,33 @@ define([
             let _Url = void 0;
             let d = void 0;
 
-            if (restart_profile == 0) {
-              const t = pgBrowser.tree;
+            const t = pgBrowser.tree;
 
-              i = t.selected();
-              d = i && i.length == 1 ? t.itemData(i) : undefined;
+            i = t.selected();
+            d = i && i.length == 1 ? t.itemData(i) : undefined;
 
-              let node = d && pgBrowser.Nodes[d._type];
+            let node = d && pgBrowser.Nodes[d._type];
 
-              if (!d)
-                return;
+            if (!d) {
+              return;
+            }
 
-              const treeInfo = node.getTreeNodeHierarchy.apply(node, [i]);
+            const treeInfo = node.getTreeNodeHierarchy.apply(node, [i]);
 
-              if (d._type == 'function') {
-                _Url = url_for('profiler.get_arguments', {
-                  'sid': treeInfo.server._id,
-                  'did': treeInfo.database._id,
-                  'scid': treeInfo.schema._id,
-                  'func_id': treeInfo.function._id,
-                });
-              } else if (d._type == 'procedure') {
-                // Get the existing function parameters available from sqlite database
-                _Url = url_for('profiler.get_arguments', {
-                  'sid': treeInfo.server._id,
-                  'did': treeInfo.database._id,
-                  'scid': treeInfo.schema._id,
-                  'func_id': treeInfo.procedure._id,
-                });
-              }
-            } else {
+            if (d._type == 'function') {
               _Url = url_for('profiler.get_arguments', {
-                'sid': profile_info.server_id,
-                'did': profile_info.database_id,
-                'scid': profile_info.schema_id,
-                'func_id': profile_info.function_id,
+                'sid': treeInfo.server._id,
+                'did': treeInfo.database._id,
+                'scid': treeInfo.schema._id,
+                'func_id': treeInfo.function._id,
+              });
+            } else if (d._type == 'procedure') {
+              // Get the existing function parameters available from sqlite database
+              _Url = url_for('profiler.get_arguments', {
+                'sid': treeInfo.server._id,
+                'did': treeInfo.database._id,
+                'scid': treeInfo.schema._id,
+                'func_id': treeInfo.procedure._id,
               });
             }
 
@@ -573,7 +563,6 @@ define([
           },
           settings: {
             profile_info: undefined,
-            restart_profile: undefined,
             trans_id: undefined,
           },
           setup: function() {
@@ -601,7 +590,7 @@ define([
               },
             };
           },
-          
+
           /**
            * Callback function that fires when one of the Alertify dialog options are chosen.
            * Determines which option was chosen. If the 'Profile' option was chosen, then the
@@ -624,17 +613,17 @@ define([
               let treeInfo = void 0;
               let i = void 0;
               let d = void 0;
-              if (self.setting('restart_profile') == 0) {
-                const t = pgBrowser.tree;
-                i = t.selected();
-                d = i && i.length == 1 ? t.itemData(i) : void 0;
-                let node = d && pgBrowser.Nodes[d._type];
 
-                if (!d)
-                  return;
+              const t = pgBrowser.tree;
+              i = t.selected();
+              d = i && i.length == 1 ? t.itemData(i) : void 0;
+              let node = d && pgBrowser.Nodes[d._type];
 
-                treeInfo = node.getTreeNodeHierarchy.apply(node, [i]);
+              if (!d) {
+                return;
               }
+
+              treeInfo = node.getTreeNodeHierarchy.apply(node, [i]);
 
               const args_value_list = [];
               const sqlite_func_args_list = this.sqlite_func_args_list = [];
@@ -667,182 +656,138 @@ define([
                   }
                 }
 
-                if (self.setting('restart_profile') == 0) {
-                  let f_id = void 0;
-                  if (d._type == 'function') {
-                    f_id = treeInfo.function._id;
-                  } else if (d._type == 'procedure') {
-                    f_id = treeInfo.procedure._id;
-                  }
-
-                  // Below will format the data to be stored in sqlite database
-                  sqlite_func_args_list.push({
-                    'server_id': treeInfo.server._id,
-                    'database_id': treeInfo.database._id,
-                    'schema_id': treeInfo.schema._id,
-                    'function_id': f_id,
-                    'arg_id': self.input_arg_id[int_count],
-                    'is_null': m.get('is_null') ? 1 : 0,
-                    'is_expression': m.get('expr') ? 1 : 0,
-                    'use_default': m.get('use_default') ? 1 : 0,
-                    'value': m.get('value'),
-                  });
-                } else {
-                  // Below will format the data to be stored in sqlite database
-                  sqlite_func_args_list.push({
-                    'server_id': self.setting('profile_info').server_id,
-                    'database_id': self.setting('profile_info').database_id,
-                    'schema_id': self.setting('profile_info').schema_id,
-                    'function_id': self.setting('profile_info').function_id,
-                    'arg_id': self.input_arg_id[int_count],
-                    'is_null': m.get('is_null') ? 1 : 0,
-                    'is_expression': m.get('expr') ? 1 : 0,
-                    'use_default': m.get('use_default') ? 1 : 0,
-                    'value': m.get('value'),
-                  });
+                let f_id = void 0;
+                if (d._type == 'function') {
+                  f_id = treeInfo.function._id;
+                } else if (d._type == 'procedure') {
+                  f_id = treeInfo.procedure._id;
                 }
+
+                // Below will format the data to be stored in sqlite database
+                sqlite_func_args_list.push({
+                  'server_id': treeInfo.server._id,
+                  'database_id': treeInfo.database._id,
+                  'schema_id': treeInfo.schema._id,
+                  'function_id': f_id,
+                  'arg_id': self.input_arg_id[int_count],
+                  'is_null': m.get('is_null') ? 1 : 0,
+                  'is_expression': m.get('expr') ? 1 : 0,
+                  'use_default': m.get('use_default') ? 1 : 0,
+                  'value': m.get('value'),
+                });
 
                 int_count = int_count + 1;
               });
 
               let baseUrl = void 0;
 
-              // TODO: At this point, we are assuming that profiling is not starting again
-              if (self.setting('restart_profile') == 0) {
-                if (d._type == 'function') {
-                  baseUrl = url_for('profiler.initialize_target_for_function', {
-                    'profile_type': 'direct',
-                    'trans_id': self.setting('trans_id'),
-                    'sid': treeInfo.server._id,
-                    'did': treeInfo.database._id,
-                    'scid': treeInfo.schema._id,
-                    'func_id': treeInfo.function._id,
-                  });
-                } else if (d._type == 'procedure') {
-                  baseUrl = url_for('profiler.initialize_target_for_function', {
-                    'profile_type': 'direct',
-                    'trans_id': self.setting('trans_id'),
-                    'sid': treeInfo.server._id,
-                    'did': treeInfo.database._id,
-                    'scid': treeInfo.schema._id,
-                    'func_id': treeInfo.procedure._id,
-                  });
-                }
-
-                $.ajax({
-                  url: baseUrl,
-                  method: 'POST',
-                  data: {
-                    'data': JSON.stringify(args_value_list),
-                  },
-                })
-                  .done(function(res) {
-                    const url = url_for(
-                      'profiler.profile', {
-                        'trans_id': res.data.profilerTransId,
-                      }
-                    );
-
-                    if (self.preferences.profiler_new_browser_tab) {
-                      window.open(url, '_blank');
-                    }  else  {
-                      pgBrowser.Events.once(
-                        'pgadmin-browser:frame:urlloaded:frm_profiler',
-                        function(frame) {
-                          frame.openURL(url);
-                        });
-
-                      // Create the profiler panel as per the data received from user input dialog.
-                      const dashboardPanel = pgBrowser.docker.findPanels('properties'),
-                        panel = pgBrowser.docker.addPanel(
-                          'frm_profiler', wcDocker.DOCK.STACKED, dashboardPanel[0]
-                        );
-
-                      panel.focus();
-
-                      // Panel Closed event
-                      panel.on(wcDocker.EVENT.CLOSED, function() {
-                        let closeUrl = url_for('profiler.close', {
-                          'trans_id': res.data.profilerTransId,
-                        });
-                        $.ajax({
-                          url: closeUrl,
-                          method: 'DELETE',
-                        });
-                      });
-                    }
-
-                    let _Url = '';
-
-                    if (d._type == 'function') {
-                      _Url = url_for('profiler.set_arguments', {
-                        'sid': treeInfo.server._id,
-                        'did': treeInfo.database._id,
-                        'scid': treeInfo.schema._id,
-                        'func_id': treeInfo.function._id,
-                      });
-                    } else if (d._type == 'procedure') {
-                      _Url = url_for('profiler.set_arguments', {
-                        'sid': treeInfo.server._id,
-                        'did': treeInfo.database._id,
-                        'scid': treeInfo.schema._id,
-                        'func_id': treeInfo.procedure._id,
-                      });
-                    }
-
-                    $.ajax({
-                      url: _Url,
-                      method: 'POST',
-                      data: {
-                        'data': JSON.stringify(sqlite_func_args_list),
-                      },
-                    })
-                      .done(function() {})
-                      .fail(function() {
-                        Alertify.alert(
-                          gettext('Profiler error'),
-                          gettext('Unable to set the arguments on the server')
-                        );
-                      });
-                  })
-                  .fail(function(e) {
-                    Alertify.alert(
-                      gettext('Profiler Target Initialization Error'),
-                      e.responseJSON.errormsg
-                    );
-                  });
-              } else {
-                // If the profiling is starting again, all we need to do is set the arguments
-                // and run the profile
-
-                const _Url = url_for('profiler.set_arguments', {
-                  'sid': profile_info.server_id,
-                  'did': profile_info.database_id,
-                  'scid': profile_info.schema_id,
-                  'func_id': profile_info.function_id,
+              if (d._type == 'function') {
+                baseUrl = url_for('profiler.initialize_target_for_function', {
+                  'profile_type': 'direct',
+                  'trans_id': self.setting('trans_id'),
+                  'sid': treeInfo.server._id,
+                  'did': treeInfo.database._id,
+                  'scid': treeInfo.schema._id,
+                  'func_id': treeInfo.function._id,
                 });
-                $.ajax({
-                  url: _Url,
-                  method: 'POST',
-                  data: {
-                    'data': JSON.stringify(sqlite_func_args_list),
-                  },
-                })
-                  .done(function() {
-                    pgAdmin.Tools.Profile.constructor.prototype.startEx(self.setting('trans_id'));
-                  })
-                  .fail(function() {
-                    Alertify.alert(
-                      gettext('Profiler error'),
-                      gettext('Unable to set the arguments on the server')
-                    );
-                  });
+              } else if (d._type == 'procedure') {
+                baseUrl = url_for('profiler.initialize_target_for_function', {
+                  'profile_type': 'direct',
+                  'trans_id': self.setting('trans_id'),
+                  'sid': treeInfo.server._id,
+                  'did': treeInfo.database._id,
+                  'scid': treeInfo.schema._id,
+                  'func_id': treeInfo.procedure._id,
+                });
               }
+
+              $.ajax({
+                url: baseUrl,
+                method: 'POST',
+                data: {
+                  'data': JSON.stringify(args_value_list),
+                },
+              })
+                .done(function(res) {
+                  const url = url_for(
+                    'profiler.profile', {
+                      'trans_id': res.data.profilerTransId,
+                    }
+                  );
+
+                  if (self.preferences.profiler_new_browser_tab) {
+                    window.open(url, '_blank');
+                  }  else  {
+                    pgBrowser.Events.once(
+                      'pgadmin-browser:frame:urlloaded:frm_profiler',
+                      function(frame) {
+                        frame.openURL(url);
+                      });
+
+                    // Create the profiler panel as per the data received from user input dialog.
+                    const dashboardPanel = pgBrowser.docker.findPanels('properties'),
+                      panel = pgBrowser.docker.addPanel(
+                        'frm_profiler', wcDocker.DOCK.STACKED, dashboardPanel[0]
+                      );
+
+                    panel.focus();
+
+                    // Panel Closed event
+                    panel.on(wcDocker.EVENT.CLOSED, function() {
+                      let closeUrl = url_for('profiler.close', {
+                        'trans_id': res.data.profilerTransId,
+                      });
+                      $.ajax({
+                        url: closeUrl,
+                        method: 'DELETE',
+                      });
+                    });
+                  }
+
+                  let _Url = '';
+
+                  if (d._type == 'function') {
+                    _Url = url_for('profiler.set_arguments', {
+                      'sid': treeInfo.server._id,
+                      'did': treeInfo.database._id,
+                      'scid': treeInfo.schema._id,
+                      'func_id': treeInfo.function._id,
+                    });
+                  } else if (d._type == 'procedure') {
+                    _Url = url_for('profiler.set_arguments', {
+                      'sid': treeInfo.server._id,
+                      'did': treeInfo.database._id,
+                      'scid': treeInfo.schema._id,
+                      'func_id': treeInfo.procedure._id,
+                    });
+                  }
+
+                  $.ajax({
+                    url: _Url,
+                    method: 'POST',
+                    data: {
+                      'data': JSON.stringify(sqlite_func_args_list),
+                    },
+                  })
+                    .done(function() {})
+                    .fail(function() {
+                      Alertify.alert(
+                        gettext('Profiler error'),
+                        gettext('Unable to set the arguments on the server')
+                      );
+                    });
+                })
+                .fail(function(e) {
+                  Alertify.alert(
+                    gettext('Profiler Target Initialization Error'),
+                    e.responseJSON.errormsg
+                  );
+                });
 
               return true;
             }
 
-            if (e.button.text === gettext('Cancel') && this.setting('restart_profile') === 0) {
+            if (e.button.text === gettext('Cancel')) {
               /* Clear the trans id */
               $.ajax({
                 method: 'DELETE',
@@ -922,7 +867,7 @@ define([
     }
 
     Alertify.profilerInputArgsDialog(
-      gettext('Profiler'), profile_info, restart_profile, trans_id
+      gettext('Profiler'), profile_info, trans_id
     ).resizeTo(pgBrowser.stdW.md,pgBrowser.stdH.md);
   };
 

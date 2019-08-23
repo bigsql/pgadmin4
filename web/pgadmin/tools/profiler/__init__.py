@@ -666,8 +666,20 @@ def start_monitor(trans_id):
                         conn.as_dict()['database'],
                         pfl_inst.profiler_data['profile_type'],
                         int(pfl_inst.profiler_data['duration']))
-        finally:
-            pass
+        except Exception as e:
+            current_app.logger.exception(e)
+            return make_json_response(
+                data={
+                    'status': 'ERROR',
+                }
+            )
+    except Exception as e:
+        current_app.logger.exception(e)
+        return make_json_response(
+            data={
+                'status': 'ERROR',
+            }
+        )
     finally:
         conn.execute_async('SET search_path to ' + namespace)
         conn.execute_async('SELECT pl_profiler_set_enabled_global(false)')
@@ -742,11 +754,18 @@ def start_execution(trans_id):
         conn.execute_async('SELECT pl_profiler_set_collect_interval(0)')
         status, result = conn.execute_async_list(sql)
         report_data = _generate_report(conn, 'local', opt_top=10, func_oids={}) # TODO: Add support for K top
+
+        duration = 0
+        for func in report_data['func_defs']:
+            if func['funcname'] == pfl_inst.function_data['name']:
+                # Divide by 10,000 because total_time is in microseconds
+                duration = int(func['total_time']) / 100000
+
         report_id = _save_report(report_data,
                                 pfl_inst.config,
                                 conn.as_dict()['database'],
                                 pfl_inst.profiler_data['profile_type'],
-                                -1)
+                                duration);
     except Exception as e:
         current_app.logger.exception(e)
         return make_json_response(
@@ -926,10 +945,8 @@ def _generate_report(conn, data_location, opt_top, func_oids = None):
         func_oids = [int(x) for x in func_oids]
 
     if len(func_oids) == 0:
-        # Possible causes of error:
-        #   - No functions being profiled
-        #   - Shared_preload_libraries contained the profiler
-        raise Exception("No profiling data found")
+        raise Exception("No profiling data found(Possible cause: no functions"
+                        " were run during the monitoring duration)")
 
     # ----
     # Get an alphabetically sorted list of the selected functions.
@@ -957,7 +974,6 @@ def _generate_report(conn, data_location, opt_top, func_oids = None):
                   'get_linestats.sql']),
         data_location=data_location
     )
-
     linestats = {}
     status, result = conn.execute_async_list(sql);
     for row in result:
@@ -1078,7 +1094,7 @@ def _generate_report(conn, data_location, opt_top, func_oids = None):
 
 def _save_report(report_data, config, dbname, profile_type, duration):
     """
-    _save_report(report_data, config, dbname, profile_type)
+    _save_report(report_data, config, dbname, profile_type, duration)
 
     This method is responsible for generating a HTML report and
     saving it internally
@@ -1094,7 +1110,7 @@ def _save_report(report_data, config, dbname, profile_type, duration):
         profile_type
         - The type of profiling (i.e. direct vs indirect)
         duration
-        - The duration of the profile (-1 for direct profiles)
+        - The duration of the profile
     Returns
     """
     report_data['config'] = config

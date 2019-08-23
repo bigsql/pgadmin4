@@ -16,23 +16,24 @@ define([
   Backform, codemirror, profile_function_again, monitor_function_again, input_report_options,
 ) {
 
-  var CodeMirror = codemirror.default,
+  const CodeMirror = codemirror.default,
     wcDocker = window.wcDocker;
 
-  if (pgAdmin.Browser.tree != null) {
+  if(pgAdmin.Browser.tree != null) {
     pgAdmin = pgAdmin || window.pgAdmin || {};
   }
 
-  var pgTools = pgAdmin.Tools = pgAdmin.Tools || {};
+  const pgTools = pgAdmin.Tools = pgAdmin.Tools || {};
 
-  if (pgTools.Profile)
+  if(pgTools.Profile) {
     return pgTools.Profile;
+  }
 
   /**
    * Primary event handler that will interact with the wcDocker instance
    *
    */
-  var controller = new(function() {});
+  const controller = new(function() {});
 
   _.extend(
     controller, Backbone.Events, {
@@ -74,11 +75,11 @@ define([
           .done(function(res) {
             $('.profiler-container').removeClass('show_progress');
 
-            if (res.data.status === 'Success') {
-              pgTools.Profile.profile_completed = true;
-              controller.add_results(res.data.col_info, res.data.result);
+            if(res.data.status === 'Success') {
+              controller.addResults(res.data.col_info, res.data.result);
               controller.update_reports();
-            } else if (res.data.status === 'NotConnected') {
+            }
+            else if(res.data.status === 'NotConnected') {
               Alertify.alert(
                 gettext('Profiler Error'),
                 gettext('Error while starting profiling.')
@@ -95,26 +96,6 @@ define([
       },
 
       /**
-       * Helper function that generates the loading wheel for indirect(global) profiling and
-       * counts down, updating the wheel
-       *
-       * @param {int} duration - The original duration of the monitoring
-       */
-      _update_monitor_load : function(duration) {
-        let time_remaining = duration * 1000;
-
-        const intervalId = setInterval(function() {
-          $('.wcLoadingLabel').html(gettext('Monitoring for ' + time_remaining/1000 + ' seconds'));
-          time_remaining = time_remaining - 1000;
-          if (time_remaining < 0) {
-
-            // kill the timer to prevent waste
-            clearInterval(intervalId);
-          }
-        }, 1000);
-      },
-
-      /**
        * Sends a message to the server to start indirect profiling, then if successful,
        * updates the reports, and opens the newly created report in a new tab
        *
@@ -128,7 +109,7 @@ define([
           method : 'GET',
         })
           .done(function(res) {
-            if (res.data.status === 'Success') {
+            if(res.data.status === 'Success') {
               let duration = parseInt(res.data.duration, 10);
 
               // Make ajax call to start monitoring
@@ -137,7 +118,7 @@ define([
                 method     : 'GET',
                 beforeSend : function(xhr) {
                   xhr.setRequestHeader(pgAdmin.csrf_token_header, pgAdmin.csrf_token);
-                  pgTools.Profile.docker.startLoading(gettext('Monitoring for ' + duration + ' seconds'));
+                  pgTools.Profile.docker.startLoading(gettext(`Monitoring for ${duration} seconds`));
 
                   // We decrease the duration by 1 because time will already have passed by the
                   // time the loading wheel is created and shown
@@ -145,14 +126,13 @@ define([
                 },
               })
                 .done(function(res) {
-                  pgTools.Profile.profile_completed = true;
                   pgTools.Profile.docker.finishLoading();
 
-                  if (res.data.status === 'Success') {
-                    // Update saved reports
+                  if(res.data.status === 'Success') {
                     controller.update_reports();
 
-                  } else if (res.data.status === 'NotConnected') {
+                  }
+                  else if(res.data.status === 'NotConnected') {
                     Alertify.alert(
                       gettext('Profiler Error'),
                       gettext('Not Connected.')
@@ -168,7 +148,8 @@ define([
                     gettext('Error while monitoring.')
                   );
                 });
-            } else if (res.data.status == 'Not Connected') {
+            }
+            else if(res.data.status == 'Not Connected') {
               Alertify.alert(
                 gettext('Profiler Error'),
                 gettext('Not Connected.')
@@ -185,61 +166,22 @@ define([
       },
 
       /**
-       * TODO
-       *
-       */
-      restart : function(trans_id) {
-        $.ajax({
-          url : url_for('profiler.restart', {'trans_id' : trans_id}),
-        })
-          .done(function(res) {
-            if (res.data.profile_data.profile_type === 'direct') {
-              if (res.data.require_input) {
-
-                const result = _.extend({}, res.data.profile_data, res.data.func_data);
-
-                result.proargtypenames = result.args_type;
-                result.proargnames     = result.args_name;
-                result.proargmodes     = result.arg_mode;
-
-                profile_function_again(result, 1, pgTools.Profile.trans_id);
-              } else {
-                controller.start_execution(pgTools.Profile.trans_id);
-              }
-            } else {
-              monitor_function_again(pgTools.Profile.trans_id);
-            }
-
-          })
-          .fail(function(xhr) {
-            try {
-              const err = JSON.parse(xhr.responseText);
-              if (err.success == 0) {
-                Alertify.alert(gettext('Debugger Error'), err.errormsg);
-              }
-            } catch (e) {
-              console.warn(e.stack || e);
-            }
-          });
-      },
-
-      /**
        * Updates the results panel for the profiling window
        *
        * @param {Array} columns Contains the names of the columns for the results panel
        * @param {Array} result  Contains the values of the columns for the results panel
        */
-      add_results : function(columns, result) {
+      addResults : function(columns, result) {
         let self = this;
 
         // Remove the existing created grid and update the result values
-        if (self.result_grid) {
+        if(self.result_grid) {
           self.result_grid.remove();
           self.result_grid = null;
         }
 
         // Collection which contains the model for results
-        var ResultsCollection = Backbone.Collection.extend({
+        const ResultsCollection = Backbone.Collection.extend({
           model : Backbone.Model.extend({
             defaults : {
               name : void 0,
@@ -247,10 +189,10 @@ define([
           }),
         });
 
-        var resultGridCols = [];
-        if (_.size(columns)) {
+        const resultGridCols = [];
+        if(_.size(columns)) {
           _.each(columns, function(c) {
-            var column = {
+            const column = {
               type     : 'text',
               editable : false,
               cell     : 'string',
@@ -261,7 +203,7 @@ define([
         }
 
         // Initialize a new Grid instance
-        var result_grid = this.result_grid = new Backgrid.Grid({
+        const result_grid = this.result_grid = new Backgrid.Grid({
           emptyText  : 'No data found',
           columns    : resultGridCols,
           collection : new ResultsCollection(result),
@@ -287,13 +229,13 @@ define([
           method : 'GET',
         })
           .done(function(res) {
-            if (res.data.status === 'Success') {
+            if(res.data.status === 'Success') {
 
               // Add the parameters to the panel
-              controller._add_parameters(res.data.result);
+              controller.addParameters(res.data.result);
             }
 
-            else if (res.data.status === 'NotConnected') {
+            else if(res.data.status === 'NotConnected') {
               Alertify.alert(
                 gettext('Profiler Error'),
                 gettext('Error while fetching parameters.')
@@ -314,17 +256,17 @@ define([
        *
        * @param {Array} result The JSON containing information about the parameters
        */
-      _add_parameters: function(result) {
-        var self = this;
+      addParameters: function(result) {
+        const self = this;
 
         // Remove the existing created grid and update the parameter values
-        if (self.param_grid) {
+        if(self.param_grid) {
           self.param_grid.remove();
           self.param_grid = null;
         }
 
         // Collection which contains the model for function informations.
-        var ParametersCollection = self.ParametersCollection = Backbone.Collection.extend({
+        const ParametersCollection = self.ParametersCollection = Backbone.Collection.extend({
           model: Backbone.Model.extend({
             defaults: {
               name  : void 0,
@@ -334,7 +276,7 @@ define([
           }),
         });
 
-        var paramGridCols = [{
+        const paramGridCols = [{
           name     : 'name',
           label    : gettext('Name'),
           type     : 'text',
@@ -358,8 +300,8 @@ define([
         ];
 
         const param_obj = [];
-        if (result.length != 0) {
-          for (let i = 0; i < result.length; i = i + 1) {
+        if(result.length != 0) {
+          for(let i = 0; i < result.length; i = i + 1) {
             param_obj.push({
               'name'  : result[i].name,
               'type'  : result[i].type,
@@ -369,7 +311,7 @@ define([
         }
 
         // Initialize a new Grid instance
-        var param_grid = this.param_grid = new Backgrid.Grid({
+        const param_grid = this.param_grid = new Backgrid.Grid({
           emptyText  : 'No data found',
           columns    : paramGridCols,
           collection : new ParametersCollection(param_obj),
@@ -405,8 +347,8 @@ define([
           method : 'GET',
         })
           .done(function(res) {
-            if (res.data.status === 'Success') {
-              controller._add_reports(res.data.result);
+            if(res.data.status === 'Success') {
+              controller.addReports(res.data.result);
             }
           })
           .fail(function() {
@@ -423,17 +365,17 @@ define([
        *
        * @param {Array} result - The JSON containing information about the reports
        */
-      _add_reports: function(result) {
-        var self = this;
+      addReports: function(result) {
+        const self = this;
 
         // Remove the existing created grid and update the result values
-        if (self.reports_grid) {
+        if(self.reports_grid) {
           self.reports_grid.remove();
           self.reports_grid = null;
         }
 
         // Collection which contains the model for report informations.
-        var ReportsCollection = self.ReportsCollection = Backbone.Collection.extend({
+        const ReportsCollection = self.ReportsCollection = Backbone.Collection.extend({
           model: Backbone.Model.extend({
             defaults : {
               profile_type : void 0,
@@ -445,7 +387,7 @@ define([
           }),
         });
 
-        var reportsGridCols = [
+        const reportsGridCols = [
           {
             name       : 'profile_type',
             label      : gettext('Profile Type / Function Name'),
@@ -470,7 +412,7 @@ define([
           },
           {
             name        : 'start_date',
-            label       : gettext('Start Date/Time'),
+            label       : gettext('Start Date | Time'),
             type        : 'text',
             editable    : false,
             headerCell  :
@@ -538,7 +480,7 @@ define([
                 },
 
                 deleteReport : function(e) {
-                  var temp = this;
+                  const temp = this;
 
                   e.preventDefault();
                   e.stopPropagation();
@@ -557,7 +499,7 @@ define([
                         method : 'POST',
                       })
                         .done(function(res) {
-                          if (res.data.status == 'ERROR') {
+                          if(res.data.status == 'ERROR') {
                             Alertify.alert(
                               gettext('Profiler Error'),
                               gettext('Error in deleting selected report'));
@@ -568,7 +510,7 @@ define([
                           pgTools.Profile.numReports -= 1;
 
                           // Case of deleting the report for the row at the bottom of the grid
-                          if (pgTools.Profile.currentReportIndex === pgTools.Profile.numReports) {
+                          if(pgTools.Profile.currentReportIndex === pgTools.Profile.numReports) {
                             pgTools.Profile.currentReportIndex -= 1;
                           }
 
@@ -591,14 +533,14 @@ define([
 
         // Now format the information fetched from the server for rendering the grid
         const reports_obj = [];
-        if (result.length != 0) {
+        if(result.length != 0) {
           pgTools.Profile.numReports = result.length;
-          for (let i = 0; i < result.length; i = i + 1) {
+          for(let i = 0; i < result.length; i = i + 1) {
             reports_obj.push({
               'profile_type': result[i].profile_type === true ? result[i].name : 'Global',
               'database'    : result[i].database,
               'start_date'  : result[i].time,
-              'duration'    : result[i].duration === -1 ? 'n/a' : result[i].duration + ' seconds',
+              'duration'    : `${result[i].duration} seconds`,
               'report_id'   : result[i].report_id,
             });
           }
@@ -607,7 +549,7 @@ define([
         self.reportsCollection = new ReportsCollection(reports_obj);
 
         // Initialize a new Grid instance
-        var reports_grid = this.reports_grid = new Backgrid.Grid({
+        const reports_grid = this.reports_grid = new Backgrid.Grid({
           emptyText  : 'No data found',
           columns    : reportsGridCols,
           row        : Backgrid.Row.extend({
@@ -671,10 +613,10 @@ define([
               });
 
             // Update the current_report_index
-            for (let i = 0; i < pgTools.Profile.reportsColl.models.length; i = i + 1) {
+            for(let i = 0; i < pgTools.Profile.reportsColl.models.length; i = i + 1) {
               const current = pgTools.Profile.reportsColl.models[i];
 
-              if (current.cid === m.model.cid){
+              if(current.cid === m.model.cid){
                 pgTools.Profile.currentReportIndex = i;
 
                 // we have found the desired index so no need to continue
@@ -689,10 +631,10 @@ define([
         this.listenTo(self.reportsCollection, 'backgrid:sorted', function() {
 
           // Update the current_report_index
-          for (let i = 0; i < pgTools.Profile.reportsColl.models.length; i = i + 1) {
+          for(let i = 0; i < pgTools.Profile.reportsColl.models.length; i = i + 1) {
             const current = pgTools.Profile.reportsColl.models[i];
 
-            if (pgTools.Profile.currentId === current.get('report_id')) {
+            if(pgTools.Profile.currentId === current.get('report_id')) {
               pgTools.Profile.currentReportIndex = i;
 
               // we have found the desired index so no need to continue
@@ -727,23 +669,50 @@ define([
       _load_report : function(reportIndex) {
 
         // Make sure that there is a report to show
-        if (pgTools.Profile.reportsColl.models.length > 0) {
+        if(pgTools.Profile.reportsColl.models.length > 0) {
 
-          var e, currentReportId =
+          let e = void 0;
+          const currentReportId =
             pgTools.Profile.reportsColl.models[reportIndex].get('report_id');
 
           // get the correct event to pass into backgrid trigger
           $.each(pgTools.Profile.reports_grid.columns._listeners, function(k, v) {
 
-            if (v.listener.model) {
-              if (currentReportId == v.listener.model.get('report_id')) {
+            if(v.listener.model) {
+              if(currentReportId == v.listener.model.get('report_id')) {
                 e = v.listener;
               }
             }
           });
 
-          // Finally, load the report
-          Backbone.trigger('rowClicked', e);
+          if(e === void 0 ) {
+            console.warn('No rowClick event found for the given report index');
+          }
+          else {
+            // Finally, load the report
+            Backbone.trigger('rowClicked', e);
+          }
+        }
+      },
+
+      /**
+       * Helper function that generates the loading wheel for indirect(global) profiling and
+       * counts down, updating the wheel
+       *
+       * @param {int} duration - The original duration of the monitoring
+       */
+      _update_monitor_load : function(duration) {
+
+        // Queue up the setTimeouts so they display properly. Note that if the duration is
+        // too long, then too many setTimeout Objects may be created, causing a slowdown on page
+        for(let i = duration; i > 0; i--) {
+          ((time) => {
+            setTimeout(
+              () => {
+                $('.wcLoadingLabel').html(gettext(`Monitoring for ${time} seconds`));
+              },
+              (duration - i + 1) * 1000);
+          })(i);
         }
       },
     },
@@ -753,7 +722,7 @@ define([
    * Profiler tool var view to create the button toolbar and listen to the button click event and inform the
    * controller about the click and controller will take the action for the specified button click.
    */
-  var ProfilerToolbarView = Backbone.View.extend({
+  const ProfilerToolbarView = Backbone.View.extend({
     el: '.profiler_main_container',
     initialize: function() {
       controller.on('pgProfiler:button:state:start', this.enable_start, this);
@@ -767,10 +736,11 @@ define([
     enable_start: function(enable) {
       const $btn = this.$el.find('.btn-start');
 
-      if (enable) {
+      if(enable) {
         $btn.prop('disabled', false);
         $btn.removeAttr('disabled');
-      } else {
+      }
+      else {
         $btn.prop('disabled', true);
         $btn.attr('disabled', 'disabled');
       }
@@ -778,37 +748,30 @@ define([
     enable_report_options: function(enable) {
       const $btn = this.$el.find('.btn-report-options');
 
-      if (enable) {
+      if(enable) {
         $btn.prop('disabled', false);
         $btn.removeAttr('disabled');
-      } else {
+      }
+      else {
         $btn.prop('disabled', true);
         $btn.attr('disabled', 'disabled');
       }
     },
     on_start: function(e) {
       e.stopPropagation();
+      e.preventDefault();
 
-      // TODO:
-      // if (pgTools.Profile.profile_completed) {
-      //   if (pgTools.Profile.profile_type == 1) {
-      //     controller.restart(pgTools.Profile.trans_id);
-      //   } else {
-      //     //pass;
-      //   }
-      // }
-      //
-      // else {
-      if (pgTools.Profile.profile_type == 1) {
+      if(pgTools.Profile.profile_type == 1) {
         controller.start_execution(pgTools.Profile.trans_id);
-      } else {
+      }
+      else {
         controller.start_monitor(pgTools.Profile.trans_id);
       }
-      //   }
-      // }
     },
     on_report_options: function(e) {
       e.stopPropagation();
+      e.preventDefault();
+
       input_report_options(pgTools.Profile.trans_id);
     },
     keyAction: function(e) {
@@ -816,11 +779,11 @@ define([
 
       const key = `${e.code}`;
 
-      if (key === 'ArrowUp' || key === 'ArrowDown') {
+      if(key === 'ArrowUp' || key === 'ArrowDown') {
         const delta = (key === 'ArrowUp') ? -1 : 1;
         const new_index = pgTools.Profile.currentReportIndex + delta;
 
-        if (new_index >= 0 && new_index < pgTools.Profile.numReports) {
+        if(new_index >= 0 && new_index < pgTools.Profile.numReports) {
           pgTools.Profile.currentReportIndex = new_index;
           controller._load_report(pgTools.Profile.currentReportIndex);
         }
@@ -833,7 +796,7 @@ define([
    * Function is responsible to create the new wcDocker instance for profiler and
    * initialize the profiler panel inside the docker instance.
    */
-  var Profile = function() {};
+  const Profile = function() {};
 
   _.extend(Profile.prototype, {
     /**
@@ -851,11 +814,10 @@ define([
       let self = this;
 
       // We do not want to initialize the module multiple times.
-      if (this.initialized)
+      if(this._initialized) {
         return;
-      this.initialized = true;
-
-      this.profile_completed = false;
+      }
+      this._initialized = true;
 
       this.trans_id                     = trans_id;
       this.profile_type                 = profile_type;
@@ -877,8 +839,7 @@ define([
       // we save this so when the grid is sorted, we show the same report and update the index
       this.currentId = -1;
 
-      let browser = window.opener ?
-        window.opener.pgAdmin.Browser : window.top.pgAdmin.Browser;
+      let browser = window.opener ? window.opener.pgAdmin.Browser : window.top.pgAdmin.Browser;
       this.preferences = browser.get_preferences_for_module('profiler');
 
       this.docker = new wcDocker(
@@ -897,12 +858,13 @@ define([
 
       controller.enable_toolbar_buttons();
       controller.update_reports();
+
       // Note that for direct profiling this will be the parameters
       // For indirect(global) profiling, this will be the profiling arguments
       controller.update_parameters();
 
       // Direct profiling requires fetching sql source code
-      if (trans_id != void 0 && profile_type) {
+      if(trans_id != void 0 && profile_type) {
 
         // Get source code to display in code editor panel
         $.ajax({
@@ -910,11 +872,11 @@ define([
           method : 'GET',
         })
           .done(function(res) {
-            if (res.data.status === 'Success') {
+            if(res.data.status === 'Success') {
               controller.add_src(res.data.result);
             }
 
-            else if (res.data.status === 'NotConnected') {
+            else if(res.data.status === 'NotConnected') {
               Alertify.alert(
                 gettext('Profiler Error'),
                 gettext('Error while fetching parameters.')
@@ -961,7 +923,7 @@ define([
         function() {
 
           // Create the parameters panel to display the arguments of the functions
-          var parameters = new pgAdmin.Browser.Panel({
+          const parameters = new pgAdmin.Browser.Panel({
             name        : 'parameters',
             title       : gettext('Parameters'),
             width       : '100%',
@@ -972,7 +934,7 @@ define([
           });
 
           // Create the result panel to display the result after profiling the function
-          var results = new pgAdmin.Browser.Panel({
+          const results = new pgAdmin.Browser.Panel({
             name        : 'results',
             title       : gettext('Results'),
             width       : '100%',
@@ -983,7 +945,7 @@ define([
           });
 
           // Create the reports panel to display saved profiling reports
-          var reports = new pgAdmin.Browser.Panel({
+          const reports = new pgAdmin.Browser.Panel({
             name        : 'reports',
             title       : gettext('Profiling Reports'),
             width       : '100%',
@@ -993,7 +955,7 @@ define([
             content     : '<div id ="reports" class="reports" tabindex="0"></div>',
           });
 
-          var current_report = new pgAdmin.Browser.Panel({
+          const current_report = new pgAdmin.Browser.Panel({
             name        : 'current_report',
             title       : gettext('Current Report'),
             width       : '100%',
@@ -1023,9 +985,9 @@ define([
       self.reports_panel        = self.docker.findPanels('reports')[0];
       self.current_report_panel = self.docker.findPanels('current_report')[0];
 
-      var editor_pane = $('<div id="stack_editor_pane" ' +
+      const editor_pane = $('<div id="stack_editor_pane" ' +
         'class="pg-panel-content info"></div>');
-      var code_editor_area = $('<textarea id="profiler-editor-textarea">' +
+      const code_editor_area = $('<textarea id="profiler-editor-textarea">' +
         '</textarea>').appendTo(editor_pane);
       self.code_editor_panel.layout().addItem(editor_pane);
 
@@ -1062,7 +1024,7 @@ define([
       });
 
       // On loading the docker, register the callbacks
-      var onLoad = function() {
+      const onLoad = function() {
         self.docker.finishLoading(100);
         self.docker.off(wcDocker.EVENT.LOADED);
         /* Set focus to the profiler container
@@ -1073,34 +1035,39 @@ define([
           self.docker.$container.parent().focus();
         }
 
-        let cacheIntervalId = setInterval(function() {
-          try {
-            let browser = window.opener ? window.opener.pgAdmin.Browser : window.top.pgAdmin.Browser;
-            if(browser.preference_version() > 0) {
-              clearInterval(cacheIntervalId);
-              self.reflectPreferences();
+        // TODO: test functionality
+        const preference_logger = () => {
+          setTimeout(() => {
+            try {
+              let browser = window.opener ? window.opener.pgAdmin.Browser : window.top.pgAdmin.Browser;
+              if(browser.preference_version() > 0) {
+                self.reflectPreferences();
 
-              /* If profiler is in a new tab, event fired is not available
-               * instead, a poller is set up who will check
-               */
-              if(self.preferences.profiler_new_browser_tab) {
-                let pollIntervalId = setInterval(()=>{
-                  if(window.opener && window.opener.pgAdmin) {
-                    self.reflectPreferences();
-                  }
-                  else {
-                    clearInterval(pollIntervalId);
-                  }
-                }, 1000);
+                /* If profiler is in a new tab, event fired is not available
+                 * instead, a poller is set up who will check
+                 */
+                if(self.preferences.profiler_new_browser_tab) {
+                  const poller = ()=> {
+                    setTimeout(() => {
+                      if(window.opener && window.opener.pgAdmin) {
+                        self.reflectPreferences();
+                        poller();
+                      }
+                    }, 1000);
+                  };
+
+                  poller();
+                }
               }
+              preference_logger();
             }
-          }
-          catch(err) {
-            clearInterval(cacheIntervalId);
-            throw err;
-          }
-        },0);
+            catch(err) {
+              throw err;
+            }
+          }, 0);
+        };
 
+        preference_logger();
       };
 
       self.docker.startLoading(gettext('Loading...'));
@@ -1159,7 +1126,7 @@ define([
         onCreate: function(panel) {
           self.panels[name] = panel;
           panel.initSize(width, height);
-          if (!title)
+          if(!title)
             panel.title(false);
           else
             panel.title(title);
@@ -1169,7 +1136,7 @@ define([
               'class': 'pg-profiler-panel',
             })
           );
-          if (onInit) {
+          if(onInit) {
             onInit.apply(self, [panel]);
           }
         },
