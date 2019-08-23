@@ -67,7 +67,7 @@ define([
         $.ajax({
           url        : url_for('profiler.start_execution', { 'trans_id': trans_id }),
           method     : 'GET',
-          beforeSend : function(xhr) {
+          beforeSend : (xhr) => {
             xhr.setRequestHeader(pgAdmin.csrf_token_header, pgAdmin.csrf_token);
             $('.profiler-container').addClass('show_progress');
           },
@@ -116,12 +116,14 @@ define([
               $.ajax({
                 url        : url_for('profiler.start_monitor', { 'trans_id': trans_id }),
                 method     : 'GET',
-                beforeSend : function(xhr) {
+                beforeSend : (xhr) => {
                   xhr.setRequestHeader(pgAdmin.csrf_token_header, pgAdmin.csrf_token);
                   pgTools.Profile.docker.startLoading(gettext(`Monitoring for ${duration} seconds`));
 
                   // We decrease the duration by 1 because time will already have passed by the
-                  // time the loading wheel is created and shown
+                  // time the loading wheel is created and shown. Note that the timer is not
+                  // synced up with the server. The server will still profile for the correct
+                  // amount of time even though the client interface may not reflect it.
                   controller._update_monitor_load(duration - 1);
                 },
               })
@@ -136,6 +138,11 @@ define([
                     Alertify.alert(
                       gettext('Profiler Error'),
                       gettext('Not Connected.')
+                    );
+                  } else if (res.data.status === 'ERROR') {
+                    Alertify.alert(
+                      gettext('Profiler Error'),
+                      gettext(res.data.result)
                     );
                   }
                 })
@@ -172,12 +179,11 @@ define([
        * @param {Array} result  Contains the values of the columns for the results panel
        */
       addResults : function(columns, result) {
-        let self = this;
 
         // Remove the existing created grid and update the result values
         if(self.result_grid) {
-          self.result_grid.remove();
-          self.result_grid = null;
+          this.result_grid.remove();
+          this.result_grid = null;
         }
 
         // Collection which contains the model for results
@@ -257,16 +263,15 @@ define([
        * @param {Array} result The JSON containing information about the parameters
        */
       addParameters: function(result) {
-        const self = this;
 
         // Remove the existing created grid and update the parameter values
-        if(self.param_grid) {
-          self.param_grid.remove();
-          self.param_grid = null;
+        if(this.param_grid) {
+          this.param_grid.remove();
+          this.param_grid = null;
         }
 
         // Collection which contains the model for function informations.
-        const ParametersCollection = self.ParametersCollection = Backbone.Collection.extend({
+        const ParametersCollection = this.ParametersCollection = Backbone.Collection.extend({
           model: Backbone.Model.extend({
             defaults: {
               name  : void 0,

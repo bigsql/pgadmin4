@@ -652,10 +652,12 @@ def start_monitor(trans_id):
     try:
         conn.execute_async('SET search_path to ' + namespace)
         conn.execute_async('SELECT pl_profiler_reset_shared()')
+
         if (pid is not None and pid is not ''):
             conn.execute_async('SELECT pl_profiler_set_enable_pid(' + str(pid) + ')')
         else:
             conn.execute_async('SELECT pl_profiler_set_enabled_global(true)')
+
         conn.execute_async('SELECT pl_profiler_set_collect_interval(' + str(interval) + ')')
         conn.execute_async('RESET search_path')
         try:
@@ -667,10 +669,15 @@ def start_monitor(trans_id):
                         pfl_inst.profiler_data['profile_type'],
                         int(pfl_inst.profiler_data['duration']))
         except Exception as e:
+            result = ''
+            if str(e) == ('No profiling data found(Possible cause: no functions were ' +
+                          'run during the monitoring duration)'):
+                result = str(e)
             current_app.logger.exception(e)
             return make_json_response(
                 data={
                     'status': 'ERROR',
+                    'result': result,
                 }
             )
     except Exception as e:
@@ -1110,7 +1117,7 @@ def _save_report(report_data, config, dbname, profile_type, duration):
         profile_type
         - The type of profiling (i.e. direct vs indirect)
         duration
-        - The duration of the profile
+        - The duration of the profile (-1 for direct profiles)
     Returns
     """
     report_data['config'] = config
