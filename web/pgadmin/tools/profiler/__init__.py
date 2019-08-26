@@ -678,8 +678,8 @@ def start_monitor(trans_id):
                         pfl_inst.profiler_data['profile_type'],
                         int(pfl_inst.profiler_data['duration']))
         except Exception as e:
-            result = ''
-            if str(e) == ('No profiling data found(Possible cause: no functions were ' +
+            result = 'Error while generating report'
+            if str(e) == ('No profiling data found(Possible cause: No functions were ' +
                           'run during the monitoring duration)'):
                 result = str(e)
             current_app.logger.exception(e)
@@ -917,7 +917,7 @@ def _generate_report(conn, data_location, func_oids = None):
         )
 
         # This query cannot be converted into a SQL template without issues,
-        # so the query is hard-coded 
+        # so the query is hard-coded
         status, result = conn.execute_async_list(
         """SELECT stack[array_upper(stack, 1)] as func_oid,
                   sum(us_self) as us_self
@@ -1099,7 +1099,7 @@ def _save_report(report_data, config, dbname, profile_type, duration):
         profile_type
         - The type of profiling (i.e. direct vs indirect)
         duration
-        - The duration of the profile (-1 for direct profiles)
+        - The duration of the profile
     Returns
     """
     report_data['config'] = config
@@ -1606,7 +1606,7 @@ def get_config(trans_id):
     get_config(trans_id)
 
     Formats and fetches the report configuration options for the profiling instance that
-    correspond with the given transaction id
+    corresponds with the given transaction id
 
     Parameters:
         trans_id

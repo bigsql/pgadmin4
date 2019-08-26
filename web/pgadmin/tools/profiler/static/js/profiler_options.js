@@ -201,8 +201,9 @@ define([
                   if (self.preferences.profiler_new_browser_tab) {
                     window.open(url, '_blank');
                   } else {
+                    console.warn(pgBrowser.Events);
                     pgBrowser.Events.once(
-                      'pgadmin-browser:fram:urlload:frm_profiler',
+                      'pgadmin-browser:frame:urlloaded:frm_profiler',
                       function(frame) {
                         frame.openURL(url);
                       });
