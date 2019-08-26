@@ -212,10 +212,9 @@ define([
                 return function() {
                   let enable_btn = false;
                   for (let i = 0; i < this.collection.length; i++) {
-                    if (this.collection.models[i].get('is_null')) {
-                      obj.__internal.buttons[1].element.disabled = false;
+                    if (this.collection.models[i].get('value') == null ||
+                        this.collection.models[i].get('value') == void 0) {
                       enable_btn = true;
-                      continue;
                     }
                   }
                   if (!enable_btn)

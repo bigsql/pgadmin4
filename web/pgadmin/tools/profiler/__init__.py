@@ -1,7 +1,7 @@
 ####################################################################################################
 #
 #
-# Todo: implement support for procedures
+#
 #
 #
 #
@@ -36,6 +36,7 @@ from config import PG_DEFAULT_DRIVER
 from pgadmin.model import db, ProfilerSavedReports, ProfilerFunctionArguments
 from pgadmin.tools.profiler.utils.profiler_instance import ProfilerInstance
 from pgadmin.tools.profiler.utils.profiler_report import plprofiler_report
+from pgadmin.utils.preferences import Preferences
 
 ASYNC_OK = 1
 
@@ -99,13 +100,12 @@ class ProfilerModule(PgAdminModule):
                 'profiler.initialize_target_for_function',
                 'profiler.initialize_target_indirect',
                 'profiler.start_monitor', 'profiler.start_execution',
-                'profiler.restart',
                 'profiler.show_report', 'profiler.delete_report',
                 'profiler.get_src', 'profiler.get_parameters',
-                'profiler.get_reports',
+                'profiler.get_reports', 'profiler.get_duration',
                 'profiler.set_arguments', 'profiler.get_arguments',
-                'profiler.set_config', 'profiler.get_config',
-                'profiler.close', 'profiler.get_duration',
+                'profiler.get_config', 'profiler.set_config',
+                'profiler.close',
                 ]
 
 
@@ -234,7 +234,6 @@ def init_function(node_type, sid, did, scid=None, fid=None):
         is_proc_supported = True if manager.version >= 110000 else False
 
         sql = ''
-
         sql = render_template(
             "/".join([template_path, 'get_function_profile_info.sql']),
             is_ppas_database=False,
@@ -506,8 +505,7 @@ def initialize_target(trans_id, sid, did,
 @login_required
 def profile_new(trans_id):
     """
-    This method is responsible for creating an asynchronous connection
-    for direct profiling.
+    Generates the HTML template for the Profiling Window
 
     Parameters:
         trans_id
@@ -662,7 +660,7 @@ def start_monitor(trans_id):
         conn.execute_async('RESET search_path')
         try:
             time.sleep(int(duration))
-            report_data = _generate_report(conn, 'shared', opt_top=10, func_oids={})
+            report_data = _generate_report(conn, 'shared', func_oids={})
             _save_report(report_data,
                         pfl_inst.config,
                         conn.as_dict()['database'],
@@ -760,7 +758,7 @@ def start_execution(trans_id):
         conn.execute_async('SELECT pl_profiler_reset_local()')
         conn.execute_async('SELECT pl_profiler_set_collect_interval(0)')
         status, result = conn.execute_async_list(sql)
-        report_data = _generate_report(conn, 'local', opt_top=10, func_oids={}) # TODO: Add support for K top
+        report_data = _generate_report(conn, 'local', func_oids={})
 
         duration = 0
         for func in report_data['func_defs']:
@@ -799,34 +797,6 @@ def start_execution(trans_id):
             'report_id': report_id
         }
     )
-
-@blueprint.route(
-    '/restart/<int:trans_id>', methods=['GET'],
-    endpoint='restart'
-)
-@login_required
-def restart(trans_id):
-    pfl_inst = ProfilerInstance(trans_id)
-    if pfl_inst.profiler_data is None:
-        return make_json_response(
-            data={
-                'status': 'NotConnected',
-                'result': gettext(
-                    'Not connected to server or connection with the server '
-                    'has been closed.'
-                )
-            }
-        )
-
-    return make_json_response(
-        data={
-            'status': 'Success',
-            'profile_data': pfl_inst.profiler_data,
-            'func_data': pfl_inst.function_data,
-            'require_input': pfl_inst.function_data['require_input']
-        }
-    )
-
 
 @blueprint.route(
     '/close/<int:trans_id>', methods=["DELETE"], endpoint='close'
@@ -897,7 +867,7 @@ def close_profiler_session(_trans_id, close_all=False):
             pfl_inst.clear()
 
 
-def _generate_report(conn, data_location, opt_top, func_oids = None):
+def _generate_report(conn, data_location, func_oids = None):
     """
     _generate_report(trans_id)
 
@@ -906,8 +876,6 @@ def _generate_report(conn, data_location, opt_top, func_oids = None):
     Parameters:
         conn
         - psycopg2 connection object to run queries on the server
-        opt_top
-        - The constant for which we will find the opt_top functions by time
         func_oids
         - Specific func_oids to profile for
         data_location
@@ -915,6 +883,9 @@ def _generate_report(conn, data_location, opt_top, func_oids = None):
     Returns:
         dictionary containing information about the performance profile
     """
+
+    # Get the value for top_k set by the user
+    opt_top = Preferences('profiler').preference('profiler_top_k').get()
 
     # Set the template path required to read the sql files
     template_path = 'profiler/sql'
@@ -932,7 +903,7 @@ def _generate_report(conn, data_location, opt_top, func_oids = None):
             "/".join([template_path,
                       'get_func_oids.sql']),
             data_location=data_location,
-            opt_top = opt_top
+            opt_top=opt_top
         )
 
         status, result = conn.execute_async_list(
@@ -1339,8 +1310,7 @@ def set_arguments_sqlite(sid, did, scid, func_id):
     """
     set_arguments_sqlite(sid, did, scid, func_id)
 
-    This method is responsible for setting the value of function arguments
-    to sqlite database
+    Sets the value of function arguments in the sqlite database
 
     Parameters:
         sid

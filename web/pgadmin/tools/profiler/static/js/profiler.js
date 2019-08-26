@@ -219,7 +219,7 @@ define([
     },
 
     /**
-     * Callback function for function profiling that will determine if a function requires
+     * Callback function for direct profiling that will determine if a function requires
      * arguments then prompts the user to input values for the arguments (if necessary)
      *
      * @param {Object} args node type

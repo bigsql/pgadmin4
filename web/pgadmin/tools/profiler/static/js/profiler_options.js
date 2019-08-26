@@ -18,8 +18,8 @@ define([
 
   const ProfilerInputOptionsModel = Backbone.Model.extend({
     defaults: {
-      option: undefined,
-      value: undefined,
+      option : void 0 ,
+      value  : void 0,
     },
     validate: function() {
       if (_.isUndefined(this.get('value'))
@@ -111,6 +111,15 @@ define([
 
             grid.render();
             $(this.elements.content).html(grid.el);
+
+            // For keyboard navigation in the grid
+            // we'll set focus on text from the first row if any
+            var grid_text = $(grid.el).find('input:text').first();
+            if (grid_text.length) {
+              setTimeout(function() {
+                grid_text.trigger('click');
+              }, 250);
+            }
 
           },
           settings: {
