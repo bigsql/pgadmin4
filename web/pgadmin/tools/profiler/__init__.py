@@ -176,10 +176,8 @@ def init_function(node_type, sid, did, scid=None, fid=None):
     """
     init_function(node_type, sid, did, scid, fid)
 
-    This method is responsible to initialize the function required for
-    profiling.
-    This method is also responsible for storing the functions data to
-    session variable.
+    Initializes the function required for profiling.
+    Also stores the functions data to session variable.
     It will also create a unique transaction id and store the information
     into session variable.
 
@@ -370,13 +368,20 @@ def initialize_target_indirect(trans_id, sid, did):
         current_app.logger.debug(msg)
         return internal_server_error(msg)
 
-    # TODO: Input checking
+    # Input checking
     try:
-        pfl_inst.profiler_data = {
-            'duration': data[0]['value'],
-            'interval': data[1]['value'],
-            'pid': data[2]['value'] if 'value' in data[2] else None
-        }
+        temp = []
+
+        # duration
+        temp.append(int(data[0]['value']))
+
+        # interval
+        temp.append(int(data[1]['value']))
+
+        # pid
+        if 'value' in data[2] and data[2]['value'] is not '':
+            temp.append(int(data[2]['value']))
+
     except Exception as e:
         return make_json_response(
             data={
@@ -384,6 +389,12 @@ def initialize_target_indirect(trans_id, sid, did):
                 'result': 'Invalid input type'
             }
         )
+
+    pfl_inst.profiler_data = {
+        'duration': data[0]['value'],
+        'interval': data[1]['value'],
+        'pid': data[2]['value'] if 'value' in data[2] else None
+    }
 
     pfl_inst.profiler_data['conn_id'] = conn_id
     pfl_inst.profiler_data['server_id'] = sid
@@ -417,7 +428,7 @@ def initialize_target(trans_id, sid, did,
     """
     initialize_target(sid, did, scid, func_id)
 
-    Create an asynchronous connection for direct profiling. Also sets default
+    Creates an asynchronous connection for direct profiling. Also sets default
     report configuration options and profiler instance data.
 
     Parameters:
@@ -460,7 +471,7 @@ def initialize_target(trans_id, sid, did,
     if "plprofiler" in rid_pre:
         msg = gettext(
             "The profiler plugin is enabled globally. "
-            "Please remove the plugin to the shared_preload_libraries "
+            "Please remove the plugin from the shared_preload_libraries "
             "setting in the postgresql.conf file and restart the "
             "database server for direct profiling."
         )
@@ -601,7 +612,7 @@ def start_monitor(trans_id):
     """
     start_monitor(trans_id)
 
-    This method is responsible for starting monitoring a database
+    Starts to monitor the database that corresponds with the transaction id
 
     Parameters:
         trans_id
@@ -706,7 +717,7 @@ def start_execution(trans_id):
     """
     start_execution(trans_id)
 
-    This method is responsible for creating an asynchronous connection for
+    Creates an asynchronous connection for
     execution thread. Also store the session id into session return with
     attach port query for the indirect profiling.
 
@@ -784,7 +795,6 @@ def start_execution(trans_id):
 
     # Format the result to display the result to client
     columns = {}
-
     for res in result:
         for key in res:
             columns['name'] = key
@@ -884,7 +894,7 @@ def _generate_report(conn, data_location, func_oids = None):
         dictionary containing information about the performance profile
     """
 
-    # Get the value for top_k set by the user
+    # Get the value for top_k set by the user from the Preferences module
     opt_top = Preferences('profiler').preference('profiler_top_k').get()
 
     # Set the template path required to read the sql files
@@ -906,6 +916,8 @@ def _generate_report(conn, data_location, func_oids = None):
             opt_top=opt_top
         )
 
+        # This query cannot be converted into a SQL template without issues,
+        # so the query is hard-coded 
         status, result = conn.execute_async_list(
         """SELECT stack[array_upper(stack, 1)] as func_oid,
                   sum(us_self) as us_self
@@ -923,7 +935,7 @@ def _generate_report(conn, data_location, func_oids = None):
         func_oids = [int(x) for x in func_oids]
 
     if len(func_oids) == 0:
-        raise Exception("No profiling data found(Possible cause: no functions"
+        raise Exception("No profiling data found(Possible cause: No functions"
                         " were run during the monitoring duration)")
 
     # ----
@@ -1074,8 +1086,7 @@ def _save_report(report_data, config, dbname, profile_type, duration):
     """
     _save_report(report_data, config, dbname, profile_type, duration)
 
-    This method is responsible for generating a HTML report and
-    saving it internally
+    Generatins a HTML report and saves it internally
 
     Parameters:
         report_data
@@ -1151,9 +1162,8 @@ def delete_report(report_id):
     """
     delete_report(report_id)
 
-    This method is responsible for deleting the report with the given report
-    id from PgAdmin4. This includes deleting the report data from the internal
-    sqlite3 database and removing it from the file system.
+    Deletes the report with the given report id from PgAdmin4. This includes deleting the
+    report data from the internal sqlite3 database and removing it from the file system.
 
     Parameters:
         report_id
@@ -1207,8 +1217,7 @@ def show_report(report_id):
     """
     show_report(report_id)
 
-    This method is responsible for finding the saved HTML report that
-    corresponds to the given report id
+    Finds the saved HTML report that corresponds to the given report id
 
     Parameters:
         report_id
@@ -1454,7 +1463,7 @@ def get_parameters(trans_id):
     """
     get_parameters(trans_id)
 
-    This method is responsible for retrieving the parameters that correspond with the profiling
+    Retrieves the parameters that correspond with the profiling
     instance specified by the given transaction id.
 
     Note that this differs from the get_arguments_sqlite(trans_id) method because it fetches
@@ -1548,7 +1557,7 @@ def get_duration(trans_id):
     """
     get_duration(trans_id)
 
-    This method is responsible for retrieving the duration of indirect(global)
+    Retrieves the duration of indirect(global)
     profiling for the profiling instance that corresponds with the given
     transaction id
 
@@ -1596,9 +1605,8 @@ def get_config(trans_id):
     """
     get_config(trans_id)
 
-    This method is responsible for formatting and getting the report
-    configuration items for the profiling instance that corresponds with the
-    given transaction id
+    Formats and fetches the report configuration options for the profiling instance that
+    correspond with the given transaction id
 
     Parameters:
         trans_id
@@ -1666,8 +1674,7 @@ def set_config(trans_id):
     """
     set_config(trans_id)
 
-    This method is responsible for setting the configuration options for the
-    report to be generated for a given profiling instance
+    Sets the configuration options for the report to be generated for a given profiling instance
 
     Parameters:
         trans_id
