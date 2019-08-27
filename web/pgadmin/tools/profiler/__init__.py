@@ -1,11 +1,11 @@
-####################################################################################################
+##########################################################################
 #
 #
 #
 #
 #
 #
-####################################################################################################
+##########################################################################
 
 """A blueprint module implementing the profiler"""
 
@@ -44,6 +44,7 @@ DEFAULT_TABSTOP = '8'
 DEFAULT_SVG_WIDTH = '1200'
 DEFAULT_TABLE_WIDTH = '80%'
 DEFAULT_DESC = ''
+
 
 class ProfilerModule(PgAdminModule):
     """
@@ -88,14 +89,14 @@ class ProfilerModule(PgAdminModule):
             'Properties', 'profiler_top_k',
             gettext("Number of functions to report for"), 'integer', 10,
             category_label=gettext('Properties'),
-            help_str=gettext('The profiler will generate a report for the given '
-                             'number of functions')
+            help_str=gettext('The profiler will generate a report for the '
+                             'given number of functions')
         )
 
     # TODO: Keyboard shortcuts
 
     def get_exposed_url_endpoints(self):
-        return ['profiler.index','profiler.profile',
+        return ['profiler.index', 'profiler.profile',
                 'profiler.init_for_database', 'profiler.init_for_function',
                 'profiler.initialize_target_for_function',
                 'profiler.initialize_target_indirect',
@@ -108,7 +109,6 @@ class ProfilerModule(PgAdminModule):
                 'profiler.close',
                 ]
 
-
     def on_logout(self, user):
         """
         This is a callback function when user logout from pgAdmin
@@ -117,9 +117,9 @@ class ProfilerModule(PgAdminModule):
         """
         close_profiler_session(None, close_all=True)
 
-####################################################################################################
 
 blueprint = ProfilerModule(MODULE_NAME, __name__)
+
 
 @blueprint.route("/", endpoint='index')
 @login_required
@@ -127,6 +127,7 @@ def index():
     return bad_request(
         errormsg=gettext("This URL cannot be called directly.")
     )
+
 
 @blueprint.route("/js/profiler.js")
 @login_required
@@ -137,6 +138,7 @@ def script():
         status=200,
         mimetype="application/javascript"
     )
+
 
 @blueprint.route("/js/profiler_ui.js")
 @login_required
@@ -259,8 +261,8 @@ def init_function(node_type, sid, did, scid=None, fid=None):
                 'default_value': r_set['rows'][0]['proargdefaults'],
                 'require_input': True}
 
-        # Below will check do we really required for the user input arguments and
-        # show input dialog
+        # Below will check do we really required for the user
+        # input arguments and show input dialog
         if not r_set['rows'][0]['proargtypenames']:
             data['require_input'] = False
         else:
@@ -308,6 +310,7 @@ def init_function(node_type, sid, did, scid=None, fid=None):
             ),
             status=200
         )
+
 
 @blueprint.route(
     '/initialize_target_indirect/<int:trans_id>/<int:sid>/<int:did>/',
@@ -416,6 +419,7 @@ def initialize_target_indirect(trans_id, sid, did):
     return make_json_response(data={'status': status,
                                     'profilerTransId': trans_id})
 
+
 @blueprint.route(
     '/initialize_target/<int:trans_id>/<int:sid>/<int:did>/'
     '<int:scid>/<int:func_id>',
@@ -478,7 +482,6 @@ def initialize_target(trans_id, sid, did,
         current_app.logger.debug(msg)
         return internal_server_error(msg)
 
-
     # Set the template path required to read the sql files
     template_path = 'profiler/sql'
 
@@ -512,7 +515,11 @@ def initialize_target(trans_id, sid, did,
     return make_json_response(data={'status': status,
                                     'profilerTransId': trans_id})
 
-@blueprint.route('/profile/<int:trans_id>', methods=['GET'], endpoint='profile')
+
+@blueprint.route(
+    '/profile/<int:trans_id>',
+    methods=['GET'], endpoint='profile'
+)
 @login_required
 def profile_new(trans_id):
     """
@@ -531,7 +538,11 @@ def profile_new(trans_id):
 
     # if indirect profiling pass value 0 to client and for direct profiling
     # pass it to 1
-    profile_type = 0 if pfl_inst.profiler_data['profile_type'] == 'indirect' else 1
+    profile_type = (
+        0
+        if pfl_inst.profiler_data['profile_type'] == 'indirect'
+        else 1
+    )
 
     """
     Animations and transitions are not automatically GPU accelerated and by
@@ -571,9 +582,10 @@ def profile_new(trans_id):
                 args_type_list = pfl_inst.profiler_data['args_type'].split(",")
                 index = 0
                 for args_name in args_name_list:
-                    function_arguments = '{}{} {}, '.format(function_arguments,
-                                                            args_name,
-                                                            args_type_list[index])
+                    function_arguments = \
+                        '{}{} {}, '.format(function_arguments,
+                                           args_name,
+                                           args_type_list[index])
                     index += 1
                 # Remove extra comma and space from the arguments list
                 if len(args_name_list) > 0:
@@ -602,6 +614,7 @@ def profile_new(trans_id):
         function_name_with_arguments=function_name_with_arguments,
         layout=layout
     )
+
 
 @blueprint.route(
     '/start_monitor/<int:trans_id>', methods=['GET'],
@@ -663,24 +676,27 @@ def start_monitor(trans_id):
         conn.execute_async('SELECT pl_profiler_reset_shared()')
 
         if (pid is not None and pid is not ''):
-            conn.execute_async('SELECT pl_profiler_set_enable_pid(' + str(pid) + ')')
+            conn.execute_async(
+                'SELECT pl_profiler_set_enable_pid(' + str(pid) + ')')
         else:
             conn.execute_async('SELECT pl_profiler_set_enabled_global(true)')
 
-        conn.execute_async('SELECT pl_profiler_set_collect_interval(' + str(interval) + ')')
+        conn.execute_async(
+            'SELECT pl_profiler_set_collect_interval(' + str(interval) + ')')
         conn.execute_async('RESET search_path')
         try:
             time.sleep(int(duration))
             report_data = _generate_report(conn, 'shared', func_oids={})
             _save_report(report_data,
-                        pfl_inst.config,
-                        conn.as_dict()['database'],
-                        pfl_inst.profiler_data['profile_type'],
-                        int(pfl_inst.profiler_data['duration']))
+                         pfl_inst.config,
+                         conn.as_dict()['database'],
+                         pfl_inst.profiler_data['profile_type'],
+                         int(pfl_inst.profiler_data['duration']))
         except Exception as e:
             result = 'Error while generating report'
-            if str(e) == ('No profiling data found(Possible cause: No functions were ' +
-                          'run during the monitoring duration)'):
+            if str(e) == ('No profiling data found(Possible cause: No '
+                          + 'functions were run during the monitoring '
+                          + 'duration'):
                 result = str(e)
             current_app.logger.exception(e)
             return make_json_response(
@@ -703,10 +719,11 @@ def start_monitor(trans_id):
         conn.execute_async('RESET search_path')
 
     return make_json_response(
-        data = {
+        data={
             'status': 'Success'
         }
     )
+
 
 @blueprint.route(
     '/start_execution/<int:trans_id>', methods=['GET'],
@@ -778,10 +795,10 @@ def start_execution(trans_id):
                 duration = int(func['total_time']) / 100000
 
         report_id = _save_report(report_data,
-                                pfl_inst.config,
-                                conn.as_dict()['database'],
-                                pfl_inst.profiler_data['profile_type'],
-                                duration);
+                                 pfl_inst.config,
+                                 conn.as_dict()['database'],
+                                 pfl_inst.profiler_data['profile_type'],
+                                 duration)
     except Exception as e:
         current_app.logger.exception(e)
         return make_json_response(
@@ -808,6 +825,7 @@ def start_execution(trans_id):
         }
     )
 
+
 @blueprint.route(
     '/close/<int:trans_id>', methods=["DELETE"], endpoint='close'
 )
@@ -825,6 +843,7 @@ def close(trans_id):
 
     close_profiler_session(trans_id)
     return make_json_response(data={'status': True})
+
 
 def close_profiler_session(_trans_id, close_all=False):
     """
@@ -854,8 +873,10 @@ def close_profiler_session(_trans_id, close_all=False):
                         did=pfl_obj['database_id'],
                         conn_id=pfl_obj['conn_id'])
 
-                    conn.execute_async('SELECT pl_profiler_set_enabled_local(false)')
-                    conn.execute_async('SELECT pl_profiler_set_enabled_global(false)')
+                    conn.execute_async(
+                        'SELECT pl_profiler_set_enabled_local(false)')
+                    conn.execute_async(
+                        'SELECT pl_profiler_set_enabled_global(false)')
                     if conn.connected():
                         conn.cancel_transaction(
                             pfl_obj['conn_id'],
@@ -877,7 +898,7 @@ def close_profiler_session(_trans_id, close_all=False):
             pfl_inst.clear()
 
 
-def _generate_report(conn, data_location, func_oids = None):
+def _generate_report(conn, data_location, func_oids=None):
     """
     _generate_report(trans_id)
 
@@ -889,13 +910,17 @@ def _generate_report(conn, data_location, func_oids = None):
         func_oids
         - Specific func_oids to profile for
         data_location
-        - Either 'local' or 'shared', which is determined by the type of profiling
+        - Either 'local' or 'shared', which is determined by the type
+          of profiling
     Returns:
         dictionary containing information about the performance profile
     """
 
     # Get the value for top_k set by the user from the Preferences module
     opt_top = Preferences('profiler').preference('profiler_top_k').get()
+    if opt_top <= 0:
+        raise Exception("Value for top_k is less than 1. Please change "
+                        "value to be greater than or equal to 1.")
 
     # Set the template path required to read the sql files
     template_path = 'profiler/sql'
@@ -908,7 +933,6 @@ def _generate_report(conn, data_location, func_oids = None):
         func_oids_by_user = False
         func_oids = []
 
-
         sql = render_template(
             "/".join([template_path,
                       'get_func_oids.sql']),
@@ -919,12 +943,12 @@ def _generate_report(conn, data_location, func_oids = None):
         # This query cannot be converted into a SQL template without issues,
         # so the query is hard-coded
         status, result = conn.execute_async_list(
-        """SELECT stack[array_upper(stack, 1)] as func_oid,
-                  sum(us_self) as us_self
-           FROM pl_profiler_callgraph_""" + data_location + """() C
-           GROUP BY func_oid
-           ORDER BY us_self DESC
-           LIMIT %s""", (opt_top + 1, ))
+            """SELECT stack[array_upper(stack, 1)] as func_oid,
+                      sum(us_self) as us_self
+               FROM pl_profiler_callgraph_""" + data_location + """() C
+               GROUP BY func_oid
+               ORDER BY us_self DESC
+               LIMIT %s""", (opt_top + 1, ))
         for row in result:
             func_oids.append(int(row['func_oid']))
         if len(func_oids) > opt_top:
@@ -946,7 +970,7 @@ def _generate_report(conn, data_location, func_oids = None):
                   'sort_func_oids.sql']),
         func_oids=func_oids
     )
-    status, result = conn.execute_async_list(sql);
+    status, result = conn.execute_async_list(sql)
     func_list = []
     for row in result:
         func_list.append({
@@ -965,7 +989,7 @@ def _generate_report(conn, data_location, func_oids = None):
         data_location=data_location
     )
     linestats = {}
-    status, result = conn.execute_async_list(sql);
+    status, result = conn.execute_async_list(sql)
     for row in result:
         if row['func_oid'] not in linestats:
             linestats[row['func_oid']] = []
@@ -997,7 +1021,7 @@ def _generate_report(conn, data_location, func_oids = None):
         status, result = conn.execute_async_list(sql)
         row = result[0]
         if row is None:
-            raise Exception("function with Oid %d not found\n" %func_oid)
+            raise Exception("function with Oid %d not found\n" % func_oid)
 
         # ----
         # With that we can start the definition.
@@ -1059,16 +1083,15 @@ def _generate_report(conn, data_location, func_oids = None):
 
     if data_location == 'shared':
         sql = render_template(
-            "/".join([template_path,
-                  'get_overflow_flags.sql'])
+            "/".join([template_path, 'get_overflow_flags.sql'])
         )
         status, result = conn.execute_async_list(sql)
-        overflow_flags['callgraph_overflow'] = \
-            result[0]['pl_profiler_callgraph_overflow']
-        overflow_flags['functions_overflow'] = \
-            result[0]['pl_profiler_functions_overflow']
-        overflow_flags['lines_overflow'] = \
-            result[0]['pl_profiler_lines_overflow']
+        overflow_flags['callgraph_overflow'] = (
+            result[0]['pl_profiler_callgraph_overflow'])
+        overflow_flags['functions_overflow'] = (
+            result[0]['pl_profiler_functions_overflow'])
+        overflow_flags['lines_overflow'] = (
+            result[0]['pl_profiler_lines_overflow'])
 
     return {
             'callgraph_overflow': overflow_flags['callgraph_overflow'],
@@ -1081,6 +1104,7 @@ def _generate_report(conn, data_location, func_oids = None):
             'func_oids_by_user': func_oids_by_user,
             'found_more_funcs': found_more_funcs,
         }
+
 
 def _save_report(report_data, config, dbname, profile_type, duration):
     """
@@ -1103,7 +1127,6 @@ def _save_report(report_data, config, dbname, profile_type, duration):
     Returns
     """
     report_data['config'] = config
-
 
     now = datetime.now().strftime("%Y-%m-%d | %H:%M")
     path = os.path.dirname(os.path.abspath(current_app.root_path))
@@ -1162,8 +1185,9 @@ def delete_report(report_id):
     """
     delete_report(report_id)
 
-    Deletes the report with the given report id from PgAdmin4. This includes deleting the
-    report data from the internal sqlite3 database and removing it from the file system.
+    Deletes the report with the given report id from PgAdmin4. This includes
+    deleting the report data from the internal sqlite3 database and removing
+    it from the file system.
 
     Parameters:
         report_id
@@ -1205,7 +1229,6 @@ def delete_report(report_id):
                 'status': 'ERROR'
             }
         )
-
 
 
 @blueprint.route(
@@ -1309,6 +1332,7 @@ def get_arguments_sqlite(sid, did, scid, func_id):
                 'result': 'result',
                 'args_count': PflFuncArgsCount}
         )
+
 
 @blueprint.route(
     '/set_arguments/<int:sid>/<int:did>/<int:scid>/<int:func_id>',
@@ -1424,7 +1448,8 @@ def get_src(trans_id):
         trans_id
         - Transaction ID
     Returns:
-        The function source code for the function that corresponds with the given transaction id
+        The function source code for the function that corresponds with
+        the given transaction id
     """
     pfl_inst = ProfilerInstance(trans_id)
     if pfl_inst.profiler_data is None:
@@ -1454,6 +1479,7 @@ def get_src(trans_id):
         }
     )
 
+
 @blueprint.route(
     '/get_parameters/<int:trans_id>', methods=['GET'],
     endpoint='get_parameters'
@@ -1466,16 +1492,19 @@ def get_parameters(trans_id):
     Retrieves the parameters that correspond with the profiling
     instance specified by the given transaction id.
 
-    Note that this differs from the get_arguments_sqlite(trans_id) method because it fetches
-    information from the profiling instance instead of the sqlite3 database. In addition,
-    if the transaction id given corresponds to an indirect(global) profiling instance, it returns
-    a formatted list of the monitoring parameters(duration, interval, pid) instead.
+    Note that this differs from the get_arguments_sqlite(trans_id) method
+    because it fetches information from the profiling instance instead of
+    the sqlite3 database. In addition, if the transaction id given
+    corresponds to an indirect(global) profiling instance, it returns a
+    formatted list of the monitoring parameters(duration, interval, pid)
+    instead.
 
     Parameters:
         trans_id
         - Transaction ID
     Returns:
-        A formatted list that contains identifying information for all of the parameters
+        A formatted list that contains identifying information for all
+        of the parameters
     """
 
     pfl_inst = ProfilerInstance(trans_id)
@@ -1516,6 +1545,7 @@ def get_parameters(trans_id):
             }
         )
 
+
 @blueprint.route(
     '/get_reports', methods=['GET'],
     endpoint='get_reports'
@@ -1528,8 +1558,8 @@ def get_reports():
     Retrieves all of the saved reports that are currently stored by PgAdmin
 
     Returns:
-        A formatted list that contains identifying information for all of the reports
-        that are currently saved
+        A formatted list that contains identifying information for all
+        of the reports that are currently saved
     """
     saved_reports = ProfilerSavedReports.query.all()
 
@@ -1549,6 +1579,7 @@ def get_reports():
         }
     )
 
+
 @blueprint.route(
     '/get_duration/<int:trans_id>', methods=['GET'],
     endpoint='get_duration'
@@ -1558,8 +1589,8 @@ def get_duration(trans_id):
     get_duration(trans_id)
 
     Retrieves the duration of indirect(global)
-    profiling for the profiling instance that corresponds with the given
-    transaction id
+    profiling for the profiling instance that corresponds
+    with the given transaction id
 
     Parameters:
         trans_id
@@ -1605,8 +1636,9 @@ def get_config(trans_id):
     """
     get_config(trans_id)
 
-    Formats and fetches the report configuration options for the profiling instance that
-    corresponds with the given transaction id
+    Formats and fetches the report configuration options
+    for the profiling instance that corresponds with the
+    given transaction id
 
     Parameters:
         trans_id
@@ -1665,6 +1697,7 @@ def get_config(trans_id):
         }
     )
 
+
 @blueprint.route(
     '/set_config/<int:trans_id>', methods=['POST'],
     endpoint='set_config'
@@ -1674,7 +1707,8 @@ def set_config(trans_id):
     """
     set_config(trans_id)
 
-    Sets the configuration options for the report to be generated for a given profiling instance
+    Sets the configuration options for the report to be
+    generated for a given profiling instance
 
     Parameters:
         trans_id
