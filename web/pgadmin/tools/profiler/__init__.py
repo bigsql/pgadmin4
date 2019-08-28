@@ -93,8 +93,6 @@ class ProfilerModule(PgAdminModule):
                              'given number of functions')
         )
 
-    # TODO: Keyboard shortcuts
-
     def get_exposed_url_endpoints(self):
         return ['profiler.index', 'profiler.profile',
                 'profiler.init_for_database', 'profiler.init_for_function',
@@ -314,7 +312,7 @@ def init_function(node_type, sid, did, scid=None, fid=None):
 
 @blueprint.route(
     '/initialize_target_indirect/<int:trans_id>/<int:sid>/<int:did>/',
-    methods=['GET', 'POST'],
+    methods=['POST'],
     endpoint='initialize_target_indirect'
 )
 @login_required
@@ -373,17 +371,15 @@ def initialize_target_indirect(trans_id, sid, did):
 
     # Input checking
     try:
-        temp = []
-
         # duration
-        temp.append(int(data[0]['value']))
+        int(data[0]['value'])
 
         # interval
-        temp.append(int(data[1]['value']))
+        int(data[1]['value'])
 
         # pid
         if 'value' in data[2] and data[2]['value'] is not '':
-            temp.append(int(data[2]['value']))
+            int(data[2]['value'])
 
     except Exception as e:
         return make_json_response(
@@ -677,7 +673,7 @@ def start_monitor(trans_id):
 
         if (pid is not None and pid is not ''):
             conn.execute_async(
-                'SELECT pl_profiler_set_enable_pid(' + str(pid) + ')')
+                'SELECT pl_profiler_set_enabled_pid(' + str(pid) + ')')
         else:
             conn.execute_async('SELECT pl_profiler_set_enabled_global(true)')
 
@@ -779,12 +775,20 @@ def start_execution(trans_id):
         data=pfl_inst.function_data['args_value']
     )
 
+    status, res = conn.execute_async_list("""
+                    SELECT N.nspname
+                    FROM pg_catalog.pg_extension E
+                    JOIN pg_catalog.pg_namespace N ON N.oid = E.extnamespace
+                    WHERE E.extname = 'plprofiler'
+                """)
+    namespace = res[0]['nspname']
+
     try:
-        schema = pfl_inst.function_data['schema']
-        conn.execute_async('SET search_path to ' + schema + ';')
+        conn.execute_async('SET search_path to ' + namespace + ';')
         conn.execute_async('SELECT pl_profiler_set_enabled_local(true)')
         conn.execute_async('SELECT pl_profiler_reset_local()')
         conn.execute_async('SELECT pl_profiler_set_collect_interval(0)')
+        conn.execute_async('RESET search_path')
         status, result = conn.execute_async_list(sql)
         report_data = _generate_report(conn, 'local', func_oids={})
 

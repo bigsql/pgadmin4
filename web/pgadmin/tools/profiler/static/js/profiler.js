@@ -289,7 +289,7 @@ define([
 
             $.ajax({
               url: initTargetUrl,
-              method: 'GET',
+              method: 'POST',
             })
               .done(function() {
                 const url = url_for('profiler.profile', { 'trans_id': trans_id });
