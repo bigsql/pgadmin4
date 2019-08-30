@@ -105,17 +105,17 @@ define([
       start_monitor : function(trans_id) {
         // Get duration through AJAX call to display to user
         $.ajax({
-          url    : url_for('profiler.get_duration', { 'trans_id': trans_id }),
+          url    : url_for('profiler.get_parameters', { 'trans_id': trans_id }),
           method : 'GET',
         })
           .done(function(res) {
             if(res.data.status === 'Success') {
-              let duration = parseInt(res.data.duration, 10);
+              let duration = parseInt(res.data.result[0].value, 10);
 
               // Make ajax call to start monitoring
               $.ajax({
                 url        : url_for('profiler.start_monitor', { 'trans_id': trans_id }),
-                method     : 'GET',
+                method     : 'POST',
                 beforeSend : (xhr) => {
                   xhr.setRequestHeader(pgAdmin.csrf_token_header, pgAdmin.csrf_token);
                   pgTools.Profile.docker.startLoading(gettext(`Monitoring for ${duration} seconds`));

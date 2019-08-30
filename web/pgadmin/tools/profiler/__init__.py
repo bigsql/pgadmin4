@@ -40,6 +40,7 @@ from pgadmin.utils.preferences import Preferences
 
 ASYNC_OK = 1
 
+# Default report configuration options
 DEFAULT_TABSTOP = '8'
 DEFAULT_SVG_WIDTH = '1200'
 DEFAULT_TABLE_WIDTH = '80%'
@@ -101,7 +102,7 @@ class ProfilerModule(PgAdminModule):
                 'profiler.start_monitor', 'profiler.start_execution',
                 'profiler.show_report', 'profiler.delete_report',
                 'profiler.get_src', 'profiler.get_parameters',
-                'profiler.get_reports', 'profiler.get_duration',
+                'profiler.get_reports',
                 'profiler.set_arguments', 'profiler.get_arguments',
                 'profiler.get_config', 'profiler.set_config',
                 'profiler.close',
@@ -356,8 +357,20 @@ def initialize_target_indirect(trans_id, sid, did):
         )
 
     pfl_inst = ProfilerInstance(trans_id)
+    if pfl_inst.function_data is None:
+        return internal_server_error(errormsg=
+            'Could not find Profiler Instance with given transaction_id')
+
     if request.method == 'POST':
-        data = json.loads(request.values['data'], encoding='utf-8')
+        try:
+            data = json.loads(request.values['data'], encoding='utf-8')
+
+        # Need to include this for regression tests. Cannot pass in the data to the request.values
+        # field in the tests
+        except Exception as e:
+            if (str(e) == '400 Bad Request: The browser (or proxy) sent a '
+                          'request that this server could not understand.'):
+                data = json.loads(request.data, encoding='utf-8')
 
     if "plprofiler" not in rid_pre:
         msg = gettext(
@@ -378,21 +391,21 @@ def initialize_target_indirect(trans_id, sid, did):
         int(data[1]['value'])
 
         # pid
-        if 'value' in data[2] and data[2]['value'] is not '':
+        if len(data) > 2 and 'value' in data[2] and data[2]['value'] is not '':
             int(data[2]['value'])
 
     except Exception as e:
+        current_app.logger.debug(e)
         return make_json_response(
-            data={
-                'status': 'ERROR',
-                'result': 'Invalid input type'
-            }
+            status=415,
+            success=0,
+            errormsg='Invalid input type'
         )
 
     pfl_inst.profiler_data = {
         'duration': data[0]['value'],
         'interval': data[1]['value'],
-        'pid': data[2]['value'] if 'value' in data[2] else None
+        'pid': data[2]['value'] if (len(data) > 2 and 'value' in data[2]) else None
     }
 
     pfl_inst.profiler_data['conn_id'] = conn_id
@@ -530,7 +543,8 @@ def profile_new(trans_id):
 
     # Return from the function if transaction id not found
     if pfl_inst.profiler_data is None:
-        return make_json_response(data={'status': True})
+        return internal_server_error(errormsg=
+            gettext('Could not find Profiler Instance with given transaction_id'))
 
     # if indirect profiling pass value 0 to client and for direct profiling
     # pass it to 1
@@ -613,7 +627,7 @@ def profile_new(trans_id):
 
 
 @blueprint.route(
-    '/start_monitor/<int:trans_id>', methods=['GET'],
+    '/start_monitor/<int:trans_id>', methods=['POST'],
     endpoint='start_monitor'
 )
 @login_required
@@ -682,6 +696,7 @@ def start_monitor(trans_id):
         conn.execute_async('RESET search_path')
         try:
             time.sleep(int(duration))
+            conn.execute_async('SET search_path to ' + namespace)
             report_data = _generate_report(conn, 'shared', func_oids={})
             _save_report(report_data,
                          pfl_inst.config,
@@ -689,10 +704,10 @@ def start_monitor(trans_id):
                          pfl_inst.profiler_data['profile_type'],
                          int(pfl_inst.profiler_data['duration']))
         except Exception as e:
+
             result = 'Error while generating report'
-            if str(e) == ('No profiling data found(Possible cause: No '
-                          + 'functions were run during the monitoring '
-                          + 'duration'):
+            if str(e) == ('No profiling data found(Possible cause: No functions'
+                          ' were run during the monitoring duration)'):
                 result = str(e)
             current_app.logger.exception(e)
             return make_json_response(
@@ -709,6 +724,7 @@ def start_monitor(trans_id):
             }
         )
     finally:
+        print('finally')
         conn.execute_async('SET search_path to ' + namespace)
         conn.execute_async('SELECT pl_profiler_set_enabled_global(false)')
         conn.execute_async('SELECT pl_profiler_set_enabled_pid(0)')
@@ -1580,53 +1596,6 @@ def get_reports():
         data={
             'status': 'Success',
             'result': reports
-        }
-    )
-
-
-@blueprint.route(
-    '/get_duration/<int:trans_id>', methods=['GET'],
-    endpoint='get_duration'
-)
-def get_duration(trans_id):
-    """
-    get_duration(trans_id)
-
-    Retrieves the duration of indirect(global)
-    profiling for the profiling instance that corresponds
-    with the given transaction id
-
-    Parameters:
-        trans_id
-        - Transaction ID
-    """
-
-    pfl_inst = ProfilerInstance(trans_id)
-    if pfl_inst.profiler_data is None:
-        return make_json_response(
-            data={
-                'status': 'NotConnected',
-                'result': gettext(
-                    'Not connected to server or connection with the server '
-                    'has been closed'
-                )
-            })
-
-    if pfl_inst.profiler_data['duration'] is None:
-        return make_json_response(
-            data={
-                'status': 'Error',
-                'result': gettext(
-                    'Duration not found, was this an indirect profiling '
-                    'instance?'
-                )
-            }
-        )
-
-    return make_json_response(
-        data={
-            'status': 'Success',
-            'duration': pfl_inst.profiler_data['duration']
         }
     )
 
