@@ -115,6 +115,7 @@ define([
         })
           .done(function(res) {
             if(res.data.status === 'Success') {
+
               let duration = parseInt(res.data.result[0].value, 10);
 
               // Make ajax call to start monitoring

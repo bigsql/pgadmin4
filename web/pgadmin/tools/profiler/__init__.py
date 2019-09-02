@@ -1549,6 +1549,29 @@ def get_parameters(trans_id):
         )
 
     if pfl_inst.profiler_data['profile_type'] == 'direct':
+
+        # If the value of an argument is a list, format
+        # the argument values to be a string of pattern:
+        #   {'{0}', '{1}', '{2}'}
+        # where '{x}' is the string representation of the value.
+        # If this step is not performed, the argument values
+        # will not display properly to the client
+        for i in range(len(pfl_inst.function_data['args_value'])):
+            current_arg = pfl_inst.function_data['args_value'][i]
+
+            # If the argument is an array, then the values
+            # are stored as a dict of {'value' : value}.
+            # Use list comprehension to make a
+            # new list of just the values and join them
+            if '[]' in current_arg['type']:
+                current_arg['value'] = (
+                    '{'
+                    + ', '.join([arg['value'] for arg in current_arg['value']])
+                    + '}'
+                )
+
+            # If the argument is a non-iterable data-type, do nothing
+
         return make_json_response(
             data={
                 'status': 'Success',
