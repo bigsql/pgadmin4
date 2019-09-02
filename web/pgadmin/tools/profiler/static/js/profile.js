@@ -9,11 +9,13 @@ define([
   'sources/gettext', 'sources/url_for', 'jquery', 'underscore',
   'pgadmin.alertifyjs', 'sources/pgadmin', 'pgadmin.browser', 'backbone',
   'pgadmin.backgrid', 'pgadmin.backform', 'sources/../bundle/codemirror',
-  'pgadmin.tools.profiler.ui', 'pgadmin.tools.profiler.options', 'pgadmin.tools.profiler.report',
-  'sources/keyboard_shortcuts', 'pgadmin.tools.profiler.utils',  'wcdocker',
+  'pgadmin.tools.profiler.ui', 'pgadmin.tools.profiler.options',
+  'pgadmin.tools.profiler.report', 'sources/keyboard_shortcuts',
+  'pgadmin.tools.profiler.utils',  'wcdocker',
 ], function(
   gettext, url_for, $, _, Alertify, pgAdmin, pgBrowser, Backbone, Backgrid,
-  Backform, codemirror, profile_function_again, monitor_function_again, input_report_options,
+  Backform, codemirror, profile_function_again, monitor_function_again,
+  input_report_options,
 ) {
 
   const CodeMirror = codemirror.default,
@@ -38,7 +40,8 @@ define([
   _.extend(
     controller, Backbone.Events, {
       /**
-       * Trigger the event and change the button view to enable/disable the buttons for profiling
+       * Trigger the event and change the button view to enable/disable
+       * the buttons for profiling
        */
       enable: function(btn, enable) {
         this.trigger('pgProfiler:button:state:' + btn, enable);
@@ -57,11 +60,12 @@ define([
       },
 
       /**
-       * Sends a message to the server to start direct profiling, then if successful, updates the
-       * results, updates the reports, and opens the newly created report in a new tab
+       * Sends a message to the server to start direct profiling, then if
+       * successful, updates the results, updates the reports, and updates
+       * the current report preview panel
        *
-       * @param {int} trans_id The unique transaction id for the already initialize profiling
-       *                       instance
+       * @param {int} trans_id The unique transaction id for the already
+       *                       initialized profiling instance
        */
       start_execution: function(trans_id) {
         $.ajax({
@@ -96,11 +100,12 @@ define([
       },
 
       /**
-       * Sends a message to the server to start indirect profiling, then if successful,
-       * updates the reports, and opens the newly created report in a new tab
+       * Sends a message to the server to start indirect profiling, then
+       * if successful, updates the reports, and opens the newly created
+       * report in a new tab
        *
-       * @param {int} trans_id The unique transaction id for the already initialize profiling
-       *                       instance
+       * @param {int} trans_id The unique transaction id for the already
+       *                       initialize profiling instance
        */
       start_monitor : function(trans_id) {
         // Get duration through AJAX call to display to user
@@ -118,12 +123,15 @@ define([
                 method     : 'POST',
                 beforeSend : (xhr) => {
                   xhr.setRequestHeader(pgAdmin.csrf_token_header, pgAdmin.csrf_token);
-                  pgTools.Profile.docker.startLoading(gettext(`Monitoring for ${duration} seconds`));
+                  pgTools.Profile.docker.startLoading(
+                    gettext(`Monitoring for ${duration} seconds`)
+                  );
 
-                  // We decrease the duration by 1 because time will already have passed by the
-                  // time the loading wheel is created and shown. Note that the timer is not
-                  // synced up with the server. The server will still profile for the correct
-                  // amount of time even though the client interface may not reflect it.
+                  // We decrease the duration by 1 because time will already
+                  // have passed by the time the loading wheel is created and
+                  // shown. Note that the timer is not synced up with the server.
+                  // The server will still profile for the correct amount of
+                  // time even though the client interface may not reflect it.
                   controller._update_monitor_load(duration - 1);
                 },
               })
@@ -257,8 +265,8 @@ define([
       },
 
       /**
-       * Adds the retrieved parameters from the server to the panel. Also initializes the grid
-       * that contains the parameters
+       * Adds the retrieved parameters from the server to the panel.
+       * Also initializes the grid that contains the parameters
        *
        * @param {Array} result The JSON containing information about the parameters
        */
@@ -271,15 +279,16 @@ define([
         }
 
         // Collection which contains the model for function informations.
-        const ParametersCollection = this.ParametersCollection = Backbone.Collection.extend({
-          model: Backbone.Model.extend({
-            defaults: {
-              name  : void 0,
-              type  : void 0,
-              value : void 0,
-            },
-          }),
-        });
+        const ParametersCollection =
+          this.ParametersCollection = Backbone.Collection.extend({
+            model: Backbone.Model.extend({
+              defaults: {
+                name  : void 0,
+                type  : void 0,
+                value : void 0,
+              },
+            }),
+          });
 
         const paramGridCols = [{
           name     : 'name',
@@ -365,8 +374,9 @@ define([
       },
 
       /**
-       * Adds the retrieved reports from the server to the panel by initializing the reports grid.
-       * Also defines functionality for the buttons on the grid and logic for keyboard navigation
+       * Adds the retrieved reports from the server to the panel by
+       * initializing the reports grid. Also defines functionality
+       * for the buttons on the grid and logic for keyboard navigation
        *
        * @param {Array} result - The JSON containing information about the reports
        */
@@ -380,17 +390,18 @@ define([
         }
 
         // Collection which contains the model for report informations.
-        const ReportsCollection = self.ReportsCollection = Backbone.Collection.extend({
-          model: Backbone.Model.extend({
-            defaults : {
-              profile_type : void 0,
-              database     : void 0,
-              time         : void 0,
-              duration     : void 0,
-              report_id    : void 0,
-            },
-          }),
-        });
+        const ReportsCollection =
+          self.ReportsCollection = Backbone.Collection.extend({
+            model: Backbone.Model.extend({
+              defaults : {
+                profile_type : void 0,
+                database     : void 0,
+                time         : void 0,
+                duration     : void 0,
+                report_id    : void 0,
+              },
+            }),
+          });
 
         const reportsGridCols = [
           {
@@ -446,7 +457,8 @@ define([
               Backgrid.HeaderCell.extend({
                 className : 'width_percent_10',
               }),
-            // Custom button cell to add functionality when the show report button is clicked
+            // Custom button cell to add functionality
+            // when the show report button is clicked
             cell       : Backgrid.Cell.extend({
               className : 'report-cell',
               events : {
@@ -512,15 +524,24 @@ define([
 
                           // Remove the selected row from the collection and therefore the grid
                           pgTools.Profile.reportsColl.remove(temp.model);
-                          pgTools.Profile.numReports -= 1;
+                          pgTools.Profile.numReports = pgTools.Profile.numReports - 1;
 
-                          // Case of deleting the report for the row at the bottom of the grid
-                          if(pgTools.Profile.currentReportIndex === pgTools.Profile.numReports) {
-                            pgTools.Profile.currentReportIndex -= 1;
+                          // The last (and only remaining report) is deleted
+                          if (pgTools.Profile.numReports == 0) {
+
+                            // clear the container
+                            const current_reports = pgTools.Profile.current_report_panel;
+                            current_reports.$container.find('.current_report').html('');
+                          } else {
+
+                            // Case of deleting the report for the row at the bottom of the grid
+                            if(pgTools.Profile.currentReportIndex === pgTools.Profile.numReports) {
+                              pgTools.Profile.currentReportIndex -= 1;
+                            }
+
+                            // show the next row
+                            controller._load_report(pgTools.Profile.currentReportIndex);
                           }
-
-                          // show the next row
-                          controller._load_report(pgTools.Profile.currentReportIndex);
                         });
 
                     },
@@ -724,8 +745,9 @@ define([
   );
 
   /*
-   * Profiler tool var view to create the button toolbar and listen to the button click event and inform the
-   * controller about the click and controller will take the action for the specified button click.
+   * Profiler tool var view to create the button toolbar and listen to the button
+   * click event and inform the controller about the click and controller will
+   * take the action for the specified button click.
    */
   const ProfilerToolbarView = Backbone.View.extend({
     el: '.profiler_main_container',
@@ -898,9 +920,10 @@ define([
     },
 
     /**
-     * Creates the default panel layout. This will be code editorpanel at the top, with the
-     * current report panel stacked next to it. Then the parameters panel at the bottom, with
-     * the results and saved reports panels stacked on top of it.
+     * Creates the default panel layout. This will be code editorpanel
+     * at the top, with the current report panel stacked next to it.
+     * Then the parameters panel at the bottom, with the results and saved
+     * reports panels stacked on top of it.
      *
      * @param {Object} docker The instance of the wcDocker that panels will be added to
      */

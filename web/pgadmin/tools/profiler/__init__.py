@@ -432,14 +432,14 @@ def initialize_target_indirect(trans_id, sid, did):
 @blueprint.route(
     '/initialize_target/<int:trans_id>/<int:sid>/<int:did>/'
     '<int:scid>/<int:func_id>',
-    methods=['GET', 'POST'],
+    methods=['POST'],
     endpoint='initialize_target_for_function'
 )
 @login_required
 def initialize_target(trans_id, sid, did,
                       scid, func_id):
     """
-    initialize_target(sid, did, scid, func_id)
+    initialize_target(trans_id sid, did, scid, func_id)
 
     Creates an asynchronous connection for direct profiling. Also sets default
     report configuration options and profiler instance data.
@@ -496,9 +496,19 @@ def initialize_target(trans_id, sid, did,
 
     pfl_inst = ProfilerInstance(trans_id)
     if request.method == 'POST':
-        data = json.loads(request.values['data'], encoding='utf-8')
-        if data:
-            pfl_inst.function_data['args_value'] = data
+        try:
+            if request.values['data']:
+                data = json.loads(request.values['data'], encoding='utf-8')
+                pfl_inst.function_data['args_value'] = data
+
+        # Need to include this for regression tests. Cannot pass in the data to the request.values
+        # field in the tests
+        except Exception as e:
+            if (str(e) == '400 Bad Request: The browser (or proxy) sent a '
+                          'request that this server could not understand.'):
+                if request.data:
+                    data = json.loads(request.data, encoding='utf-8')
+                    pfl_inst.function_data['args_value'] = data
 
     pfl_inst.profiler_data = {
         'conn_id': conn_id,
@@ -724,7 +734,6 @@ def start_monitor(trans_id):
             }
         )
     finally:
-        print('finally')
         conn.execute_async('SET search_path to ' + namespace)
         conn.execute_async('SELECT pl_profiler_set_enabled_global(false)')
         conn.execute_async('SELECT pl_profiler_set_enabled_pid(0)')
@@ -1699,8 +1708,14 @@ def set_config(trans_id):
                 )
             }
         )
-
-    data = json.loads(request.values['data'], encoding='utf-8')
+    try:
+        data = json.loads(request.values['data'], encoding='utf-8')
+    # Need to include this for regression tests. Cannot pass in the data to the request.values
+    # field in the tests
+    except Exception as e:
+        if (str(e) == '400 Bad Request: The browser (or proxy) sent a '
+                      'request that this server could not understand.'):
+            data = json.loads(request.data, encoding='utf-8')
     try:
         pfl_inst.config = {
                    'name': data[0]['value'],
