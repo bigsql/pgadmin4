@@ -363,7 +363,6 @@ define([
         })
           .done(function(res) {
             if(res.data.status === 'Success') {
-              console.warn(res.data.result);
               controller.addReports(res.data.result);
             }
           })
@@ -695,7 +694,7 @@ define([
        *                 report
        */
       _add_new_report : function(report_data) {
-        
+
         // format the report headers and add new report to grid
         pgTools.Profile.reportsColl.add({
           'profile_type': report_data.profile_type === true ? report_data.name : 'Global',
@@ -704,7 +703,9 @@ define([
           'duration'    : `${report_data.duration} seconds`,
           'report_id'   : report_data.report_id,
         });
+
         pgTools.Profile.numReports = pgTools.Profile.numReports + 1;
+        pgTools.Profile.currentId = report_data.report_id;
 
         // Default the currently showed report to the first report in the grid and show it
         pgTools.Profile.currentReportIndex = 0;
@@ -832,8 +833,8 @@ define([
       const key = `${e.code}`;
 
       if(key === 'ArrowUp' || key === 'ArrowDown') {
-        const delta = (key === 'ArrowUp') ? -1 : 1;
-        const new_index = pgTools.Profile.currentReportIndex + delta;
+        const change = (key === 'ArrowUp') ? -1 : 1;
+        const new_index = pgTools.Profile.currentReportIndex + change;
 
         if(new_index >= 0 && new_index < pgTools.Profile.numReports) {
           pgTools.Profile.currentReportIndex = new_index;
