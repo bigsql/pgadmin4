@@ -708,11 +708,11 @@ def start_monitor(trans_id):
             time.sleep(int(duration))
             conn.execute_async('SET search_path to ' + namespace)
             report_data = _generate_report(conn, 'shared', func_oids={})
-            _save_report(report_data,
-                         pfl_inst.config,
-                         conn.as_dict()['database'],
-                         pfl_inst.profiler_data['profile_type'],
-                         int(pfl_inst.profiler_data['duration']))
+            report_headers = _save_report(report_data,
+                                     pfl_inst.config,
+                                     conn.as_dict()['database'],
+                                     pfl_inst.profiler_data['profile_type'],
+                                     int(pfl_inst.profiler_data['duration']))
         except Exception as e:
 
             result = 'Error while generating report'
@@ -741,7 +741,8 @@ def start_monitor(trans_id):
 
     return make_json_response(
         data={
-            'status': 'Success'
+            'status': 'Success',
+            'report_headers': report_headers
         }
     )
 
@@ -823,7 +824,7 @@ def start_execution(trans_id):
                 # Divide by 10,000 because total_time is in microseconds
                 duration = int(func['total_time']) / 100000
 
-        report_id = _save_report(report_data,
+        report_headers = _save_report(report_data,
                                  pfl_inst.config,
                                  conn.as_dict()['database'],
                                  pfl_inst.profiler_data['profile_type'],
@@ -850,7 +851,7 @@ def start_execution(trans_id):
             'status': 'Success',
             'result':  result,
             'col_info': [columns],
-            'report_id': report_id
+            'report_headers': report_headers
         }
     )
 
@@ -1154,6 +1155,7 @@ def _save_report(report_data, config, dbname, profile_type, duration):
         duration
         - The duration of the profile
     Returns
+        Report data as saved in the sqlite database
     """
     report_data['config'] = config
 
@@ -1199,7 +1201,14 @@ def _save_report(report_data, config, dbname, profile_type, duration):
             db.session.add(profile_report)
             db.session.commit()
 
-            return profile_report.rid
+            return {
+                'name': profile_report.name,
+                'database': profile_report.dbname,
+                'time': profile_report.time,
+                'profile_type': profile_report.direct,
+                'duration': profile_report.duration,
+                'report_id': profile_report.rid
+                    }
     except Exception as e:
         current_app.logger.exception(e)
         os.remove(path)

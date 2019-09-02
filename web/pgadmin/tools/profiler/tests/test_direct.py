@@ -248,7 +248,7 @@ class DirectProfilingTestCase(BaseTestGenerator):
         self.assertEqual(response.json['data']['status'], 'Success')
         self.assertEqual(response.json['data']['result'][0][TEST_FUNC_NAME], TEST_FUNC_RESULT)
 
-        report_id = response.json['data']['report_id']
+        report_id = response.json['data']['report_headers']['report_id']
 
         # We should now have a new report
         response = self.tester.get(self.urls[5])

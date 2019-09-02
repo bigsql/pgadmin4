@@ -81,7 +81,7 @@ define([
 
             if(res.data.status === 'Success') {
               controller.addResults(res.data.col_info, res.data.result);
-              controller.update_reports();
+              controller._add_new_report(res.data.report_headers);
             }
             else if(res.data.status === 'NotConnected') {
               Alertify.alert(
@@ -140,7 +140,7 @@ define([
                   pgTools.Profile.docker.finishLoading();
 
                   if(res.data.status === 'Success') {
-                    controller.update_reports();
+                    controller._add_new_report(res.data.report_headers);
 
                   }
                   else if(res.data.status === 'NotConnected') {
@@ -363,6 +363,7 @@ define([
         })
           .done(function(res) {
             if(res.data.status === 'Success') {
+              console.warn(res.data.result);
               controller.addReports(res.data.result);
             }
           })
@@ -681,6 +682,29 @@ define([
         // Save the reports collection and reports grid, so we can use it for keyboard navigation
         pgTools.Profile.reportsColl  = self.reportsCollection;
         pgTools.Profile.reports_grid = reports_grid;
+
+        // Default the currently showed report to the first report in the grid and show it
+        pgTools.Profile.currentReportIndex = 0;
+        controller._load_report(pgTools.Profile.currentReportIndex);
+      },
+
+      /**
+       * Formats and adds new report data to the Reports grid
+       *
+       * @param {Object} An object that contains report information about the newly generated
+       *                 report
+       */
+      _add_new_report : function(report_data) {
+        
+        // format the report headers and add new report to grid
+        pgTools.Profile.reportsColl.add({
+          'profile_type': report_data.profile_type === true ? report_data.name : 'Global',
+          'database'    : report_data.database,
+          'start_date'  : report_data.time,
+          'duration'    : `${report_data.duration} seconds`,
+          'report_id'   : report_data.report_id,
+        });
+        pgTools.Profile.numReports = pgTools.Profile.numReports + 1;
 
         // Default the currently showed report to the first report in the grid and show it
         pgTools.Profile.currentReportIndex = 0;
