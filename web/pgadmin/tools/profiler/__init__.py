@@ -841,16 +841,17 @@ def start_execution(trans_id):
         conn.execute_async('RESET search_path')
 
     # Format the result to display the result to client
-    columns = {}
+    columns = []
+
     for res in result:
         for key in res:
-            columns['name'] = key
+            columns.append({'name': key})
 
     return make_json_response(
         data={
             'status': 'Success',
             'result':  result,
-            'col_info': [columns],
+            'col_info': columns,
             'report_headers': report_headers
         }
     )
