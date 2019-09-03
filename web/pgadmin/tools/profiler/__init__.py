@@ -361,16 +361,15 @@ def initialize_target_indirect(trans_id, sid, did):
         return internal_server_error(errormsg=
             'Could not find Profiler Instance with given transaction_id')
 
-    if request.method == 'POST':
-        try:
-            data = json.loads(request.values['data'], encoding='utf-8')
+    try:
+        data = json.loads(request.values['data'], encoding='utf-8')
 
-        # Need to include this for regression tests. Cannot pass in the data to the request.values
-        # field in the tests
-        except Exception as e:
-            if (str(e) == '400 Bad Request: The browser (or proxy) sent a '
-                          'request that this server could not understand.'):
-                data = json.loads(request.data, encoding='utf-8')
+    # Need to include this for regression tests. Cannot pass
+    # in the data to the request.values field in the tests
+    except Exception as e:
+        if (str(e) == '400 Bad Request: The browser (or proxy) sent a '
+                      'request that this server could not understand.'):
+            data = json.loads(request.data, encoding='utf-8')
 
     if "plprofiler" not in rid_pre:
         msg = gettext(
@@ -385,21 +384,24 @@ def initialize_target_indirect(trans_id, sid, did):
     # Input checking
     try:
         # duration
-        int(data[0]['value'])
+        if int(data[0]['value']) < 0:
+            raise ValueError('Duration cannot be negative')
 
         # interval
-        int(data[1]['value'])
+        if int(data[1]['value']) < 0:
+            raise ValueError('Interval cannot be negative')
 
         # pid
         if len(data) > 2 and 'value' in data[2] and data[2]['value'] is not '':
-            int(data[2]['value'])
+            if int(data[2]['value']) < 0:
+                raise ValueError('PID cannot be negative')
 
     except Exception as e:
         current_app.logger.debug(e)
         return make_json_response(
             status=415,
             success=0,
-            errormsg='Invalid input type'
+            errormsg='One or more arguments have invalid input'
         )
 
     pfl_inst.profiler_data = {
@@ -501,8 +503,8 @@ def initialize_target(trans_id, sid, did,
                 data = json.loads(request.values['data'], encoding='utf-8')
                 pfl_inst.function_data['args_value'] = data
 
-        # Need to include this for regression tests. Cannot pass in the data to the request.values
-        # field in the tests
+        # Need to include this for regression tests. Cannot pass in the data
+        # to the request.values field in the tests
         except Exception as e:
             if (str(e) == '400 Bad Request: The browser (or proxy) sent a '
                           'request that this server could not understand.'):
@@ -716,8 +718,9 @@ def start_monitor(trans_id):
         except Exception as e:
 
             result = 'Error while generating report'
-            if str(e) == ('No profiling data found(Possible cause: No functions'
-                          ' were run during the monitoring duration)'):
+            if str(e) == (
+                'No profiling data found(Possible cause: No functions'
+                ' were run during the monitoring duration)'):
                 result = str(e)
             current_app.logger.exception(e)
             return make_json_response(
@@ -1743,8 +1746,8 @@ def set_config(trans_id):
         )
     try:
         data = json.loads(request.values['data'], encoding='utf-8')
-    # Need to include this for regression tests. Cannot pass in the data to the request.values
-    # field in the tests
+    # Need to include this for regression tests. Cannot pass
+    # in the data to the request.values field in the tests
     except Exception as e:
         if (str(e) == '400 Bad Request: The browser (or proxy) sent a '
                       'request that this server could not understand.'):

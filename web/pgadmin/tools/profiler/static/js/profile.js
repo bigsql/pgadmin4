@@ -48,14 +48,16 @@ define([
       },
 
       enable_toolbar_buttons: function() {
-        let self = this;
+        const self = this;
         self.enable('start', true);
+        self.enable('edit-arg', true);
         self.enable('report-options', true);
       },
 
       disable_toolbar_buttons: function() {
-        let self = this;
+        const self = this;
         self.enable('start', false);
+        self.disable('edit-arg, false');
         self.disable('report-options', false);
       },
 
@@ -340,15 +342,6 @@ define([
           .$container
           .find('.parameters')
           .append(param_grid.el);
-      },
-
-      /**
-       * Adds the source code for the function to be profiled into the code editor panel
-       *
-       * @param {Array} result - The JSON containing information about the source code
-       */
-      add_src: function(result) {
-        pgTools.Profile.editor.setValue(result);
       },
 
       /**
@@ -779,15 +772,29 @@ define([
     el: '.profiler_main_container',
     initialize: function() {
       controller.on('pgProfiler:button:state:start', this.enable_start, this);
+      controller.on('pgProfiler:button:state:edit-arg', this.enable_edit_arg, this);
       controller.on('pgProfiler:button:state:report-options' , this.enable_report_options, this);
     },
     events: {
       'click .btn-start'          : 'on_start',
+      'click .btn-edit-arg'       : 'on_edit_arg',
       'click .btn-report-options' : 'on_report_options',
       'keydown'                   : 'keyAction',
     },
     enable_start: function(enable) {
       const $btn = this.$el.find('.btn-start');
+
+      if(enable) {
+        $btn.prop('disabled', false);
+        $btn.removeAttr('disabled');
+      }
+      else {
+        $btn.prop('disabled', true);
+        $btn.attr('disabled', 'disabled');
+      }
+    },
+    enable_edit_arg: function(enable) {
+      const $btn = this.$el.find('.btn-edit-arg');
 
       if(enable) {
         $btn.prop('disabled', false);
@@ -819,6 +826,16 @@ define([
       }
       else {
         controller.start_monitor(pgTools.Profile.trans_id);
+      }
+    },
+    on_edit_arg: function(e) {
+      e.stopPropagation();
+      e.preventDefault();
+
+      if (pgTools.Profile.profile_type == 1) {
+        Alertify.alert('direct');
+      } else {
+        Alertify.alert('indirect');
       }
     },
     on_report_options: function(e) {
@@ -926,7 +943,7 @@ define([
         })
           .done(function(res) {
             if(res.data.status === 'Success') {
-              controller.add_src(res.data.result);
+              pgTools.Profile.editor.setValue(res.data.result);
             }
 
             else if(res.data.status === 'NotConnected') {
