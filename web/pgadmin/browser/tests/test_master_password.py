@@ -22,7 +22,7 @@ class MasterPasswordTestCase(BaseTestGenerator):
 
     scenarios = [
         # This testcase validates invalid confirmation password
-         ('TestCase for Create master password dialog', dict(
+        ('TestCase for Create master password dialog', dict(
             password="",
             content=(
                 "Set Master Password",
