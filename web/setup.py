@@ -360,7 +360,8 @@ def setup_db():
 
             # Run migration if current schema version is greater than the
             # schema version stored in version table
-            db_upgrade(app)
+            if CURRENT_SCHEMA_VERSION >= schema_version:
+                db_upgrade(app)
 
             # Update schema version to the latest
             if CURRENT_SCHEMA_VERSION > schema_version:

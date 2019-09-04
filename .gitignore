@@ -38,11 +38,9 @@ runtime/ui_BrowserWindow.h
 web/config_local.py
 web/geckodriver.log
 web/regression/test_config.json
-web/regression/test_config.json.in
 node_modules/
 web/pgAdmin/static/js/generated
 web/pgadmin/static/js/generated
 web/yarn-error.log
 web/pgadmin/instance/
-web/pgadmin/tools/profiler/templates/profiler/instance/
 /web/cacert.pem
