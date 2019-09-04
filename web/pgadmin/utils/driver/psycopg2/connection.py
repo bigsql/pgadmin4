@@ -73,6 +73,10 @@ class Connection(BaseConnection):
     * execute_async(query, params, formatted_exception_msg)
       - Execute the given query asynchronously and returns result.
 
+    * execute_async(query, params, formatted_exception_msg)
+      - Execute the given query asynchronously and returns a list that
+        is the result of the query.
+
     * execute_void(query, params, formatted_exception_msg)
       - Execute the given query with no result.
 
