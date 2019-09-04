@@ -1,11 +1,12 @@
-/////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////
 //
+// pgAdmin 4 - PostgreSQL Tools
 //
+// Copyright (C) 2013 - 2019, The pgAdmin Development Team
+// This software is released under the PostgreSQL Licence
 //
-//
-//
-//
-/////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////
+
 
 define([
   'sources/gettext', 'sources/url_for', 'jquery', 'underscore',
@@ -132,7 +133,7 @@ define([
       // Find the function is really available in database
       const tree = pgBrowser.tree,
         info = tree.selected(),
-        d_ = info && info.length == 1 ? tree.itemData(info) : undefined;
+        d_ = info && info.length == 1 ? tree.itemData(info) : void 0;
 
       if (!d_)
         return false;
@@ -198,7 +199,7 @@ define([
     get_options: function(args, item) {
       const t = pgBrowser.tree,
         i = item || t.selected(),
-        d = i && i.length == 1 ? t.itemData(i) : undefined,
+        d = i && i.length == 1 ? t.itemData(i) : void 0,
         node = d && pgBrowser.Nodes[d._type];
 
       if (!d)
@@ -229,7 +230,7 @@ define([
     get_function_information: function(args, item) {
       const t = pgBrowser.tree,
         i = item || t.selected(),
-        d = i && i.length == 1 ? t.itemData(i) : undefined,
+        d = i && i.length == 1 ? t.itemData(i) : void 0,
         node = d && pgBrowser.Nodes[d._type],
         self = this;
 
@@ -255,7 +256,7 @@ define([
             // Directly open the panel
             const t = pgBrowser.tree,
               i = t.selected(),
-              d = i && i.length == 1 ? t.itemData(i) : undefined,
+              d = i && i.length == 1 ? t.itemData(i) : void 0,
               node = d && pgBrowser.Nodes[d._type];
 
             if (!d) {
