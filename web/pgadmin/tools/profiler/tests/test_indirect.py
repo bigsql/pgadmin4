@@ -9,6 +9,8 @@
 
 import json
 
+from flask_babelex import gettext
+
 from pgadmin.utils.route import BaseTestGenerator
 from regression.python_test_utils import test_utils as utils
 
@@ -47,7 +49,8 @@ class IndirectProfilingTest(BaseTestGenerator):
         self.cursor.execute("""
                         SELECT N.nspname
                         FROM pg_catalog.pg_extension E
-                        JOIN pg_catalog.pg_namespace N ON N.oid = E.extnamespace
+                        JOIN pg_catalog.pg_namespace N
+                            ON N.oid = E.extnamespace
                         WHERE E.extname = 'plprofiler'
                     """)
         res = self.cursor.fetchone()[0]
@@ -60,7 +63,8 @@ class IndirectProfilingTest(BaseTestGenerator):
 
     def runTest(self):
         ### init_function tests ###
-        response = self.tester.get(self.urls[0].format(self.server_id, self.db_id))
+        response = self.tester.get(
+            self.urls[0].format(self.server_id, self.db_id))
         data = response.json['data']
 
         self.assertEqual(response.status_code, 200)
@@ -86,12 +90,16 @@ class IndirectProfilingTest(BaseTestGenerator):
                 ]),
             content_type='application/json'
         )
-        if (response.status_code == 500):
-            if response.json['errormsg'] == ("The profiler plugin is not enabled. "
+        if response.status_code == 500 and response.json['errormsg'] == \
+            gettext(
+                "The profiler plugin is not enabled. "
                 "Please add the plugin to the shared_preload_libraries "
                 "setting in the postgresql.conf file and restart the "
-                "database server for indirect profiling."):
-                self.skipTest('pl_profiler plugin not installed on server in testing config')
+                "database server for indirect profiling."
+            ):
+            self.skipTest(
+                'pl_profiler plugin not installed on server in testing config'
+            )
 
         self.assertEqual(response.status_code, 200)
         profilerTransId = response.json['data']['profilerTransId']
@@ -113,7 +121,10 @@ class IndirectProfilingTest(BaseTestGenerator):
             content_type='application/json'
         )
         self.assertEqual(response.status_code, 415)
-        self.assertEqual(response.json['errormsg'], 'One or more arguments have invalid input')
+        self.assertEqual(
+            response.json['errormsg'],
+            'One or more arguments have invalid input'
+        )
 
         # Wrong trans_id
         response = self.tester.post(
@@ -185,7 +196,8 @@ class IndirectProfilingTest(BaseTestGenerator):
         # Case of no functions called
         self.assertEqual(
             response.json['data']['result'],
-            'No profiling data found(Possible cause: No functions were run during the monitoring duration)'
+            'No profiling data found(Possible '
+            'cause: No functions were run during the monitoring duration)'
         )
 
         # Case of functions are called

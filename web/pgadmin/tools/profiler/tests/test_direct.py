@@ -25,7 +25,8 @@ TEST_FUNC_RESULT = 3
 TEST_FUNC_SIGN = \
     '{0}({1})'.format(
         TEST_FUNC_NAME,
-        ", ".join(['{0} {1}'.format(arg, TEST_FUNC_ARGS[arg][1]) for arg in TEST_FUNC_ARGS])
+        ", ".join(['{0} {1}'.format(
+            arg, TEST_FUNC_ARGS[arg][1]) for arg in TEST_FUNC_ARGS])
     )
 
 TEST_REPORT_NAME = 'test_name'
@@ -68,7 +69,8 @@ class DirectProfilingTestCase(BaseTestGenerator):
         self.cursor.execute(
                         "SELECT N.nspname "
                         "FROM pg_catalog.pg_extension E "
-                        "JOIN pg_catalog.pg_namespace N ON N.oid = E.extnamespace "
+                        "JOIN pg_catalog.pg_namespace N "
+                        "   ON N.oid = E.extnamespace "
                         "WHERE E.extname = \'plprofiler\'")
         self.schema_name = self.cursor.fetchone()[0]
 
@@ -79,12 +81,14 @@ class DirectProfilingTestCase(BaseTestGenerator):
 
         self.cursor.execute("SELECT N.oid "
                             "FROM pg_catalog.pg_namespace N "
-                            "   JOIN pg_catalog.pg_extension E ON N.oid = E.extnamespace "
+                            "JOIN pg_catalog.pg_extension E "
+                            "   ON N.oid = E.extnamespace "
                             "WHERE E.extname = 'plprofiler'")
         try:
             self.schema_id = self.cursor.fetchone()[0]
         except Exception as e:
-            self.skipTest('Could not find schema with plprofiler extension installed '
+            self.skipTest('Could not find schema with plprofiler '
+                          'extension installed '
                           '(Please verify config settings are correct)')
         schid = str(self.schema_id)
 
@@ -94,15 +98,18 @@ class DirectProfilingTestCase(BaseTestGenerator):
                 "   BEGIN "
                 "       {1}; "
                 "   END; "
-                "$$   LANGUAGE plpgsql; ".format(TEST_FUNC_SIGN, TEST_FUNC_BODY)
+                "$$   LANGUAGE plpgsql; ".format(
+                    TEST_FUNC_SIGN, TEST_FUNC_BODY)
             )
         except Exception as e:
             self.skipTest('Could not create test function')
 
         self.cursor.execute("SELECT p.oid "
                             "FROM pg_catalog.pg_proc P "
-                            "   LEFT JOIN pg_catalog.pg_namespace N on p.pronamespace = N.oid "
-                            "WHERE p.proname = '{0}' AND N.oid = {1}".format(TEST_FUNC_NAME, schid))
+                            "LEFT JOIN pg_catalog.pg_namespace N "
+                            "   ON p.pronamespace = N.oid "
+                            "WHERE p.proname = '{0}' AND N.oid = {1}".format(
+                                TEST_FUNC_NAME, schid))
         try:
             self.fid = self.cursor.fetchone()[0]
         except Exception as e:
@@ -151,13 +158,16 @@ class DirectProfilingTestCase(BaseTestGenerator):
             data=json.dumps(args) if args is not [] else None
         )
 
-        if response.status_code == 500 and response.json['errormsg'] == gettext(
-            "The profiler plugin is enabled globally. "
-            "Please remove the plugin from the shared_preload_libraries "
-            "setting in the postgresql.conf file and restart the "
-            "database server for direct profiling."
-        ):
-            self.skipTest('pl_profiler plugin installed on server in testing config')
+        if response.status_code == 500 and response.json['errormsg'] == \
+            gettext(
+                "The profiler plugin is enabled globally. "
+                "Please remove the plugin from the shared_preload_libraries "
+                "setting in the postgresql.conf file and restart the "
+                "database server for direct profiling."
+            ):
+            self.skipTest(
+                'pl_profiler plugin installed on server in testing config'
+            )
 
         self.assertEqual(response.status_code, 200)
 
@@ -173,7 +183,10 @@ class DirectProfilingTestCase(BaseTestGenerator):
         ### get_parameters tests ###
         response = self.tester.get(self.urls[4].format(trans_id))
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.json['data']['result']), len(TEST_FUNC_ARGS))
+        self.assertEqual(
+            len(response.json['data']['result']),
+            len(TEST_FUNC_ARGS)
+        )
         for i in range(len(TEST_FUNC_ARGS)):
             self.assertEqual(response.json['data']['result'][i], args[i])
 
@@ -244,7 +257,10 @@ class DirectProfilingTestCase(BaseTestGenerator):
         report_desc = response.json['data']['result'][5]['value']
 
         self.assertEqual(report_name, TEST_REPORT_NAME)
-        self.assertEqual(report_title, response.json['data']['result'][1]['value'])
+        self.assertEqual(
+            report_title,
+            response.json['data']['result'][1]['value']
+        )
         self.assertEqual(report_tabstop, TEST_REPORT_TABSTOP)
         self.assertEqual(report_svg_width, TEST_REPORT_SVG_WIDTH)
         self.assertEqual(report_table_width, TEST_REPORT_TABLE_WIDTH)
@@ -255,13 +271,19 @@ class DirectProfilingTestCase(BaseTestGenerator):
         response = self.tester.get(self.urls[8].format(trans_id))
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json['data']['status'], 'Success')
-        self.assertEqual(response.json['data']['result'][0][TEST_FUNC_NAME], TEST_FUNC_RESULT)
+        self.assertEqual(
+            response.json['data']['result'][0][TEST_FUNC_NAME],
+            TEST_FUNC_RESULT
+        )
 
         report_id = response.json['data']['report_headers']['report_id']
 
         # We should now have a new report
         response = self.tester.get(self.urls[5])
-        self.assertEqual(num_reports + 1, len(response.json['data']['result']))
+        self.assertEqual(
+            num_reports + 1,
+            len(response.json['data']['result'])
+        )
         num_reports = len(response.json['data']['result'])
 
         ### show_report tests ###
@@ -274,7 +296,10 @@ class DirectProfilingTestCase(BaseTestGenerator):
 
         # Make sure that the number of reports has lowered
         response = self.tester.get(self.urls[5])
-        self.assertEqual(num_reports - 1, len(response.json['data']['result']))
+        self.assertEqual(
+            num_reports - 1,
+            len(response.json['data']['result'])
+        )
         num_reports = len(response.json['data']['result'])
 
 
