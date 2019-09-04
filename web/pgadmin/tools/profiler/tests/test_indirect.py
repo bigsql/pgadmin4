@@ -104,7 +104,7 @@ class IndirectProfilingTest(BaseTestGenerator):
             content_type='application/json'
         )
         self.assertEqual(response.status_code, 415)
-        self.assertEqual(response.json['errormsg'], 'Invalid input type')
+        self.assertEqual(response.json['errormsg'], 'One or more arguments have invalid input')
 
         # Wrong trans_id
         response = self.tester.post(
@@ -158,7 +158,7 @@ class IndirectProfilingTest(BaseTestGenerator):
         interval = response.json['data']['result'][1]
         pid = response.json['data']['result'][2]
 
-        self.assertEqual(duration['value'], TEST_ßDURATION)
+        self.assertEqual(duration['value'], TEST_DURATION)
         self.assertEqual(duration['name'], 'Duration')
         self.assertEqual(duration['type'], 'Monitoring Parameter')
 

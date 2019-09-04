@@ -9,13 +9,11 @@ define([
   'sources/gettext', 'sources/url_for', 'jquery', 'underscore',
   'pgadmin.alertifyjs', 'sources/pgadmin', 'pgadmin.browser', 'backbone',
   'pgadmin.backgrid', 'pgadmin.backform', 'sources/../bundle/codemirror',
-  'pgadmin.tools.profiler.ui', 'pgadmin.tools.profiler.options',
   'pgadmin.tools.profiler.report', 'sources/keyboard_shortcuts',
   'pgadmin.tools.profiler.utils',  'wcdocker',
 ], function(
   gettext, url_for, $, _, Alertify, pgAdmin, pgBrowser, Backbone, Backgrid,
-  Backform, codemirror, profile_function_again, monitor_function_again,
-  input_report_options,
+  Backform, codemirror, input_report_options,
 ) {
 
   const CodeMirror = codemirror.default,
@@ -50,14 +48,12 @@ define([
       enable_toolbar_buttons: function() {
         const self = this;
         self.enable('start', true);
-        self.enable('edit-arg', true);
         self.enable('report-options', true);
       },
 
       disable_toolbar_buttons: function() {
         const self = this;
         self.enable('start', false);
-        self.disable('edit-arg, false');
         self.disable('report-options', false);
       },
 
@@ -772,29 +768,15 @@ define([
     el: '.profiler_main_container',
     initialize: function() {
       controller.on('pgProfiler:button:state:start', this.enable_start, this);
-      controller.on('pgProfiler:button:state:edit-arg', this.enable_edit_arg, this);
       controller.on('pgProfiler:button:state:report-options' , this.enable_report_options, this);
     },
     events: {
       'click .btn-start'          : 'on_start',
-      'click .btn-edit-arg'       : 'on_edit_arg',
       'click .btn-report-options' : 'on_report_options',
       'keydown'                   : 'keyAction',
     },
     enable_start: function(enable) {
       const $btn = this.$el.find('.btn-start');
-
-      if(enable) {
-        $btn.prop('disabled', false);
-        $btn.removeAttr('disabled');
-      }
-      else {
-        $btn.prop('disabled', true);
-        $btn.attr('disabled', 'disabled');
-      }
-    },
-    enable_edit_arg: function(enable) {
-      const $btn = this.$el.find('.btn-edit-arg');
 
       if(enable) {
         $btn.prop('disabled', false);
@@ -826,16 +808,6 @@ define([
       }
       else {
         controller.start_monitor(pgTools.Profile.trans_id);
-      }
-    },
-    on_edit_arg: function(e) {
-      e.stopPropagation();
-      e.preventDefault();
-
-      if (pgTools.Profile.profile_type == 1) {
-        Alertify.alert('direct');
-      } else {
-        Alertify.alert('indirect');
       }
     },
     on_report_options: function(e) {
@@ -881,7 +853,7 @@ define([
      */
     load: function(trans_id, profile_type, function_name_with_arguments, layout) {
 
-      let self = this;
+      const self = this;
 
       // We do not want to initialize the module multiple times.
       if(this._initialized) {
@@ -909,7 +881,8 @@ define([
       // we save this so when the grid is sorted, we show the same report and update the index
       this.currentId = -1;
 
-      let browser = window.opener ? window.opener.pgAdmin.Browser : window.top.pgAdmin.Browser;
+      const browser =
+        window.opener ? window.opener.pgAdmin.Browser : window.top.pgAdmin.Browser;
       this.preferences = browser.get_preferences_for_module('profiler');
 
       this.docker = new wcDocker(
@@ -1106,11 +1079,11 @@ define([
           self.docker.$container.parent().focus();
         }
 
-        // TODO: test functionality
         const preference_logger = () => {
           setTimeout(() => {
             try {
-              let browser = window.opener ? window.opener.pgAdmin.Browser : window.top.pgAdmin.Browser;
+              const browser =
+                window.opener ? window.opener.pgAdmin.Browser : window.top.pgAdmin.Browser;
               if(browser.preference_version() > 0) {
                 self.reflectPreferences();
 
@@ -1173,7 +1146,7 @@ define([
      * Retrieve preferences for the profiler
      */
     reflectPreferences: function() {
-      let self = this,
+      const self = this,
         browser = window.opener ? window.opener.pgAdmin.Browser : window.top.pgAdmin.Browser;
       self.preferences = browser.get_preferences_for_module('profiler');
       self.toolbarView.preferences = self.preferences;
@@ -1189,7 +1162,7 @@ define([
      * @param {function} onInit function to be called on initialization
      */
     registerPanel: function(name, title, width, height, onInit) {
-      let self = this;
+      const self = this;
 
       this.docker.registerPanelType(name, {
         title: title,

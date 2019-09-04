@@ -392,7 +392,10 @@ def initialize_target_indirect(trans_id, sid, did):
             raise ValueError('Interval cannot be negative')
 
         # pid
-        if len(data) > 2 and 'value' in data[2] and data[2]['value'] is not '':
+        if len(data) > 2 \
+            and 'value' in data[2] \
+            and data[2]['value'] is not None \
+            and data[2]['value'] is not '':
             if int(data[2]['value']) < 0:
                 raise ValueError('PID cannot be negative')
 

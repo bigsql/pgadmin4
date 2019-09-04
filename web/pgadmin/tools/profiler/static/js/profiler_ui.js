@@ -66,7 +66,7 @@ define([
       case 'xid':
       case 'tid':
         // As we are getting this value as text from sqlite database so we need to type cast it.
-        if (model.get('value') != undefined) {
+        if (model.get('value') != void 0) {
           model.set({
             'value': parseInt(model.get('value')),
           }, {
@@ -80,7 +80,7 @@ define([
       case 'double precision':
       case 'decimal':
         // As we are getting this value as text from sqlite database so we need to type cast it.
-        if (model.get('value') != undefined) {
+        if (model.get('value') != void 0) {
           model.set({
             'value': parseFloat(model.get('value')),
           }, {
@@ -116,13 +116,13 @@ define([
    **/
   const ProfilerInputArgsModel = Backbone.Model.extend({
     defaults: {
-      name: undefined,
-      type: undefined,
-      is_null: undefined,
-      expr: undefined,
-      value: undefined,
-      use_default: undefined,
-      default_value: undefined,
+      name: void 0,
+      type: void 0,
+      is_null: void 0,
+      expr: void 0,
+      value: void 0,
+      use_default: void 0,
+      default_value: void 0,
     },
     validate: function() {
       if (_.isUndefined(this.get('value')) ||
@@ -197,7 +197,7 @@ define([
             const t = pgBrowser.tree;
 
             i = t.selected();
-            d = i && i.length == 1 ? t.itemData(i) : undefined;
+            d = i && i.length == 1 ? t.itemData(i) : void 0;
 
             let node = d && pgBrowser.Nodes[d._type];
 
@@ -562,8 +562,8 @@ define([
 
           },
           settings: {
-            profile_info: undefined,
-            trans_id: undefined,
+            profile_info: void 0,
+            trans_id: void 0,
           },
           setup: function() {
             return {
@@ -837,7 +837,7 @@ define([
                     // TODO: Need to check the "Expression" column value to
                     // enable/disable the "Profile" button
                     if (this.collection.models[i].get('value') == null ||
-                        this.collection.models[i].get('value') == undefined) {
+                        this.collection.models[i].get('value') == void 0) {
                       enable_btn = true;
 
                       if (this.collection.models[i].get('use_default')) {
