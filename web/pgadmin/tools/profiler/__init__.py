@@ -588,18 +588,19 @@ def profile_new(trans_id):
         function_name = pfl_inst.profiler_data['function_name']
 
         function_arguments = '('
-        if pfl_inst.profiler_data is not None:
-            if 'args_name' in pfl_inst.profiler_data and \
-                pfl_inst.profiler_data['args_name'] is not None and \
-                    pfl_inst.profiler_data['args_name'] != '':
-                args_name_list = pfl_inst.profiler_data['args_name'].split(",")
-                args_type_list = pfl_inst.profiler_data['args_type'].split(",")
+        print(pfl_inst.function_data['args_value'])
+        if pfl_inst.function_data is not None:
+            if 'args_name' in pfl_inst.function_data and \
+                pfl_inst.function_data['args_name'] is not None and \
+                    pfl_inst.function_data['args_name'] != '':
+                args_name_list = pfl_inst.function_data['args_name'].split(",")
+                args_type_list = pfl_inst.function_data['args_type'].split(",")
                 index = 0
                 for args_name in args_name_list:
+                    arg_value = pfl_inst.function_data['args_value'][index]['value']
                     function_arguments = \
-                        '{}{} {}, '.format(function_arguments,
-                                           args_name,
-                                           args_type_list[index])
+                        '{}{}, '.format(function_arguments,
+                                           arg_value)
                     index += 1
                 # Remove extra comma and space from the arguments list
                 if len(args_name_list) > 0:
@@ -609,6 +610,7 @@ def profile_new(trans_id):
 
         function_name_with_arguments = \
             pfl_inst.profiler_data['function_name'] + function_arguments
+        pfl_inst.config['name'] = function_name_with_arguments
 
     else:
         function_name = "Indirect"
