@@ -485,17 +485,6 @@ def initialize_target(trans_id, sid, did,
             gettext("Could not fetch profiler plugin information.")
         )
 
-    # Need to check if plugin is not loaded or not with "plprofiler" string
-    if "plprofiler" in rid_pre:
-        msg = gettext(
-            "The profiler plugin is enabled globally. "
-            "Please remove the plugin from the shared_preload_libraries "
-            "setting in the postgresql.conf file and restart the "
-            "database server for direct profiling."
-        )
-        current_app.logger.debug(msg)
-        return internal_server_error(msg)
-
     # Set the template path required to read the sql files
     template_path = 'profiler/sql'
 

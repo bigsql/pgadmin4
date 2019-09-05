@@ -157,18 +157,7 @@ class DirectProfilingTestCase(BaseTestGenerator):
             ),
             data=json.dumps(args) if args is not [] else None
         )
-
-        if response.status_code == 500 and response.json['errormsg'] == \
-            gettext(
-                "The profiler plugin is enabled globally. "
-                "Please remove the plugin from the shared_preload_libraries "
-                "setting in the postgresql.conf file and restart the "
-                "database server for direct profiling."
-            ):
-            self.skipTest(
-                'pl_profiler plugin installed on server in testing config'
-            )
-
+        
         self.assertEqual(response.status_code, 200)
 
         ### profile_new tests ###
