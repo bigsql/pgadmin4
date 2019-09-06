@@ -179,7 +179,8 @@ define([
            * @param {number} trans_id the unique transaction Id that was generated
            */
           main: function(title, profile_info, trans_id) {
-            this.preferences = window.top.pgAdmin.Browser.get_preferences_for_module('profiler');
+            const browser = window.opener ? window.opener.pgAdmin.Browser : window.top.pgAdmin.Browser;
+            this.preferences = browser.get_preferences_for_module('profiler');
             this.set('title', title);
 
             // setting value in alertify settings allows us to access it from

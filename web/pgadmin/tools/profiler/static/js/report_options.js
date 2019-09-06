@@ -13,13 +13,13 @@ define([
   'pgadmin.alertifyjs', 'sources/pgadmin', 'pgadmin.browser',
   'pgadmin.backgrid',
 ], function(
-  gettext, url_for, $, _, Backbone, Alertify, pgAdmin, pgBrowser, Backgrid
+  gettext, url_for, $, _, Backbone, Alertify, pgAdmin, pgBrowser, Backgrid,
 ) {
 
   const ProfilerReportOptionsModel = Backbone.Model.extend({
-    defaults: {
-      option: undefined,
-      value: undefined,
+    defaults : {
+      option : undefined,
+      value  : undefined,
     },
     validate: function() {
       if (_.isUndefined(this.get('value')) ||
@@ -45,10 +45,10 @@ define([
       Alertify.dialog('profilerReportOptionsDialog', function factory() {
         return {
           main: function(title, trans_id) {
-            this.preferences = pgBrowser.get_preferences_for_module('profiler');
+            this.preferences = window.top.pgAdmin.Browser.get_preferences_for_module('profiler');
             this.set('title', title);
 
-            if (this.initialized){
+            if(this.initialized) {
               return;
             }
 
@@ -71,10 +71,11 @@ define([
                   }),
               },
               {
-                name  : 'value',
-                label : gettext('Value'),
-                type  : 'text',
-                cell  : 'string',
+                name     : 'value',
+                label    : gettext('Value'),
+                type     : 'text',
+                editable : true,
+                cell     : 'string',
               },
             ];
 
@@ -82,6 +83,7 @@ define([
 
             $.ajax({
               url    : url_for('profiler.get_config', { 'trans_id': trans_id }),
+              cache  : false,
               method : 'GET',
               async  : false,
             })
@@ -123,7 +125,6 @@ define([
           },
           settings: {
             trans_id: undefined,
-            function_name_with_arguments: undefined,
           },
           setup: function() {
             return {
@@ -150,6 +151,7 @@ define([
               },
             };
           },
+
           // Callback functions when click on the buttons of the Alertify dialogs
           callback: function(e) {
             if (e.button.text === gettext('Submit')) {
@@ -169,6 +171,7 @@ define([
               $.ajax({
                 url    : url_for('profiler.set_config', { 'trans_id' : self.setting('trans_id') }),
                 method : 'POST',
+                cache  : false,
                 data   : {
                   'data': JSON.stringify(options_value_list),
                 },
@@ -192,6 +195,7 @@ define([
             }
 
             if (e.button.text === gettext('Cancel')) {
+              this.initialized = false;
               return false;
             }
           },

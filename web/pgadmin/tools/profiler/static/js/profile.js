@@ -611,8 +611,7 @@ define([
 
                 // We use a shadow DOM to encapsulate the report's css and javascript
                 // Note that the shadow DOM cannot use the JS of the page because we load the
-                // report data by setting innerHTML. Thus, we extract the scripts by hand and
-                // add them manually
+                // report data by setting innerHTML.
                 let container = document.createElement('div');
                 container.attachShadow({mode: 'open'});
                 container.shadowRoot.innerHTML = res;
@@ -1150,6 +1149,7 @@ define([
      */
     reflectPreferences: function() {
       const self = this,
+        // determine if the browser is in a new tab or not
         browser = window.opener ? window.opener.pgAdmin.Browser : window.top.pgAdmin.Browser;
       self.preferences = browser.get_preferences_for_module('profiler');
       self.toolbarView.preferences = self.preferences;

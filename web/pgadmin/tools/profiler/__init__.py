@@ -588,7 +588,6 @@ def profile_new(trans_id):
         function_name = pfl_inst.profiler_data['function_name']
 
         function_arguments = '('
-        print(pfl_inst.function_data['args_value'])
         if pfl_inst.function_data is not None:
             if 'args_name' in pfl_inst.function_data and \
                 pfl_inst.function_data['args_name'] is not None and \

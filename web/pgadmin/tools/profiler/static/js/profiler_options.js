@@ -47,6 +47,7 @@ define([
     if (!Alertify.profilerInputOptionsDialog) {
       Alertify.dialog('profilerInputOptionsDialog', function factory() {
         return {
+          
           /**
            * Sets up the Alertify dialog box by creating the grid and input areas
            *
